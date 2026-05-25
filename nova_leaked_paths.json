@@ -1,0 +1,19 @@
+{
+  "leaked_paths": [
+    "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/route.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/angular.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/layer.js",
+    "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/dialects/sqlite/query.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/dialects/abstract/query-generator.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/morgan/index.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/orderHistory.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/dialects/abstract/query-interface.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/model.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/sequelize.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/captcha.js"
+  ],
+  "count": 14
+}

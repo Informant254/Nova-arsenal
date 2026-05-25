@@ -1,0 +1,106 @@
+{
+  "timestamp": "2026-05-24T13:24:12.851655",
+  "target": "http://localhost:3000",
+  "mission_duration_seconds": 31.15,
+  "agents_executed": [
+    "Recon",
+    "Exploit",
+    "Auth",
+    "Code",
+    "Race",
+    "Validate"
+  ],
+  "total_findings": 9,
+  "critical": 5,
+  "high": 3,
+  "medium": 1,
+  "tokens_captured": 1,
+  "paths_leaked": 6,
+  "findings": [
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/user/login",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "admin",
+        "token"
+      ],
+      "severity": "critical",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/user/register",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "admin",
+        "token"
+      ],
+      "severity": "critical",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/order-history",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "admin",
+        "token"
+      ],
+      "severity": "critical",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/products/search",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "admin",
+        "token"
+      ],
+      "severity": "critical",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/api/Feedbacks",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "admin",
+        "token"
+      ],
+      "severity": "critical",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "session_fixation",
+      "endpoint": "/rest/user/whoami",
+      "severity": "medium",
+      "agent": "AuthAgent"
+    },
+    {
+      "type": "jwt",
+      "endpoint": "/rest/user/whoami",
+      "theory": "JWT verification flaw at insecurity.ts:191",
+      "source_file": "insecurity.ts",
+      "source_line": 191,
+      "severity": "high",
+      "agent": "CodeAgent"
+    },
+    {
+      "type": "auth",
+      "endpoint": "/rest/admin/application-configuration",
+      "theory": "Authorization bypass possible at verify.ts:30",
+      "source_file": "verify.ts",
+      "source_line": 30,
+      "severity": "high",
+      "agent": "CodeAgent"
+    },
+    {
+      "type": "rate_limit_bypass",
+      "endpoint": "/rest/products/search",
+      "severity": "high",
+      "agent": "RaceAgent"
+    }
+  ]
+}

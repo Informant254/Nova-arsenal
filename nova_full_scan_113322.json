@@ -1,0 +1,45 @@
+{
+  "findings": [
+    {
+      "repo": "python/cpython",
+      "file": "Lib/_aix_support.py",
+      "type": "command_injection",
+      "url": "https://github.com/python/cpython/blob/fbeafc062e55a52ba7369c36be0b3eb34eabb560/Lib/_aix_support.py",
+      "code": "\"\"\"Shared AIX support functions.\"\"\"\n\nimport sys\nimport sysconfig\n\n\n# Taken from _osx_support _read_output function\ndef _read_cmd_output(commandstring, capture_stderr=False):\n    \"\"\"Output from successful command execution or None\"\"\"\n    # Similar to os.popen(commandstring, \"r\").read(),\n    # but wit",
+      "timestamp": "2026-05-25T11:28:18.989194"
+    },
+    {
+      "repo": "python/cpython",
+      "file": "Lib/_osx_support.py",
+      "type": "command_injection",
+      "url": "https://github.com/python/cpython/blob/fbeafc062e55a52ba7369c36be0b3eb34eabb560/Lib/_osx_support.py",
+      "code": "\"\"\"Shared OS X support functions.\"\"\"\n\nimport os\nimport re\nimport sys\n\n__all__ = [\n    'compiler_fixup',\n    'customize_config_vars',\n    'customize_compiler',\n    'get_platform_osx',\n]\n\n# configuration variables that may contain universal build flags,\n# like \"-arch\" or \"-isdkroot\", that may need cus",
+      "timestamp": "2026-05-25T11:28:20.362299"
+    },
+    {
+      "repo": "python/cpython",
+      "file": "Lib/_pyrepl/pager.py",
+      "type": "command_injection",
+      "url": "https://github.com/python/cpython/blob/fbeafc062e55a52ba7369c36be0b3eb34eabb560/Lib/_pyrepl/pager.py",
+      "code": "from __future__ import annotations\n\nimport io\nimport os\nimport re\nimport sys\n\n\n# types\nif False:\n    from typing import Protocol\n    class Pager(Protocol):\n        def __call__(self, text: str, title: str = \"\") -> None:\n            ...\n\n\ndef get_pager() -> Pager:\n    \"\"\"Decide what method to use for",
+      "timestamp": "2026-05-25T11:28:21.051250"
+    },
+    {
+      "repo": "python/cpython",
+      "file": "Lib/asyncio/windows_events.py",
+      "type": "path_traversal",
+      "url": "https://github.com/python/cpython/blob/fbeafc062e55a52ba7369c36be0b3eb34eabb560/Lib/asyncio/windows_events.py",
+      "code": "\"\"\"Selector and proactor event loops for Windows.\"\"\"\n\nimport sys\n\nif sys.platform != 'win32':  # pragma: no cover\n    raise ImportError('win32 only')\n\nimport _overlapped\nimport _winapi\nimport errno\nfrom functools import partial\nimport math\nimport msvcrt\nimport socket\nimport struct\nimport time\nimport",
+      "timestamp": "2026-05-25T11:28:30.662430"
+    },
+    {
+      "repo": "python/cpython",
+      "file": "Lib/test/test_socket.py",
+      "type": "path_traversal",
+      "url": "https://github.com/python/cpython/blob/fbeafc062e55a52ba7369c36be0b3eb34eabb560/Lib/test/test_socket.py",
+      "code": "import unittest\nfrom unittest import mock\nfrom test import support\nfrom test.support import (\n    cpython_only, is_apple, os_helper, refleak_helper, socket_helper, threading_helper\n)\nfrom test.support.import_helper import ensure_lazy_imports\nimport _thread as thread\nimport array\nimport contextlib\nim",
+      "timestamp": "2026-05-25T11:28:32.134971"
+    }
+  ],
+  "total": 5
+}

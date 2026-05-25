@@ -1,0 +1,452 @@
+{
+  "audit_date": "2026-05-24T22:07:15.698276",
+  "auditor": "Nova AI Security Agent v3.0",
+  "repositories_audited": 11,
+  "total_files_scanned": 754,
+  "total_findings": 48,
+  "critical": 11,
+  "high": 37,
+  "vulnerability_classes": [
+    "sql_injection",
+    "command_injection",
+    "xss",
+    "path_traversal",
+    "ssrf",
+    "insecure_deserialization",
+    "prompt_injection",
+    "auth_bypass",
+    "idor",
+    "race_condition"
+  ],
+  "findings_by_repo": {
+    "NodeGoat": {
+      "total": 1,
+      "critical": 0,
+      "high": 1
+    },
+    "WebGoat": {
+      "total": 20,
+      "critical": 1,
+      "high": 19
+    },
+    "railsgoat": {
+      "total": 17,
+      "critical": 6,
+      "high": 11
+    },
+    "SecurityShepherd": {
+      "total": 9,
+      "critical": 3,
+      "high": 6
+    },
+    "Vulnerable-Web-Application": {
+      "total": 1,
+      "critical": 1,
+      "high": 0
+    },
+    "openssl": {
+      "total": 0,
+      "critical": 0,
+      "high": 0
+    },
+    "cpython": {
+      "total": 0,
+      "critical": 0,
+      "high": 0
+    },
+    "nginx": {
+      "total": 0,
+      "critical": 0,
+      "high": 0
+    },
+    "open-interpreter": {
+      "total": 0,
+      "critical": 0,
+      "high": 0
+    },
+    "aider": {
+      "total": 0,
+      "critical": 0,
+      "high": 0
+    },
+    "continue": {
+      "total": 0,
+      "critical": 0,
+      "high": 0
+    }
+  },
+  "top_findings": [
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/CommandInjection.java",
+      "line": 142,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "results = exec(s, \"cmd.exe /c dir /b \\\"\" + safeDir.getPath() + \"\\\"\");",
+      "context": "\t\t\t\t\t// Add quotes around the filename to avoid having special characters in DOS\n\t\t\t\t\t// filenames\n\t\t\t\t\tresults = exec(s, \"cmd.exe /c dir /b \\\"\" + safeDir.getPath() + \"\\\"\");\n\t\t\t\t\tfileData = exec(s, \"cmd.exe /c type \\\"\" + new File(safeDir, helpFile).getPath() + \"\\\"\");\n\n\t\t\t\t}",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/railsgoat/app/assets/javascripts/bootstrap-editable.min.js",
+      "line": 5,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "(function(e){var t=function(t,n){this.options=e.extend({},e.fn.editableform.defaults,n),this.$div=e(t),this.options.scope||(this.options.scope=this)};",
+      "context": "* http://github.com/vitalets/x-editable\n* Copyright (c) 2013 Vitaliy Potapov; Licensed MIT */\n(function(e){var t=function(t,n){this.options=e.extend({},e.fn.editableform.defaults,n),this.$div=e(t),this.options.scope||(this.options.scope=this)};t.prototype={constructor:t,initInput:function(){this.inp",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/railsgoat/app/assets/javascripts/fullcalendar.min.js",
+      "line": 6,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "!function(t){\"function\"==typeof define&&define.amd?define([\"jquery\",\"moment\"],t):\"object\"==typeof exports?module.exports=t(require(\"jquery\"),require(\"",
+      "context": " * (c) 2017 Adam Shaw\n */\n!function(t){\"function\"==typeof define&&define.amd?define([\"jquery\",\"moment\"],t):\"object\"==typeof exports?module.exports=t(require(\"jquery\"),require(\"moment\")):t(jQuery,moment)}(function(t,e){function n(t){return j(t,qt)}function i(t,e){e.left&&t.css({\"border-left-width\":1,",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/railsgoat/app/assets/javascripts/jquery.min.js",
+      "line": 2,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "(function(e,t){function _(e){var t=M[e]={};return v.each(e.split(y),function(e,n){t[n]=!0}),t}function H(e,n,r){if(r===t&&e.nodeType===1){var i=\"data-",
+      "context": "/*! jQuery v1.8.3 jquery.com | jquery.org/license */\n(function(e,t){function _(e){var t=M[e]={};return v.each(e.split(y),function(e,n){t[n]=!0}),t}function H(e,n,r){if(r===t&&e.nodeType===1){var i=\"data-\"+n.replace(P,\"-$1\").toLowerCase();r=e.getAttribute(i);if(typeof r==\"string\"){try{r=r===\"true\"?!0",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/railsgoat/app/assets/javascripts/jquery.snippet.js",
+      "line": 737,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "if(!this.sh_languages){this.sh_languages={}}var sh_requests={};function sh_isEmailAddress(a){if(/^mailto:/.test(a)){return false}return a.indexOf(\"@\")",
+      "context": "/* License: http://shjs.sourceforge.net/doc/gplv3.html */\n\nif(!this.sh_languages){this.sh_languages={}}var sh_requests={};function sh_isEmailAddress(a){if(/^mailto:/.test(a)){return false}return a.indexOf(\"@\")!==-1}function sh_setHref(b,c,d){var a=d.substring(b[c-2].pos,b[c-1].pos);if(a.length>=2&&a",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/railsgoat/app/assets/javascripts/moment.js",
+      "line": 6,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "(function(a){function E(a,b,c,d){var e=c.lang();return e[a].call?e[a](c,d):e[a][b]}function F(a,b){return function(c){return K(a.call(this,c),b)}}func",
+      "context": "// license : MIT\n// momentjs.com\n(function(a){function E(a,b,c,d){var e=c.lang();return e[a].call?e[a](c,d):e[a][b]}function F(a,b){return function(c){return K(a.call(this,c),b)}}function G(a){return function(b){var c=a.call(this,b);return c+this.lang().ordinal(c)}}function H(a,b,c){this._d=a,this._",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/railsgoat/app/assets/javascripts/moment.min.js",
+      "line": 1,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "!function(e,t){\"object\"==typeof exports&&\"undefined\"!=typeof module?module.exports=t():\"function\"==typeof define&&define.amd?define(t):e.moment=t()}(t",
+      "context": "!function(e,t){\"object\"==typeof exports&&\"undefined\"!=typeof module?module.exports=t():\"function\"==typeof define&&define.amd?define(t):e.moment=t()}(this,function(){\"use strict\";function e(){return Yt.apply(null,arguments)}function t(e){return e instanceof Array||\"[object Array]\"===Object.prototype.",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/SecurityShepherd/src/main/webapp/js/jquery-ui.min.js",
+      "line": 6,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "(function(e){\"function\"==typeof define&&define.amd?define([\"jquery\"],e):e(jQuery)})(function(e){function t(t,s){var n,a,o,r=t.nodeName.toLowerCase();r",
+      "context": "* Copyright 2015 jQuery Foundation and other contributors; Licensed MIT */\n\n(function(e){\"function\"==typeof define&&define.amd?define([\"jquery\"],e):e(jQuery)})(function(e){function t(t,s){var n,a,o,r=t.nodeName.toLowerCase();return\"area\"===r?(n=t.parentNode,a=n.name,t.href&&a&&\"map\"===n.nodeName.toL",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/SecurityShepherd/src/main/webapp/js/jquery.js",
+      "line": 2,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "(function(a,b){function cy(a){return f.isWindow(a)?a:a.nodeType===9?a.defaultView||a.parentWindow:!1}function cv(a){if(!ck[a]){var b=c.body,d=f(\"<\"+a+",
+      "context": "/*! jQuery v1.7.1 jquery.com | jquery.org/license */\n(function(a,b){function cy(a){return f.isWindow(a)?a:a.nodeType===9?a.defaultView||a.parentWindow:!1}function cv(a){if(!ck[a]){var b=c.body,d=f(\"<\"+a+\">\").appendTo(b),e=d.css(\"display\");d.remove();if(e===\"none\"||e===\"\"){cl||(cl=c.createElement(\"if",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/SecurityShepherd/src/main/webapp/js/jqueryUI.js",
+      "line": 5,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "(function(a,b){function c(b,c){var e=b.nodeName.toLowerCase();if(\"area\"===e){var f=b.parentNode,g=f.name,h;return!b.href||!g||f.nodeName.toLowerCase()",
+      "context": "* Includes: jquery.ui.core.js, jquery.ui.widget.js, jquery.ui.mouse.js, jquery.ui.draggable.js, jquery.ui.droppable.js, jquery.ui.resizable.js, jquery.ui.selectable.js, jquery.ui.sortable.js, jquery.effects.core.js, jquery.effects.blind.js, jquery.effects.bounce.js, jquery.effects.clip.js, jquery.ef",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/Vulnerable-Web-Application/CommandExecution/CommandExec-4.php",
+      "line": 25,
+      "vulnerability_type": "command_injection",
+      "cwe": "CWE-78",
+      "cvss": "9.8",
+      "poc": "; id",
+      "code": "exec(\"attrib +h .hidden\");",
+      "context": "      exec(\"echo \\\"flag:secret\\\" > .hidden/log4.txt\");\n      if(strtoupper(substr(PHP_OS, 0, 3)) === 'WIN'){\n        exec(\"attrib +h .hidden\");\n      }\n    }\n    if(isset($_GET[\"typeBox\"])){",
+      "confidence": "HIGH",
+      "severity": "CRITICAL"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/NodeGoat/config/env/development.js",
+      "line": 11,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "`<script>document.write(\"<script src='http://\" + (location.host || \"localhost\").split(\":\")[0] + \":35729/livereload.js'></\" + \"script>\");</script>`",
+      "context": "   environmentalScripts: [\n      // jshint -W101\n      `<script>document.write(\"<script src='http://\" + (location.host || \"localhost\").split(\":\")[0] + \":35729/livereload.js'></\" + \"script>\");</script>`\n      // jshint +W101\n   ]\n};",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/AbstractLesson.java",
+      "line": 696,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "script.append(\"\t      win = window.open(url, '\" + windowName + \"' , params);\\n\");",
+      "context": "\t\tscript.append(\"\t      }\\n\");\n\t\tscript.append(\"\\n\");\n\t\tscript.append(\"\t      win = window.open(url, '\" + windowName + \"' , params);\\n\");\n\t\tscript.append(\"\\n\");\n\t\tscript.append(\" \t\t  // bring the window to the front\\n\");\n\t\tscript.append(\"\t\t  win.focus();\\n\");",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/DOMInjection.java",
+      "line": 116,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "+ \"        messageDiv.innerHTML = 'Correct licence Key.' \" + lineSep + \"      }\" + lineSep",
+      "context": "\t\t\t\t+ \"    var messageDiv = document.getElementById('MessageDiv');\" + lineSep + \"  try {\" + lineSep\n\t\t\t\t+ \"\t\t\t eval(message);\" + lineSep + \"    \" + lineSep\n\t\t\t\t+ \"        messageDiv.innerHTML = 'Correct licence Key.' \" + lineSep + \"      }\" + lineSep\n\t\t\t\t+ \"  catch(err)\" + lineSep + \"  { \" + lineSep",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/DOMInjection.java",
+      "line": 110,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "+ lineSep + \"   }\" + lineSep + \"   req.open('GET', url, true);\" + lineSep",
+      "context": "\t\t\t\t+ \"if (typeof XMLHttpRequest != 'undefined') {\" + lineSep + \"req = new XMLHttpRequest();\" + lineSep\n\t\t\t\t+ \"} else if (window.ActiveXObject) {\" + lineSep + \"req = new ActiveXObject('Microsoft.XMLHTTP');\"\n\t\t\t\t+ lineSep + \"   }\" + lineSep + \"   req.open('GET', url, true);\" + lineSep\n\t\t\t\t+ \"   req.o",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/DangerousEval.java",
+      "line": 232,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "// xmlHttp.send();str1=xmlHttp.responseText;document.write(str1);}</script>",
+      "context": "    // <script type=\"text/javascript\">if ( navigator.appName.indexOf(\"Microsoft\") !=-1) \n    // {var xmlHttp = new ActiveXObject(\"Microsoft.XMLHTTP\");xmlHttp.open(\"TRACE\", \"./\", false); \n\t// xmlHttp.send();str1=xmlHttp.responseText;document.write(str1);}</script>\n\t/**\n\t * Gets the instructions attri",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/JSONInjection.java",
+      "line": 163,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "+ \"\t\t\t\tflightsDiv.innerHTML = '';\"",
+      "context": "\t\t\t\t+ \"\t\t\t var flightsDiv = document.getElementById('flightsDiv');\"\n\t\t\t\t+ lineSep\n\t\t\t\t+ \"\t\t\t\tflightsDiv.innerHTML = '';\"\n\t\t\t\t+ lineSep\n\t\t\t\t+ \"\t\t\t\tvar strHTML='';\"\n\t\t\t\t+ lineSep",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/ReflectedXSS.java",
+      "line": 237,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "// xmlHttp.send();str1=xmlHttp.responseText;document.write(str1);}</script>",
+      "context": "\t// = new\n\t// ActiveXObject(\"Microsoft.XMLHTTP\");xmlHttp.open(\"TRACE\", \"./\", false);\n\t// xmlHttp.send();str1=xmlHttp.responseText;document.write(str1);}</script>\n\t\n\n\tprivate final static Integer DEFAULT_RANKING = new Integer(120);",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/SilentTransactions.java",
+      "line": 176,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "+ \"document.getElementById('balanceID').innerHTML = balanceValue + '$';\"",
+      "context": "\t\t\t\t+ \"balanceValue = balanceValue.toFixed(2);\"\n\t\t\t\t+ lineSep\n\t\t\t\t+ \"document.getElementById('balanceID').innerHTML = balanceValue + '$';\"\n\t\t\t\t+ lineSep\n\t\t\t\t+ \"}\"\n\t\t\t\t+ lineSep",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/SilentTransactions.java",
+      "line": 188,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "+ \"   req.open('GET', url, true);\" + lineSep + \"   req.onreadystatechange = callback;\" + lineSep",
+      "context": "\t\t\t\t+ lineSep + \"} else if (window.ActiveXObject) {\" + lineSep\n\t\t\t\t+ \"req = new ActiveXObject('Microsoft.XMLHTTP');\" + lineSep + \"   }\" + lineSep\n\t\t\t\t+ \"   req.open('GET', url, true);\" + lineSep + \"   req.onreadystatechange = callback;\" + lineSep\n\t\t\t\t+ \"   req.send(null);\" + lineSep + \"}\" + lineSep ",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/TraceXSS.java",
+      "line": 225,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "+ \" xmlHttp.send();str1=xmlHttp.responseText;  \" + \"document.write(str1);&lt;/script&gt;\");",
+      "context": "\t\t\t\t+ \"&lt;script type=\\\"text/javascript\\\"&gt;if ( navigator.appName.indexOf(\\\"Microsoft\\\") !=-1)\"\n\t\t\t\t+ \" {var xmlHttp = new ActiveXObject(\\\"Microsoft.XMLHTTP\\\");xmlHttp.open(\\\"GET\\\", \\\"./\\\", false);\"\n\t\t\t\t+ \" xmlHttp.send();str1=xmlHttp.responseText;  \" + \"document.write(str1);&lt;/script&gt;\");\n\t\t",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/XMLInjection.java",
+      "line": 161,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "+ \"\t\t\t\trewardsDiv.innerHTML = '';\"",
+      "context": "\t\t\t\t+ \"\t\t\t var rewardsDiv = document.getElementById('rewardsDiv');\"\n\t\t\t\t+ lineSep\n\t\t\t\t+ \"\t\t\t\trewardsDiv.innerHTML = '';\"\n\t\t\t\t+ lineSep\n\t\t\t\t+ \"\t\t\t\tvar strHTML='';\"\n\t\t\t\t+ lineSep",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/java/org/owasp/webgoat/lessons/XMLInjection.java",
+      "line": 148,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "+ lineSep + \"   }\" + lineSep + \"   req.open('GET', url, true);\" + lineSep",
+      "context": "\t\t\t\t+ \"if (typeof XMLHttpRequest != 'undefined') {\" + lineSep + \"req = new XMLHttpRequest();\" + lineSep\n\t\t\t\t+ \"} else if (window.ActiveXObject) {\" + lineSep + \"req = new ActiveXObject('Microsoft.XMLHTTP');\"\n\t\t\t\t+ lineSep + \"   }\" + lineSep + \"   req.open('GET', url, true);\" + lineSep\n\t\t\t\t+ \"   req.o",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/DOMXSS.js",
+      "line": 3,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "document.getElementById(\"greeting\").innerHTML=\"Hello, \" + name+ \"!\";",
+      "context": "function displayGreeting(name) {\n\tif (name != ''){\n\t\tdocument.getElementById(\"greeting\").innerHTML=\"Hello, \" + name+ \"!\";\n\t}\n}",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/DOMXSS_backup.js",
+      "line": 3,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "document.getElementById(\"greeting\").innerHTML=\"Hello, \" + name+ \"!\";",
+      "context": "function displayGreeting(name) {\n\tif (name != ''){\n\t\tdocument.getElementById(\"greeting\").innerHTML=\"Hello, \" + name+ \"!\";\n\t}\n}",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/clientSideFiltering.js",
+      "line": 9,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "document.getElementById(\"employeeRecord\").innerHTML = document.getElementById(newEmployeeID).innerHTML;",
+      "context": "\t    if (navigator.userAgent.indexOf(\"MSIE \") == -1)\n    {\n\t\t\tdocument.getElementById(\"employeeRecord\").innerHTML = document.getElementById(newEmployeeID).innerHTML;\n    }\n    else\n    {",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/clientSideFiltering.js",
+      "line": 103,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "xmlHttp.open(\"GET\",\"lessons/Ajax/clientSideFiltering.jsp?userId=\" + userId,true);",
+      "context": "        }\n      }\n    xmlHttp.open(\"GET\",\"lessons/Ajax/clientSideFiltering.jsp?userId=\" + userId,true);\n    xmlHttp.send(null);\n  }",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/clientSideValidation.js",
+      "line": 81,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "xmlHttp.open(\"GET\",\"lessons/Ajax/clientSideValidation.jsp?coupon=\" + coupon,true);",
+      "context": "        }\n      }\n    xmlHttp.open(\"GET\",\"lessons/Ajax/clientSideValidation.jsp?coupon=\" + coupon,true);\n    xmlHttp.send(null);\n  }\n  ",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/makeWindow.js",
+      "line": 6,
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cvss": "7.5",
+      "poc": "../../../etc/passwd",
+      "code": "eval(\"page\" + id + \" = window.open(url, '\" + id + \"', 'toolbar=0,location=0,scrollbars=1,statusbar=0,menubar=0,resizable=1,width=600,height=500');\");",
+      "context": "\tday = new Date();\n\tid = day.getTime();\n\teval(\"page\" + id + \" = window.open(url, '\" + id + \"', 'toolbar=0,location=0,scrollbars=1,statusbar=0,menubar=0,resizable=1,width=600,height=500');\");\n}",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/sameOrigin.js",
+      "line": 6,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "document.getElementById(\"responseTitle\").innerHTML=\"Response: \";",
+      "context": "function submitXHR(){\n\n\tdocument.getElementById(\"responseTitle\").innerHTML=\"Response: \";\n   \t\n   \tdocument.getElementById(\"responseArea\").innerHTML=\"\"; \n",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    },
+    {
+      "file": "/data/data/com.termux/files/usr/tmp/nova_ecosystem_x7au3phc/WebGoat/webgoat/src/main/webapp/javascript/instructor/DOMXSS_i.js",
+      "line": 3,
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cvss": "7.5",
+      "poc": "<script>alert('XSS')</script>",
+      "code": "document.getElementById(\"greeting\").innerHTML=\"Hello, \" + escapeHTML(name) + \"!\";",
+      "context": "function displayGreeting(name) {\n\tif (name != ''){\n\t\tdocument.getElementById(\"greeting\").innerHTML=\"Hello, \" + escapeHTML(name) + \"!\";\n\t}\n}\n",
+      "confidence": "HIGH",
+      "severity": "HIGH"
+    }
+  ]
+}

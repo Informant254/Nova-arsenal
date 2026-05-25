@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-05-24T12:04:54.520582",
+  "target": "http://localhost:3000",
+  "endpoints_profiled": 12,
+  "critical_targets": 6,
+  "findings": [
+    {
+      "type": "path_disclosure",
+      "endpoint": "/rest/user/login",
+      "file_paths": [
+        "/data/data/com.termux/files/home/juice-shop/build/routes/angular.js",
+        "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js"
+      ],
+      "evidence": "<html>\n  <head>\n    <meta charset='utf-8'> \n    <title>Error: Unexpected path: /rest/user/login?q=%27%27</title>\n    <style>* {\n  margin: 0;\n  padding: 0;\n  outline: 0;\n}\n\nbody {\n  padding: 80px 100px;\n  font: 13px \"Helvetica Neue\", \"Lucida Grande\", \"Arial\";\n  background: #ECE9E9 -webkit-gradient(linear, 0% 0%, 0% 100%, from(#fff), to(#ECE9E9));\n  background: #ECE9E9 -moz-linear-gradient(top, #fff, #ECE9E9);\n  background-repeat: no-repeat;\n  color: #555;\n  -webkit-font-smoothing: antialiased;\n}\n"
+    },
+    {
+      "type": "path_disclosure",
+      "endpoint": "/rest/user/register",
+      "file_paths": [
+        "/data/data/com.termux/files/home/juice-shop/build/routes/angular.js",
+        "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js"
+      ],
+      "evidence": "<html>\n  <head>\n    <meta charset='utf-8'> \n    <title>Error: Unexpected path: /rest/user/register?q=%27%27</title>\n    <style>* {\n  margin: 0;\n  padding: 0;\n  outline: 0;\n}\n\nbody {\n  padding: 80px 100px;\n  font: 13px \"Helvetica Neue\", \"Lucida Grande\", \"Arial\";\n  background: #ECE9E9 -webkit-gradient(linear, 0% 0%, 0% 100%, from(#fff), to(#ECE9E9));\n  background: #ECE9E9 -moz-linear-gradient(top, #fff, #ECE9E9);\n  background-repeat: no-repeat;\n  color: #555;\n  -webkit-font-smoothing: antialiased;"
+    },
+    {
+      "type": "path_disclosure",
+      "endpoint": "/rest/order-history",
+      "file_paths": [
+        "/data/data/com.termux/files/home/juice-shop/build/routes/orderHistory.js",
+        "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js"
+      ],
+      "evidence": "<html>\n  <head>\n    <meta charset='utf-8'> \n    <title>Error: Blocked illegal activity by ::ffff:127.0.0.1</title>\n    <style>* {\n  margin: 0;\n  padding: 0;\n  outline: 0;\n}\n\nbody {\n  padding: 80px 100px;\n  font: 13px \"Helvetica Neue\", \"Lucida Grande\", \"Arial\";\n  background: #ECE9E9 -webkit-gradient(linear, 0% 0%, 0% 100%, from(#fff), to(#ECE9E9));\n  background: #ECE9E9 -moz-linear-gradient(top, #fff, #ECE9E9);\n  background-repeat: no-repeat;\n  color: #555;\n  -webkit-font-smoothing: antialiased;\n"
+    }
+  ],
+  "evidence_chain": [
+    {
+      "type": "path_disclosure",
+      "endpoint": "/rest/user/login",
+      "file_paths": [
+        "/data/data/com.termux/files/home/juice-shop/build/routes/angular.js",
+        "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js"
+      ],
+      "evidence": "<html>\n  <head>\n    <meta charset='utf-8'> \n    <title>Error: Unexpected path: /rest/user/login?q=%27%27</title>\n    <style>* {\n  margin: 0;\n  padding: 0;\n  outline: 0;\n}\n\nbody {\n  padding: 80px 100px;\n  font: 13px \"Helvetica Neue\", \"Lucida Grande\", \"Arial\";\n  background: #ECE9E9 -webkit-gradient(linear, 0% 0%, 0% 100%, from(#fff), to(#ECE9E9));\n  background: #ECE9E9 -moz-linear-gradient(top, #fff, #ECE9E9);\n  background-repeat: no-repeat;\n  color: #555;\n  -webkit-font-smoothing: antialiased;\n}\n"
+    },
+    {
+      "type": "path_disclosure",
+      "endpoint": "/rest/user/register",
+      "file_paths": [
+        "/data/data/com.termux/files/home/juice-shop/build/routes/angular.js",
+        "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js"
+      ],
+      "evidence": "<html>\n  <head>\n    <meta charset='utf-8'> \n    <title>Error: Unexpected path: /rest/user/register?q=%27%27</title>\n    <style>* {\n  margin: 0;\n  padding: 0;\n  outline: 0;\n}\n\nbody {\n  padding: 80px 100px;\n  font: 13px \"Helvetica Neue\", \"Lucida Grande\", \"Arial\";\n  background: #ECE9E9 -webkit-gradient(linear, 0% 0%, 0% 100%, from(#fff), to(#ECE9E9));\n  background: #ECE9E9 -moz-linear-gradient(top, #fff, #ECE9E9);\n  background-repeat: no-repeat;\n  color: #555;\n  -webkit-font-smoothing: antialiased;"
+    },
+    {
+      "type": "path_disclosure",
+      "endpoint": "/rest/order-history",
+      "file_paths": [
+        "/data/data/com.termux/files/home/juice-shop/build/routes/orderHistory.js",
+        "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+        "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+        "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js"
+      ],
+      "evidence": "<html>\n  <head>\n    <meta charset='utf-8'> \n    <title>Error: Blocked illegal activity by ::ffff:127.0.0.1</title>\n    <style>* {\n  margin: 0;\n  padding: 0;\n  outline: 0;\n}\n\nbody {\n  padding: 80px 100px;\n  font: 13px \"Helvetica Neue\", \"Lucida Grande\", \"Arial\";\n  background: #ECE9E9 -webkit-gradient(linear, 0% 0%, 0% 100%, from(#fff), to(#ECE9E9));\n  background: #ECE9E9 -moz-linear-gradient(top, #fff, #ECE9E9);\n  background-repeat: no-repeat;\n  color: #555;\n  -webkit-font-smoothing: antialiased;\n"
+    }
+  ],
+  "attack_summary": {
+    "path_disclosure": 3
+  }
+}

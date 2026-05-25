@@ -1,0 +1,39 @@
+{
+  "solved_challenges": [
+    "Access Log",
+    "Admin Registration",
+    "Confidential Document",
+    "Empty User Registration",
+    "Error Handling",
+    "Five-Star Feedback",
+    "Forged Feedback",
+    "Login Admin",
+    "Login Bender",
+    "Login Jim",
+    "Nested Easter Egg",
+    "NoSQL Manipulation",
+    "Outdated Allowlist",
+    "Password Strength",
+    "Repetitive Registration",
+    "Reset Bender's Password",
+    "Reset Jim's Password",
+    "Security Policy",
+    "View Basket",
+    "Exposed Metrics"
+  ],
+  "successful_techniques": {},
+  "failed_techniques": [],
+  "mission_history": [
+    {
+      "timestamp": "2026-05-24T15:40:03.045383",
+      "score": 20,
+      "new": 3
+    },
+    {
+      "timestamp": "2026-05-24T15:44:44.540799",
+      "score": 20,
+      "new_challenges": 0
+    }
+  ],
+  "total_score": 20
+}

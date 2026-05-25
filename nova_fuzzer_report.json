@@ -1,0 +1,198 @@
+{
+  "timestamp": "2026-05-24T12:26:52.516192",
+  "total_payloads": 15,
+  "anomalies_found": 8,
+  "critical": 8,
+  "high": 0,
+  "medium": 0,
+  "top_findings": [
+    {
+      "endpoint": "/rest/products/search",
+      "method": "GET",
+      "payload": "'><script>alert(1)</script>",
+      "timestamp": "2026-05-24T12:26:51.579190",
+      "response": "<nova_fuzzer_fix.Response object at 0x728233cc30>",
+      "status_code": 500,
+      "response_length": 980,
+      "response_time": 0.035735368728637695,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/rest/user/login",
+      "method": "POST",
+      "payload": "' UNION SELECT NULL,NULL--",
+      "timestamp": "2026-05-24T12:26:51.947890",
+      "response": "<nova_fuzzer_fix.Response object at 0x72824afdf0>",
+      "status_code": 500,
+      "response_length": 1577,
+      "response_time": 0.03800392150878906,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "method": "POST",
+      "payload": "\"><script>alert(1)</script>",
+      "timestamp": "2026-05-24T12:26:52.106834",
+      "response": "<nova_fuzzer_fix.Response object at 0x72822d6f50>",
+      "status_code": 500,
+      "response_length": 2598,
+      "response_time": 0.014047861099243164,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "stack_trace",
+          "pattern": "Error:.*\\n.*at "
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "method": "POST",
+      "payload": "<img src=x onerror=alert(1)>",
+      "timestamp": "2026-05-24T12:26:52.175809",
+      "response": "<nova_fuzzer_fix.Response object at 0x72822f9c70>",
+      "status_code": 500,
+      "response_length": 2598,
+      "response_time": 0.015423774719238281,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "stack_trace",
+          "pattern": "Error:.*\\n.*at "
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "method": "POST",
+      "payload": "><img src=x onerror=alert(1)>",
+      "timestamp": "2026-05-24T12:26:52.247831",
+      "response": "<nova_fuzzer_fix.Response object at 0x72822f9400>",
+      "status_code": 500,
+      "response_length": 2598,
+      "response_time": 0.018635272979736328,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "stack_trace",
+          "pattern": "Error:.*\\n.*at "
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "method": "POST",
+      "payload": "'; DROP TABLE users--",
+      "timestamp": "2026-05-24T12:26:52.319369",
+      "response": "<nova_fuzzer_fix.Response object at 0x7282370750>",
+      "status_code": 500,
+      "response_length": 2598,
+      "response_time": 0.01592278480529785,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "stack_trace",
+          "pattern": "Error:.*\\n.*at "
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "method": "POST",
+      "payload": "1' AND '1'='1",
+      "timestamp": "2026-05-24T12:26:52.389901",
+      "response": "<nova_fuzzer_fix.Response object at 0x7282370830>",
+      "status_code": 500,
+      "response_length": 2598,
+      "response_time": 0.015363693237304688,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "stack_trace",
+          "pattern": "Error:.*\\n.*at "
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "method": "POST",
+      "payload": "' OR '1'='1",
+      "timestamp": "2026-05-24T12:26:52.463140",
+      "response": "<nova_fuzzer_fix.Response object at 0x728232a750>",
+      "status_code": 500,
+      "response_length": 2598,
+      "response_time": 0.01754283905029297,
+      "anomalies": [
+        {
+          "category": "sql_error",
+          "pattern": "sqlite"
+        },
+        {
+          "category": "stack_trace",
+          "pattern": "Error:.*\\n.*at "
+        },
+        {
+          "category": "path_disclosure",
+          "pattern": "/home/"
+        }
+      ],
+      "severity": "critical"
+    }
+  ]
+}

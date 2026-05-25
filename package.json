@@ -186,6 +186,7 @@
     "@types/jsonwebtoken": "^8.5.9",
     "@types/jws": "^3.2.10",
     "@types/lodash": "^4.17.14",
+    "@types/minimatch": "^6.0.0",
     "@types/mocha": "^8.2.3",
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.12",
@@ -231,7 +232,8 @@
     "linux",
     "darwin",
     "freebsd",
-    "openbsd"
+    "openbsd",
+    "android"
   ],
   "cpu": [
     "x64",

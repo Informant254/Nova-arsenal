@@ -1,0 +1,50 @@
+{
+  "program": "Internet Bug Bounty / Python.org",
+  "authorization": "IBB Safe Harbor Policy",
+  "timestamp": "2026-05-24T17:12:28.914359",
+  "target": "python.org",
+  "findings": {
+    "critical": [],
+    "high": [],
+    "medium": [
+      {
+        "title": "Open redirect surface",
+        "type": "domain_takeover",
+        "severity": "medium",
+        "evidence": "Redirects to: https://www.python.org/?to=https%3A%2F%2Fevil.com",
+        "endpoint": "/?to="
+      },
+      {
+        "title": "Open redirect surface",
+        "type": "domain_takeover",
+        "severity": "medium",
+        "evidence": "Redirects to: https://www.python.org/?url=https%3A%2F%2Fevil.com",
+        "endpoint": "/?url="
+      },
+      {
+        "title": "Open redirect surface",
+        "type": "domain_takeover",
+        "severity": "medium",
+        "evidence": "Redirects to: https://www.python.org/?redirect=https%3A%2F%2Fevil.com",
+        "endpoint": "/?redirect="
+      },
+      {
+        "title": "Open redirect surface",
+        "type": "domain_takeover",
+        "severity": "medium",
+        "evidence": "Redirects to: https://www.python.org/?next=https%3A%2F%2Fevil.com",
+        "endpoint": "/?next="
+      }
+    ],
+    "low": [
+      {
+        "title": "Missing: CSP, XCTO",
+        "type": "missing_headers",
+        "severity": "low",
+        "evidence": "['CSP', 'XCTO']",
+        "endpoint": ""
+      }
+    ]
+  },
+  "total": 5
+}

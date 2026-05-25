@@ -1,0 +1,41 @@
+
+╔══════════════════════════════════════════════╗
+║        NOVA MISSION REPORT                   ║
+╚══════════════════════════════════════════════╝
+
+EXECUTIVE SUMMARY
+─────────────────
+Nova conducted an autonomous security assessment targeting http://localhost:3000.
+Mission duration: 31.15 seconds.
+Total findings: 9 (5 critical, 3 high)
+
+CRITICAL FINDINGS
+─────────────────
+• sql_injection on /rest/user/login
+  Data exposed: ['admin', 'token']
+• sql_injection on /rest/user/register
+  Data exposed: ['admin', 'token']
+• sql_injection on /rest/order-history
+  Data exposed: ['admin', 'token']
+• sql_injection on /rest/products/search
+  Data exposed: ['admin', 'token']
+• sql_injection on /api/Feedbacks
+  Data exposed: ['admin', 'token']
+
+ATTACK CHAIN
+───────────
+1. Reconnaissance mapped 10 endpoints
+2. Exploitation confirmed vulnerabilities on multiple endpoints
+3. Credential extraction yielded 1 tokens
+4. Privilege escalation achieved via token reuse
+5. Source code analysis traced vulnerabilities to specific files
+
+RECOMMENDATIONS
+───────────────
+• Implement parameterized queries for all SQL operations
+• Add rate limiting to all search endpoints
+• Remove stack traces from production error responses
+• Validate JWT algorithms server-side (reject 'none')
+• Sanitize all user input before rendering
+
+Nova signing off. 🦅

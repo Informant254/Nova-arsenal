@@ -1,0 +1,633 @@
+{
+  "solved": [
+    "Error Handling",
+    "Login Admin",
+    "Login Jim",
+    "Password Strength",
+    "Repetitive Registration",
+    "Reset Bender's Password",
+    "Reset Jim's Password",
+    "Security Policy",
+    "View Basket"
+  ],
+  "unsolved": [
+    {
+      "name": "Password Hash Leak",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 2,
+      "description": "Obtain the password (hash) of the currently logged-in user directly from a REST API endpoint."
+    },
+    {
+      "name": "API-only XSS",
+      "category": "XSS",
+      "difficulty": 3,
+      "description": "Perform a <i>persisted</i> XSS attack with <code>&lt;iframe src=\"javascript:alert(`xss`)\"&gt;</code> without using the frontend application at all."
+    },
+    {
+      "name": "Access Log",
+      "category": "Observability Failures",
+      "difficulty": 4,
+      "description": "Gain access to any access log file of the server."
+    },
+    {
+      "name": "Admin Registration",
+      "category": "Improper Input Validation",
+      "difficulty": 3,
+      "description": "Register as a user with administrator privileges."
+    },
+    {
+      "name": "Admin Section",
+      "category": "Broken Access Control",
+      "difficulty": 2,
+      "description": "Access the administration section of the store."
+    },
+    {
+      "name": "Arbitrary File Write",
+      "category": "Vulnerable Components",
+      "difficulty": 6,
+      "description": "Overwrite the <a href=\"/ftp/legal.md\">Legal Information</a> file."
+    },
+    {
+      "name": "Bjoern's Favorite Pet",
+      "category": "Broken Authentication",
+      "difficulty": 3,
+      "description": "Reset the password of Bjoern's OWASP account via the <a href=\"/#/forgot-password\">Forgot Password</a> mechanism with <i>the original answer</i> to his security question."
+    },
+    {
+      "name": "Blockchain Hype",
+      "category": "Security through Obscurity",
+      "difficulty": 5,
+      "description": "Learn about the Token Sale before its official announcement."
+    },
+    {
+      "name": "NFT Takeover",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 2,
+      "description": "Take over the wallet containing our official Soul Bound Token (NFT)."
+    },
+    {
+      "name": "Mint the Honey Pot",
+      "category": "Improper Input Validation",
+      "difficulty": 3,
+      "description": "Mint the Honey Pot NFT by gathering BEEs from the bee haven."
+    },
+    {
+      "name": "Wallet Depletion",
+      "category": "Miscellaneous",
+      "difficulty": 6,
+      "description": "Withdraw more ETH from the new wallet than you deposited."
+    },
+    {
+      "name": "Web3 Sandbox",
+      "category": "Broken Access Control",
+      "difficulty": 1,
+      "description": "Find an accidentally deployed code sandbox for writing smart contracts on the fly."
+    },
+    {
+      "name": "Blocked RCE DoS",
+      "category": "Insecure Deserialization",
+      "difficulty": 5,
+      "description": "Perform a Remote Code Execution that would keep a less hardened application busy <em>forever</em>."
+    },
+    {
+      "name": "CAPTCHA Bypass",
+      "category": "Broken Anti Automation",
+      "difficulty": 3,
+      "description": "Submit 10 or more customer feedbacks within 20 seconds."
+    },
+    {
+      "name": "Change Bender's Password",
+      "category": "Broken Authentication",
+      "difficulty": 5,
+      "description": "Change Bender's password into <i>slurmCl4ssic</i> without using SQL Injection or Forgot Password."
+    },
+    {
+      "name": "Christmas Special",
+      "category": "Injection",
+      "difficulty": 4,
+      "description": "Order the Christmas special offer of 2014."
+    },
+    {
+      "name": "CSP Bypass",
+      "category": "XSS",
+      "difficulty": 4,
+      "description": "Bypass the Content Security Policy and perform an XSS attack with <code>&lt;script&gt;alert(`xss`)&lt;/script&gt;</code> on a legacy page within the application."
+    },
+    {
+      "name": "Client-side XSS Protection",
+      "category": "XSS",
+      "difficulty": 3,
+      "description": "Perform a <i>persisted</i> XSS attack with <code>&lt;iframe src=\"javascript:alert(`xss`)\"&gt;</code> bypassing a <i>client-side</i> security mechanism."
+    },
+    {
+      "name": "Confidential Document",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 1,
+      "description": "Access a confidential document."
+    },
+    {
+      "name": "DOM XSS",
+      "category": "XSS",
+      "difficulty": 1,
+      "description": "Perform a <i>DOM</i> XSS attack with <code>&lt;iframe src=\"javascript:alert(`xss`)\"&gt;</code>."
+    },
+    {
+      "name": "Database Schema",
+      "category": "Injection",
+      "difficulty": 3,
+      "description": "Exfiltrate the entire DB schema definition via SQL Injection."
+    },
+    {
+      "name": "Deprecated Interface",
+      "category": "Security Misconfiguration",
+      "difficulty": 2,
+      "description": "Use a deprecated B2B interface that was not properly shut down."
+    },
+    {
+      "name": "Easter Egg",
+      "category": "Broken Access Control",
+      "difficulty": 4,
+      "description": "Find the hidden <a href=\"https://en.wikipedia.org/wiki/Easter_egg_(media)\" target=\"_blank\">easter egg</a>."
+    },
+    {
+      "name": "Email Leak",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 5,
+      "description": "Perform an unwanted information disclosure by accessing data cross-domain."
+    },
+    {
+      "name": "Empty User Registration",
+      "category": "Improper Input Validation",
+      "difficulty": 2,
+      "description": "Register a user with an empty email and password."
+    },
+    {
+      "name": "Ephemeral Accountant",
+      "category": "Injection",
+      "difficulty": 4,
+      "description": "Log in with the (non-existing) accountant <i>acc0unt4nt@juice-sh.op</i> without ever registering that user."
+    },
+    {
+      "name": "Expired Coupon",
+      "category": "Improper Input Validation",
+      "difficulty": 4,
+      "description": "Successfully redeem an expired campaign coupon code."
+    },
+    {
+      "name": "Extra Language",
+      "category": "Broken Anti Automation",
+      "difficulty": 5,
+      "description": "Retrieve the language file that never made it into production."
+    },
+    {
+      "name": "Five-Star Feedback",
+      "category": "Broken Access Control",
+      "difficulty": 2,
+      "description": "Get rid of all 5-star customer feedback."
+    },
+    {
+      "name": "Forged Coupon",
+      "category": "Cryptographic Issues",
+      "difficulty": 6,
+      "description": "Forge a coupon code that gives you a discount of at least 80%."
+    },
+    {
+      "name": "Forged Feedback",
+      "category": "Broken Access Control",
+      "difficulty": 3,
+      "description": "Post some feedback in another user's name."
+    },
+    {
+      "name": "Forged Review",
+      "category": "Broken Access Control",
+      "difficulty": 3,
+      "description": "Post a product review as another user or edit any user's existing review."
+    },
+    {
+      "name": "Forged Signed JWT",
+      "category": "Vulnerable Components",
+      "difficulty": 6,
+      "description": "Forge an almost properly RSA-signed JWT token that impersonates the (non-existing) user <i>rsa_lord@juice-sh.op</i>."
+    },
+    {
+      "name": "Forgotten Developer Backup",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 4,
+      "description": "Access a developer's forgotten backup file."
+    },
+    {
+      "name": "Forgotten Sales Backup",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 4,
+      "description": "Access a salesman's forgotten backup file."
+    },
+    {
+      "name": "Frontend Typosquatting",
+      "category": "Vulnerable Components",
+      "difficulty": 5,
+      "description": "<a href=\"/#/contact\">Inform the shop</a> about a <i>typosquatting</i> imposter that dug itself deep into the frontend. (Mention the exact name of the culprit)"
+    },
+    {
+      "name": "GDPR Data Erasure",
+      "category": "Broken Authentication",
+      "difficulty": 3,
+      "description": "Log in with Chris' erased user account."
+    },
+    {
+      "name": "GDPR Data Theft",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 4,
+      "description": "Steal someone else's personal data without using Injection."
+    },
+    {
+      "name": "HTTP-Header XSS",
+      "category": "XSS",
+      "difficulty": 4,
+      "description": "Perform a <i>persisted</i> XSS attack with <code>&lt;iframe src=\"javascript:alert(`xss`)\"&gt;</code> through an HTTP header."
+    },
+    {
+      "name": "Imaginary Challenge",
+      "category": "Cryptographic Issues",
+      "difficulty": 6,
+      "description": "Solve challenge #999. Unfortunately, this challenge does not exist."
+    },
+    {
+      "name": "Leaked Access Logs",
+      "category": "Observability Failures",
+      "difficulty": 5,
+      "description": "Dumpster dive the Internet for a leaked password and log in to the original user account it belongs to. (Creating a new account with the same password does not qualify as a solution.)"
+    },
+    {
+      "name": "Leaked Unsafe Product",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 4,
+      "description": "Identify an unsafe product that was removed from the shop and <a href=\"/#/contact\">inform the shop</a> which ingredients are dangerous."
+    },
+    {
+      "name": "Legacy Typosquatting",
+      "category": "Vulnerable Components",
+      "difficulty": 4,
+      "description": "<a href=\"/#/contact\">Inform the shop</a> about a <i>typosquatting</i> trick it has been a victim of at least in <code>v6.2.0-SNAPSHOT</code>. (Mention the exact name of the culprit)"
+    },
+    {
+      "name": "Login Amy",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 3,
+      "description": "Log in with Amy's original user credentials. (This could take 93.83 billion trillion trillion centuries to brute force, but luckily she did not read the \"One Important Final Note\")"
+    },
+    {
+      "name": "Login Bender",
+      "category": "Injection",
+      "difficulty": 3,
+      "description": "Log in with Bender's user account."
+    },
+    {
+      "name": "Login Bjoern",
+      "category": "Broken Authentication",
+      "difficulty": 4,
+      "description": "Log in with Bjoern's Gmail account <i>without</i> previously changing his password, applying SQL Injection, or hacking his Google account."
+    },
+    {
+      "name": "Login MC SafeSearch",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 2,
+      "description": "Log in with MC SafeSearch's original user credentials without applying SQL Injection or any other bypass."
+    },
+    {
+      "name": "Login Support Team",
+      "category": "Security Misconfiguration",
+      "difficulty": 6,
+      "description": "Log in with the support team's original user credentials without applying SQL Injection or any other bypass."
+    },
+    {
+      "name": "Manipulate Basket",
+      "category": "Broken Access Control",
+      "difficulty": 3,
+      "description": "Put an additional product into another user's shopping basket."
+    },
+    {
+      "name": "Misplaced Signature File",
+      "category": "Observability Failures",
+      "difficulty": 4,
+      "description": "Access a misplaced <a href=\"https://github.com/Neo23x0/sigma\">SIEM signature</a> file."
+    },
+    {
+      "name": "Multiple Likes",
+      "category": "Broken Anti Automation",
+      "difficulty": 6,
+      "description": "Like any review at least three times as the same user."
+    },
+    {
+      "name": "Nested Easter Egg",
+      "category": "Cryptographic Issues",
+      "difficulty": 4,
+      "description": "Apply some advanced cryptanalysis to find <i>the real</i> easter egg."
+    },
+    {
+      "name": "NoSQL DoS",
+      "category": "Injection",
+      "difficulty": 4,
+      "description": "Let the server sleep for some time. (It has done more than enough hard work for you)"
+    },
+    {
+      "name": "NoSQL Exfiltration",
+      "category": "Injection",
+      "difficulty": 5,
+      "description": "All your orders are belong to us! Even the ones which don't."
+    },
+    {
+      "name": "NoSQL Manipulation",
+      "category": "Injection",
+      "difficulty": 4,
+      "description": "Update multiple product reviews at the same time."
+    },
+    {
+      "name": "Outdated Allowlist",
+      "category": "Unvalidated Redirects",
+      "difficulty": 1,
+      "description": "Let us redirect you to one of our crypto currency addresses which are not promoted any longer."
+    },
+    {
+      "name": "Payback Time",
+      "category": "Improper Input Validation",
+      "difficulty": 3,
+      "description": "Place an order that makes you rich."
+    },
+    {
+      "name": "Premium Paywall",
+      "category": "Cryptographic Issues",
+      "difficulty": 6,
+      "description": "\ud83d\udc8e\ud83d\udc8e\ud83d\udc8e\ud83d\udc8e\ud83d\udc8e<!--IvLuRfBJYlmStf9XfL6ckJFngyd9LfV1JaaN/KRTPQPidTuJ7FR+D/nkWJUF+0xUF07CeCeqYfxq+OJVVa0gNbqgYkUNvn//UbE7e95C+6e+7GtdpqJ8mqm4WcPvUGIUxmGLTTAC2+G9UuFCD1DUjg==--> <a href=\"https://blockchain.info/address/1AbKfgvw9psQ41NbLi8kufDQTezwG8DRZm\" target=\"_blank\">\u20bf Unlock Premium Challenge</a> to access exclusive content."
+    },
+    {
+      "name": "Privacy Policy",
+      "category": "Miscellaneous",
+      "difficulty": 1,
+      "description": "Read our privacy policy."
+    },
+    {
+      "name": "Privacy Policy Inspection",
+      "category": "Security through Obscurity",
+      "difficulty": 3,
+      "description": "Prove that you actually read our privacy policy."
+    },
+    {
+      "name": "Product Tampering",
+      "category": "Broken Access Control",
+      "difficulty": 3,
+      "description": "Change the <code>href</code> of the link within the <a href=\"/#/search?q=OWASP SSL Advanced Forensic Tool (O-Saft)\">OWASP SSL Advanced Forensic Tool (O-Saft)</a> product description into <i>https://owasp.slack.com</i>."
+    },
+    {
+      "name": "Reflected XSS",
+      "category": "XSS",
+      "difficulty": 2,
+      "description": "Perform a <i>reflected</i> XSS attack with <code>&lt;iframe src=\"javascript:alert(`xss`)\"&gt;</code>."
+    },
+    {
+      "name": "Reset Bjoern's Password",
+      "category": "Broken Authentication",
+      "difficulty": 5,
+      "description": "Reset the password of Bjoern's internal account via the <a href=\"/#/forgot-password\">Forgot Password</a> mechanism with <i>the original answer</i> to his security question."
+    },
+    {
+      "name": "Reset Morty's Password",
+      "category": "Broken Anti Automation",
+      "difficulty": 5,
+      "description": "Reset Morty's password via the <a href=\"/#/forgot-password\">Forgot Password</a> mechanism with <i>his obfuscated answer</i> to his security question."
+    },
+    {
+      "name": "Retrieve Blueprint",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 5,
+      "description": "Deprive the shop of earnings by downloading the blueprint for one of its products."
+    },
+    {
+      "name": "SSRF",
+      "category": "Broken Access Control",
+      "difficulty": 6,
+      "description": "Request a hidden resource on server through server."
+    },
+    {
+      "name": "SSTi",
+      "category": "Injection",
+      "difficulty": 6,
+      "description": "Infect the server with juicy malware by abusing arbitrary command execution."
+    },
+    {
+      "name": "Score Board",
+      "category": "Miscellaneous",
+      "difficulty": 1,
+      "description": "Find the carefully hidden 'Score Board' page."
+    },
+    {
+      "name": "Server-side XSS Protection",
+      "category": "XSS",
+      "difficulty": 4,
+      "description": "Perform a <i>persisted</i> XSS attack with <code>&lt;iframe src=\"javascript:alert(`xss`)\"&gt;</code> bypassing a <i>server-side</i> security mechanism."
+    },
+    {
+      "name": "Steganography",
+      "category": "Security through Obscurity",
+      "difficulty": 4,
+      "description": "<a href=\"/#/contact\">Rat out</a> a notorious character hiding in plain sight in the shop. (Mention the exact name of the character)"
+    },
+    {
+      "name": "Successful RCE DoS",
+      "category": "Insecure Deserialization",
+      "difficulty": 6,
+      "description": "Perform a Remote Code Execution that occupies the server for a while without using infinite loops."
+    },
+    {
+      "name": "Supply Chain Attack",
+      "category": "Vulnerable Components",
+      "difficulty": 5,
+      "description": "<a href=\"/#/contact\">Inform the development team</a> about a danger to some of <em>their</em> credentials. (Send them the URL of the <em>original report</em> or an assigned CVE or another identifier of this vulnerability)"
+    },
+    {
+      "name": "Two Factor Authentication",
+      "category": "Broken Authentication",
+      "difficulty": 5,
+      "description": "Solve the 2FA challenge for user \"wurstbrot\". (Disabling, bypassing or overwriting his 2FA settings does not count as a solution)"
+    },
+    {
+      "name": "Unsigned JWT",
+      "category": "Vulnerable Components",
+      "difficulty": 5,
+      "description": "Forge an essentially unsigned JWT token that impersonates the (non-existing) user <i>jwtn3d@juice-sh.op</i>."
+    },
+    {
+      "name": "Upload Size",
+      "category": "Improper Input Validation",
+      "difficulty": 3,
+      "description": "Upload a file larger than 100 kB."
+    },
+    {
+      "name": "Upload Type",
+      "category": "Improper Input Validation",
+      "difficulty": 3,
+      "description": "Upload a file that has no .pdf or .zip extension."
+    },
+    {
+      "name": "User Credentials",
+      "category": "Injection",
+      "difficulty": 4,
+      "description": "Retrieve a list of all user credentials via SQL Injection."
+    },
+    {
+      "name": "Video XSS",
+      "category": "XSS",
+      "difficulty": 6,
+      "description": "Embed an XSS payload <code>&lt;/script&gt;&lt;script&gt;alert(`xss`)&lt;/script&gt;</code> into our promo video."
+    },
+    {
+      "name": "Vulnerable Library",
+      "category": "Vulnerable Components",
+      "difficulty": 4,
+      "description": "<a href=\"/#/contact\">Inform the shop</a> about a vulnerable library it is using. (Mention the exact library name and version in your comment)"
+    },
+    {
+      "name": "Weird Crypto",
+      "category": "Cryptographic Issues",
+      "difficulty": 2,
+      "description": "<a href=\"/#/contact\">Inform the shop</a> about an algorithm or library it should definitely not use the way it does."
+    },
+    {
+      "name": "Allowlist Bypass",
+      "category": "Unvalidated Redirects",
+      "difficulty": 4,
+      "description": "Enforce a redirect to a page you are not supposed to redirect to."
+    },
+    {
+      "name": "XXE Data Access",
+      "category": "XXE",
+      "difficulty": 3,
+      "description": "Retrieve the content of <code>C:\\Windows\\system.ini</code> or <code>/etc/passwd</code> from the server."
+    },
+    {
+      "name": "XXE DoS",
+      "category": "XXE",
+      "difficulty": 5,
+      "description": "Give the server something to chew on for quite a while."
+    },
+    {
+      "name": "Memory Bomb",
+      "category": "Insecure Deserialization",
+      "difficulty": 5,
+      "description": "Drop some explosive data into a vulnerable file-handling endpoint."
+    },
+    {
+      "name": "Zero Stars",
+      "category": "Improper Input Validation",
+      "difficulty": 1,
+      "description": "Give a devastating zero-star feedback to the store."
+    },
+    {
+      "name": "Missing Encoding",
+      "category": "Improper Input Validation",
+      "difficulty": 1,
+      "description": "Retrieve the photo of Bjoern's cat in \"melee combat-mode\"."
+    },
+    {
+      "name": "Cross-Site Imaging",
+      "category": "Security Misconfiguration",
+      "difficulty": 5,
+      "description": "Stick <a href=\"https://cataas.com/cat\" target=\"_blank\">cute cross-domain kittens</a> all over our delivery boxes."
+    },
+    {
+      "name": "Exposed Metrics",
+      "category": "Observability Failures",
+      "difficulty": 1,
+      "description": "Find the endpoint that serves usage data to be scraped by a <a href=\"https://github.com/prometheus/prometheus\">popular monitoring system</a>."
+    },
+    {
+      "name": "Deluxe Fraud",
+      "category": "Improper Input Validation",
+      "difficulty": 3,
+      "description": "Obtain a Deluxe Membership without paying for it."
+    },
+    {
+      "name": "CSRF",
+      "category": "Broken Access Control",
+      "difficulty": 3,
+      "description": "Change the name of a user by performing Cross-Site Request Forgery from <a href=\"http://htmledit.squarefree.com\">another origin</a>."
+    },
+    {
+      "name": "Bonus Payload",
+      "category": "XSS",
+      "difficulty": 1,
+      "description": "Use the bonus payload <code>&lt;iframe width=&quot;100%&quot; height=&quot;166&quot; scrolling=&quot;no&quot; frameborder=&quot;no&quot; allow=&quot;autoplay&quot; src=&quot;https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/771984076&amp;color=%23ff5500&amp;auto_play=true&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;show_teaser=true&quot;&gt;&lt;/iframe&gt;</code> in the <i>DOM XSS</i> challenge."
+    },
+    {
+      "name": "Reset Uvogin's Password",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 4,
+      "description": "Reset Uvogin's password via the <a href=\"/#/forgot-password\">Forgot Password</a> mechanism with <i>the original answer</i> to his security question."
+    },
+    {
+      "name": "Meta Geo Stalking",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 2,
+      "description": "Determine the answer to John's security question by looking at an upload of him to the Photo Wall and use it to reset his password via the <a href=\"/#/forgot-password\">Forgot Password</a> mechanism."
+    },
+    {
+      "name": "Visual Geo Stalking",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 2,
+      "description": "Determine the answer to Emma's security question by looking at an upload of her to the Photo Wall and use it to reset her password via the <a href=\"/#/forgot-password\">Forgot Password</a> mechanism."
+    },
+    {
+      "name": "Poison Null Byte",
+      "category": "Improper Input Validation",
+      "difficulty": 4,
+      "description": "Bypass a security control with a <a href=\"https://hakipedia.com/index.php/Poison_Null_Byte\">Poison Null Byte</a> to access a file not meant for your eyes."
+    },
+    {
+      "name": "Local File Read",
+      "category": "Vulnerable Components",
+      "difficulty": 5,
+      "description": "Gain read access to an arbitrary local file on the web server."
+    },
+    {
+      "name": "Mass Dispel",
+      "category": "Miscellaneous",
+      "difficulty": 1,
+      "description": "Close multiple \"Challenge solved\"-notifications in one go."
+    },
+    {
+      "name": "Security Advisory",
+      "category": "Miscellaneous",
+      "difficulty": 3,
+      "description": "The Juice Shop is susceptible to a known vulnerability in a library, for which an advisory has already been issued, marking the Juice Shop as <i>known affected</i>. A fix is still pending. <a href=\"/#/contact\">Inform the shop</a> about a suitable checksum as proof that you did your due diligence."
+    },
+    {
+      "name": "Exposed credentials",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 2,
+      "description": "A developer was careless with hardcoding unused, but still valid credentials for a testing account on the client-side."
+    },
+    {
+      "name": "Leaked API Key",
+      "category": "Sensitive Data Exposure",
+      "difficulty": 5,
+      "description": "<a href=\"/#/contact\">Inform the shop</a> about a leaked API key. (Mention the exact key in your comment)"
+    },
+    {
+      "name": "Chatbot Prompt Injection",
+      "category": "Injection",
+      "difficulty": 2,
+      "description": "Trick the chatbot into generating a coupon code for you despite its coupon policy saying otherwise."
+    },
+    {
+      "name": "Greedy Chatbot Manipulation",
+      "category": "Injection",
+      "difficulty": 3,
+      "description": "Convince the chatbot to give you a coupon of 50% or more. Because apparently a 10% max policy is just a suggestion when you ask nicely enough."
+    },
+    {
+      "name": "AI Debugging",
+      "category": "Broken Access Control",
+      "difficulty": 2,
+      "description": "Reveal some behind-the-scenes information on the chatbot as a non-admin user."
+    }
+  ]
+}

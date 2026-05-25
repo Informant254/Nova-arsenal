@@ -1,0 +1,89 @@
+{
+  "timestamp": "2026-05-24T14:42:35.309772",
+  "token_captured": true,
+  "token_preview": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdGF0dXMiOiJzdWNjZXN...",
+  "paths_extracted": [
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/dialects/sqlite/query.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/sequelize.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/angular.js",
+    "/data/data/com.termux/files/home/juice-shop/build/lib/utils.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/index.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/verify.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/express/lib/router/layer.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/morgan/index.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/dialects/abstract/query-generator.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/dialects/abstract/query-interface.js",
+    "/data/data/com.termux/files/home/juice-shop/node_modules/sequelize/lib/model.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/captcha.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/orderHistory.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/login.js",
+    "/data/data/com.termux/files/home/juice-shop/build/routes/register.js"
+  ],
+  "challenges_solved": [
+    "Error Handling",
+    "Login Admin",
+    "Repetitive Registration",
+    "Security Policy"
+  ],
+  "deep_findings": [
+    {
+      "endpoint": "/rest/admin/application-configuration",
+      "status": 200,
+      "size": 23442,
+      "sensitive_data": [
+        "emails",
+        "hashes"
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/rest/admin/application-version",
+      "status": 200,
+      "size": 20,
+      "sensitive_data": [],
+      "severity": "high"
+    },
+    {
+      "endpoint": "/api/Users",
+      "status": 200,
+      "size": 12092,
+      "sensitive_data": [
+        "emails",
+        "hashes"
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Feedbacks",
+      "status": 200,
+      "size": 1734,
+      "sensitive_data": [
+        "emails"
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Challenges",
+      "status": 200,
+      "size": 63422,
+      "sensitive_data": [
+        "emails"
+      ],
+      "severity": "critical"
+    },
+    {
+      "endpoint": "/api/Complaints",
+      "status": 200,
+      "size": 219,
+      "sensitive_data": [],
+      "severity": "high"
+    },
+    {
+      "endpoint": "/api/Recycles",
+      "status": 200,
+      "size": 76,
+      "sensitive_data": [],
+      "severity": "high"
+    }
+  ]
+}

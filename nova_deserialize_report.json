@@ -1,0 +1,8 @@
+{
+  "timestamp": "2026-05-24T12:27:17.303605",
+  "target": "http://localhost:3000",
+  "gadget_chains_tested": 19,
+  "endpoints_tested": 6,
+  "successful_chains": [],
+  "findings": []
+}

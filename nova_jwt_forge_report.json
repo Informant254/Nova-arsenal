@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-05-24T13:23:58.023041",
+  "attacks": [
+    {
+      "type": "alg_none",
+      "validation": {
+        "token_preview": "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJyb2xlIj",
+        "endpoint": "/rest/user/whoami",
+        "accepted": false,
+        "status_code": 200,
+        "response_preview": "{\"user\":{}}"
+      }
+    }
+  ],
+  "successful_forgeries": [],
+  "analysis": {
+    "error": "Not a valid JWT",
+    "parts_found": 2
+  }
+}

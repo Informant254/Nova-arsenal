@@ -1,0 +1,19 @@
+{
+  "program": "Internet Bug Bounty / OpenSSL",
+  "authorization": "IBB Safe Harbor Policy",
+  "timestamp": "2026-05-24T17:08:29.786122",
+  "target": "openssl.org",
+  "findings_summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "total": 0
+  },
+  "findings": [],
+  "submission_guidelines": {
+    "platform": "HackerOne",
+    "program_url": "https://hackerone.com/internet-bug-bounty",
+    "response_sla": "5 days first response, 10 days triage, 30 days bounty"
+  }
+}

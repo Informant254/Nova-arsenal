@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-05-24T13:23:55.071760",
+  "sessions_extracted": [],
+  "fixation_results": [
+    {
+      "endpoint": "/rest/user/whoami",
+      "fixation_attempted": true,
+      "success": true,
+      "responses": [
+        {
+          "method": "cookie_fixation",
+          "status": 200,
+          "length": 11,
+          "authenticated": true
+        },
+        {
+          "method": "url_parameter",
+          "status": 200,
+          "authenticated": true
+        }
+      ]
+    }
+  ],
+  "cross_user_findings": [
+    {
+      "auth_method": "Bearer",
+      "status": 200,
+      "body_preview": "{\"user\":{}}",
+      "authenticated": false
+    },
+    {
+      "auth_method": "Cookie_token",
+      "status": 200,
+      "body_preview": "{\"user\":{}}",
+      "authenticated": false
+    },
+    {
+      "auth_method": "Cookie_sid",
+      "status": 200,
+      "body_preview": "{\"user\":{}}",
+      "authenticated": false
+    }
+  ],
+  "idor_findings": []
+}

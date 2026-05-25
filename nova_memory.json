@@ -1,0 +1,67 @@
+{
+  "nodes": {
+    "rest_products_search": {
+      "endpoint": "/rest/products/search",
+      "risk_score": 0.7999999999999999,
+      "vulnerability_types": [
+        "sql_injection"
+      ],
+      "exploit_count": 10,
+      "success_count": 3
+    },
+    "rest_user_login": {
+      "endpoint": "/rest/user/login",
+      "risk_score": 0.6,
+      "vulnerability_types": [
+        "auth_bypass"
+      ],
+      "exploit_count": 4,
+      "success_count": 1
+    },
+    "api_Feedbacks": {
+      "endpoint": "/api/Feedbacks",
+      "risk_score": 0.5,
+      "vulnerability_types": [],
+      "exploit_count": 3,
+      "success_count": 0
+    },
+    "rest_user_change-password": {
+      "endpoint": "/rest/user/change-password",
+      "risk_score": 0.5,
+      "vulnerability_types": [],
+      "exploit_count": 4,
+      "success_count": 0
+    },
+    "file-serving": {
+      "endpoint": "/file-serving",
+      "risk_score": 0.5,
+      "vulnerability_types": [],
+      "exploit_count": 5,
+      "success_count": 0
+    },
+    "rest_user_whoami": {
+      "endpoint": "/rest/user/whoami",
+      "risk_score": 0.5,
+      "vulnerability_types": [],
+      "exploit_count": 4,
+      "success_count": 0
+    },
+    "api_Users": {
+      "endpoint": "/api/Users",
+      "risk_score": 0.5,
+      "vulnerability_types": [],
+      "exploit_count": 4,
+      "success_count": 0
+    },
+    "rest_admin_application-configuration": {
+      "endpoint": "/rest/admin/application-configuration",
+      "risk_score": 0.8999999999999999,
+      "vulnerability_types": [
+        "auth_bypass"
+      ],
+      "exploit_count": 4,
+      "success_count": 4
+    }
+  },
+  "edges": []
+}

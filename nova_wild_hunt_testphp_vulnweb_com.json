@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-05-24T15:14:49.197064",
+  "target": "testphp.vulnweb.com",
+  "domain": "testphp.vulnweb.com",
+  "duration_seconds": 219.13,
+  "reconnaissance": {
+    "subdomains": 0,
+    "open_ports": [
+      {
+        "port": 80,
+        "service": "HTTP"
+      },
+      {
+        "port": 443,
+        "service": "HTTPS"
+      },
+      {
+        "port": 8080,
+        "service": "HTTP-Alt"
+      },
+      {
+        "port": 8443,
+        "service": "HTTPS-Alt"
+      },
+      {
+        "port": 3000,
+        "service": "Node.js/Grafana"
+      },
+      {
+        "port": 3001,
+        "service": "Unknown"
+      },
+      {
+        "port": 5000,
+        "service": "Unknown"
+      },
+      {
+        "port": 8000,
+        "service": "Unknown"
+      },
+      {
+        "port": 8081,
+        "service": "Unknown"
+      },
+      {
+        "port": 9000,
+        "service": "Unknown"
+      },
+      {
+        "port": 9090,
+        "service": "Unknown"
+      },
+      {
+        "port": 3306,
+        "service": "MySQL"
+      },
+      {
+        "port": 5432,
+        "service": "PostgreSQL"
+      },
+      {
+        "port": 27017,
+        "service": "MongoDB"
+      },
+      {
+        "port": 6379,
+        "service": "Redis"
+      }
+    ],
+    "tech_stack": {}
+  },
+  "findings_summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "total": 0
+  },
+  "findings": []
+}

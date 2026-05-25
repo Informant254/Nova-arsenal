@@ -1,0 +1,315 @@
+{
+  "timestamp": "2026-05-24T17:01:57.145272",
+  "program": "Internet Bug Bounty",
+  "authorization": "IBB Safe Harbor Policy",
+  "domains_assessed": {
+    "gnu.org": {
+      "domain": "gnu.org",
+      "error": "HTTPSConnectionPool(host='gnu.org', port=443): Max retries exceeded with url: / (Caused by NewConnec"
+    },
+    "python.org": {
+      "domain": "python.org",
+      "status": 200,
+      "final_url": "https://www.python.org/",
+      "size": 52424,
+      "technologies": [
+        "nginx"
+      ],
+      "security_headers": {
+        "HSTS": "max-age=63072000; includeSubDomains; preload",
+        "CSP": false,
+        "XFO": "SAMEORIGIN",
+        "XCTO": "MISSING",
+        "CORS": "Not set"
+      }
+    },
+    "kernel.org": {
+      "domain": "kernel.org",
+      "status": 200,
+      "final_url": "https://kernel.org/",
+      "size": 16923,
+      "technologies": [
+        "nginx"
+      ],
+      "security_headers": {
+        "HSTS": "max-age=15768001",
+        "CSP": true,
+        "XFO": "DENY",
+        "XCTO": "nosniff",
+        "CORS": "Not set"
+      }
+    },
+    "openssl.org": {
+      "domain": "openssl.org",
+      "status": 200,
+      "final_url": "https://openssl.org/",
+      "size": 7057,
+      "technologies": [],
+      "security_headers": {
+        "HSTS": "max-age=31536000; includeSubDomains; preload",
+        "CSP": false,
+        "XFO": "DENY",
+        "XCTO": "nosniff",
+        "CORS": "Not set"
+      }
+    },
+    "openbsd.org": {
+      "domain": "openbsd.org",
+      "status": 200,
+      "final_url": "https://www.openbsd.org/",
+      "size": 3552,
+      "technologies": [],
+      "security_headers": {
+        "HSTS": "MISSING",
+        "CSP": false,
+        "XFO": "MISSING",
+        "XCTO": "MISSING",
+        "CORS": "Not set"
+      }
+    }
+  },
+  "endpoints_tested": [
+    {
+      "domain": "python.org",
+      "path": "/robots.txt",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/sitemap.xml",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/.well-known/security.txt",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/.env",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/.git/config",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/backup/",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/admin/",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/api/",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/docs/",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/debug/",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/phpinfo.php",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "python.org",
+      "path": "/server-status",
+      "status": 301,
+      "size": 0,
+      "sensitive": false
+    },
+    {
+      "domain": "openssl.org",
+      "path": "/robots.txt",
+      "status": 200,
+      "size": 26,
+      "sensitive": false
+    },
+    {
+      "domain": "openssl.org",
+      "path": "/sitemap.xml",
+      "status": 200,
+      "size": 451,
+      "sensitive": false
+    },
+    {
+      "domain": "openssl.org",
+      "path": "/.well-known/security.txt",
+      "status": 200,
+      "size": 322,
+      "sensitive": false
+    },
+    {
+      "domain": "openssl.org",
+      "path": "/docs/",
+      "status": 301,
+      "size": 169,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/robots.txt",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/sitemap.xml",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/.well-known/security.txt",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/.env",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/.git/config",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/backup/",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/admin/",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/api/",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/docs/",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/debug/",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/phpinfo.php",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    },
+    {
+      "domain": "openbsd.org",
+      "path": "/server-status",
+      "status": 301,
+      "size": 510,
+      "sensitive": false
+    }
+  ],
+  "findings": [
+    {
+      "domain": "python.org",
+      "type": "Missing Security Headers",
+      "detail": [
+        "CSP",
+        "XCTO",
+        "CORS"
+      ],
+      "severity": "Low",
+      "evidence": "Headers missing: ['CSP', 'XCTO', 'CORS']"
+    },
+    {
+      "domain": "kernel.org",
+      "type": "Missing Security Headers",
+      "detail": [
+        "CORS"
+      ],
+      "severity": "Low",
+      "evidence": "Headers missing: ['CORS']"
+    },
+    {
+      "domain": "openssl.org",
+      "type": "Missing Security Headers",
+      "detail": [
+        "CSP",
+        "CORS"
+      ],
+      "severity": "Low",
+      "evidence": "Headers missing: ['CSP', 'CORS']"
+    },
+    {
+      "domain": "openbsd.org",
+      "type": "Missing Security Headers",
+      "detail": [
+        "HSTS",
+        "CSP",
+        "XFO",
+        "XCTO",
+        "CORS"
+      ],
+      "severity": "Low",
+      "evidence": "Headers missing: ['HSTS', 'CSP', 'XFO', 'XCTO', 'CORS']"
+    }
+  ],
+  "total_findings": 4
+}

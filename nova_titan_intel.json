@@ -1,0 +1,64 @@
+{
+  "mission": "AI Titan Hunt \u2014 Technique Intelligence",
+  "date": "2026-05-24T17:44:56.391804",
+  "techniques_documented": 7,
+  "total_potential_bounty": 100000,
+  "techniques": [
+    {
+      "technique": "Tool Output Poisoning",
+      "target": "Claude Code / Codex CLI",
+      "impact": "AI executes commands from attacker-controlled tool output",
+      "confidence": "HIGH",
+      "bounty_usd": 15000,
+      "timestamp": "2026-05-24T17:44:56.390148"
+    },
+    {
+      "technique": "Multi-Turn Context Pollution",
+      "target": "All LLM agents (Claude, Gemini, GPT)",
+      "impact": "AI provides exploitation code after gradual desensitization",
+      "confidence": "HIGH",
+      "bounty_usd": 15000,
+      "timestamp": "2026-05-24T17:44:56.390533"
+    },
+    {
+      "technique": "Role Confusion",
+      "target": "Claude Code, Cursor, Open Interpreter",
+      "impact": "AI bypasses safety filters after role reassignment",
+      "confidence": "CRITICAL",
+      "bounty_usd": 15000,
+      "timestamp": "2026-05-24T17:44:56.390759"
+    },
+    {
+      "technique": "Recursive Self-Improvement",
+      "target": "Claude Agent SDK, Codex CLI",
+      "impact": "AI generates code that calls its own API without restrictions",
+      "confidence": "CRITICAL",
+      "bounty_usd": 15000,
+      "timestamp": "2026-05-24T17:44:56.390905"
+    },
+    {
+      "technique": "AI Dependency Confusion",
+      "target": "Aider, Continue, Cline",
+      "impact": "AI installs attacker-suggested malicious package",
+      "confidence": "CRITICAL",
+      "bounty_usd": 15000,
+      "timestamp": "2026-05-24T17:44:56.391003"
+    },
+    {
+      "technique": "Memory Persistence Poisoning",
+      "target": "Cursor, Continue, Windsurf",
+      "impact": "Malicious knowledge persists across AI sessions",
+      "confidence": "HIGH",
+      "bounty_usd": 10000,
+      "timestamp": "2026-05-24T17:44:56.391160"
+    },
+    {
+      "technique": "Unicode Token Smuggling",
+      "target": "All LLM deployments",
+      "impact": "Malicious instructions bypass safety filters via Unicode",
+      "confidence": "CRITICAL",
+      "bounty_usd": 15000,
+      "timestamp": "2026-05-24T17:44:56.391256"
+    }
+  ]
+}

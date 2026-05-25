@@ -1,0 +1,10 @@
+{
+  "program": "Mozilla 0DIN GenAI Bug Bounty",
+  "date": "2026-05-24T17:42:23.449459",
+  "duration": 10.84,
+  "attacks": 54,
+  "critical": 0,
+  "high": 0,
+  "total_bounty": 0,
+  "findings": []
+}

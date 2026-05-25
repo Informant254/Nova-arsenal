@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-05-24T12:27:09.648783",
+  "target": "http://localhost:3000",
+  "total_attempts": 52,
+  "successful_pollutions": 0,
+  "findings": [],
+  "persistence": {
+    "endpoint": "/rest/user/whoami",
+    "persistent": false,
+    "indicators": []
+  }
+}

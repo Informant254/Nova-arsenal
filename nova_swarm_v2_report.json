@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-05-24T13:10:47.046891",
+  "target": "http://localhost:3000",
+  "mission_duration_seconds": 23.95,
+  "agents_executed": [
+    "Recon",
+    "Exploit",
+    "Auth",
+    "Code",
+    "Race",
+    "Validate"
+  ],
+  "total_findings": 6,
+  "critical": 0,
+  "high": 6,
+  "medium": 0,
+  "tokens_captured": 0,
+  "paths_leaked": 0,
+  "findings": [
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/user/login",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "user",
+        "unexpected"
+      ],
+      "severity": "high",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/user/register",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "user",
+        "unexpected"
+      ],
+      "severity": "high",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/order-history",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "user",
+        "unexpected"
+      ],
+      "severity": "high",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/rest/products/search",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "user",
+        "unexpected"
+      ],
+      "severity": "high",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "sql_injection",
+      "endpoint": "/api/Feedbacks",
+      "payload": "' OR 1=1--",
+      "data_exposed": [
+        "user",
+        "unexpected"
+      ],
+      "severity": "high",
+      "agent": "ExploitAgent"
+    },
+    {
+      "type": "rate_limit_bypass",
+      "detail": "{'attack_type': 'rate_limit_bypass', 'endpoint': '/rest/products/search', 'total_requests': 50, 'successful': 50, 'rate_limited': 0, 'errors': 0, 'bypass_ratio': 100.0, 'vulnerable': True}",
+      "severity": "high",
+      "agent": "RaceAgent"
+    }
+  ]
+}
