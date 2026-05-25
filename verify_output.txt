@@ -1,0 +1,18 @@
+🦅 NOVA VERIFY
+
+3 findings to verify
+
+
+🔍 Verifying SSRF: FormFieldValidator.java:263
+   ⚠️ Needs live Jenkins URL
+
+🔍 Verifying SSRF: FormFieldValidator.java:353
+   ⚠️ Needs live Jenkins URL
+
+🔍 Verifying SSRF: FormFieldValidator.java:353
+   ⚠️ Needs live Jenkins URL
+
+==================================================
+Verified: 0 | Needs target: 3 | Failed: 0
+
+📁 Report saved
