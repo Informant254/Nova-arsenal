@@ -63,5 +63,5 @@
    🔥 [COMMAND_INJECTION] webapp/jquery-ui.min.js:6
       CWE-78 | CVSS 9.8 | PoC: ; id
 
-📁 Report: nova_ecosystem_audit_20260525_103509.json
+📁 Report: nova_ecosystem_audit_20260525_105356.json
 🎯 Ready for CVE submission and bug bounty disclosure
