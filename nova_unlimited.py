@@ -27,11 +27,11 @@ class NovaUnlimited:
             "https://github.com/apache/logging-log4j2.git",
             "https://github.com/apache/tomcat.git",
             "https://github.com/jenkinsci/jenkins.git",
-            "https://github.com/drupal/drupal.git",
-            "https://github.com/WordPress/WordPress.git",
-            "https://github.com/magento/magento2.git",
-            "https://github.com/kubernetes/kubernetes.git",
-            "https://github.com/elastic/elasticsearch.git",
+            "https://github.com/OWASP/NodeGoat.git",
+            "https://github.com/OWASP/WebGoat.git",
+            "https://github.com/OWASP/railsgoat.git",
+            "https://github.com/OWASP/SecurityShepherd.git",
+            "https://github.com/juice-shop/juice-shop.git",
         ]
         
         # Active exploitation patterns from CISA KEV catalog
@@ -225,7 +225,9 @@ class NovaUnlimited:
         # Collect all findings
         all_findings = []
         for result in scan_results:
-            all_findings.extend(result.get("findings", []))
+            findings_data = result.get("findings", [])
+            if isinstance(findings_data, list):
+                all_findings.extend(findings_data)
         
         # Phase 2: Match against active threats
         threat_matches = self.match_active_threats(all_findings)
