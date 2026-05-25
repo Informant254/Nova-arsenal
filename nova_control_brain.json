@@ -1,0 +1,14 @@
+{
+  "missions": [
+    {
+      "type": "audit",
+      "target": "https://github.com/python/cpython.git",
+      "timestamp": "2026-05-25T13:04:37.868189",
+      "status": "sent",
+      "codespace": "https://automatic-space-lamp-96955vj4pqxxcp97g.github.dev"
+    }
+  ],
+  "findings": [],
+  "codespace_connected": true,
+  "codespace_url": "https://automatic-space-lamp-96955vj4pqxxcp97g.github.dev"
+}
