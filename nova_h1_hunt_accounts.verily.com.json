@@ -1,0 +1,8 @@
+{
+  "h1_researcher": "Informant254",
+  "target": "https://accounts.verily.com",
+  "timestamp": "2026-05-27T11:56:36.804521",
+  "findings": [],
+  "total": 0,
+  "safe_harbor": "Traffic identifiable via User-Agent header"
+}

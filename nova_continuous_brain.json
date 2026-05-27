@@ -1,0 +1,21 @@
+{
+  "total_bugs_found": 25,
+  "critical_bugs": 0,
+  "repos_scanned": [
+    "https://github.com/OWASP/WebGoat.git",
+    "https://github.com/nginx/nginx.git",
+    "https://github.com/redis/redis.git",
+    "https://github.com/spring-projects/spring-framework.git",
+    "https://github.com/juice-shop/juice-shop.git",
+    "https://github.com/OWASP/NodeGoat.git",
+    "https://github.com/openssl/openssl.git",
+    "https://github.com/laravel/laravel.git",
+    "https://github.com/expressjs/express.git",
+    "https://github.com/postgres/postgres.git"
+  ],
+  "patches_submitted": 0,
+  "techniques_learned": {},
+  "mission_count": 3,
+  "uptime_hours": 0.30797827638888886,
+  "started": "2026-05-25T22:58:59.538101"
+}

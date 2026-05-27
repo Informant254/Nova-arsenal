@@ -1,0 +1,8 @@
+{
+  "h1_researcher": "Informant254",
+  "target": "https://Error parsing crt.sh response",
+  "timestamp": "2026-05-27T08:15:21.103736",
+  "findings": [],
+  "total": 0,
+  "safe_harbor": "Traffic identifiable via User-Agent header"
+}

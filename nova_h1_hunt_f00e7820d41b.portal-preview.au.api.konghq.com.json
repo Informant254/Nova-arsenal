@@ -1,0 +1,8 @@
+{
+  "h1_researcher": "Informant254",
+  "target": "https://f00e7820d41b.portal-preview.au.api.konghq.com",
+  "timestamp": "2026-05-27T09:01:52.659266",
+  "findings": [],
+  "total": 0,
+  "safe_harbor": "Traffic identifiable via User-Agent header"
+}

@@ -1,0 +1,158 @@
+{
+  "speed": 12.89363942676464,
+  "findings": [
+    {
+      "endpoint": "/debug",
+      "payload": "../../../etc/passwd",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/.env",
+      "payload": "",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/debug",
+      "payload": "",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/.env",
+      "payload": "<script>alert(1)</script>",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/.env",
+      "payload": "http://169.254.169.254/latest/meta-data/",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/debug",
+      "payload": "http://169.254.169.254/latest/meta-data/",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/.env",
+      "payload": "../../../etc/passwd",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/rest/admin/application-configuration",
+      "payload": "",
+      "status": 200,
+      "size": 23442,
+      "indicators": [
+        "EMAIL_LEAK",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "{\"config\":{\"server\":{\"port\":3000,\"basePath\":\"\",\"baseUrl\":\"http://localhost:3000\"},\"application\":{\"domain\":\"juice-sh.op\",\"name\":\"OWASP Juice Shop\",\"logo\":\"JuiceShop_Logo.png\",\"favicon\":\"favicon_js.ico\""
+    },
+    {
+      "endpoint": "/debug",
+      "payload": "<script>alert(1)</script>",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/administration",
+      "payload": "<script>alert(1)</script>",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/administration",
+      "payload": "../../../etc/passwd",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/administration",
+      "payload": "",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/administration",
+      "payload": "http://169.254.169.254/latest/meta-data/",
+      "status": 200,
+      "size": 9903,
+      "indicators": [
+        "XSS_REFLECTED",
+        "LARGE_RESPONSE"
+      ],
+      "preview": "<!--\n  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.\n  ~ SPDX-License-Identifier: MIT\n  -->\n\n<!doctype html>\n<html lang=\"en\" data-beasties-container>\n<head>\n  <meta c"
+    },
+    {
+      "endpoint": "/rest/products/search?q=",
+      "payload": "",
+      "status": 200,
+      "size": 16560,
+      "indicators": [
+        "LARGE_RESPONSE"
+      ],
+      "preview": "{\"status\":\"success\",\"data\":[{\"id\":24,\"name\":\"Apple Pomace\",\"description\":\"Finest pressings of apples. Allergy disclaimer: Might contain traces of worms. Can be <a href=\\\"/#recycle\\\">sent back to us</a"
+    }
+  ]
+}

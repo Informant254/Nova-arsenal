@@ -1,0 +1,8 @@
+{
+  "h1_researcher": "Informant254",
+  "target": "https://admin-portal-fe-demo.api.verily.com",
+  "timestamp": "2026-05-27T11:56:40.826097",
+  "findings": [],
+  "total": 0,
+  "safe_harbor": "Traffic identifiable via User-Agent header"
+}

@@ -1,0 +1,40 @@
+Subject: [SECURITY] Unhandled StringIndexOutOfBoundsException in Jenkins Core — CWE-209
+
+Jenkins Security Team,
+
+I am reporting an unhandled exception in Jenkins core that leaks full server stack traces without authentication.
+
+SUMMARY
+- Product: Jenkins CI/CD Server (Latest LTS)
+- File: jenkins/model/Jenkins.java (doJnlpJars method, line 4393)
+- Vulnerability: StringIndexOutOfBoundsException due to missing bounds check
+- CWE: CWE-209 (Information Exposure Through Error Message)
+- Authentication: NOT REQUIRED
+- Severity: MEDIUM
+
+DESCRIPTION
+The /jnlpJars/ endpoint fails to validate string length before calling String.substring(), causing a crash that exposes the full server stack trace including:
+- Jenkins core class paths
+- Spring Security filter chain configuration
+- Jetty server internals
+- Java runtime details
+
+REPRODUCTION
+curl http://JENKINS_HOST:9090/jnlpJars/
+
+IMPACT
+An unauthenticated attacker can trigger this crash repeatedly, causing:
+1. Information disclosure of internal server architecture
+2. Potential denial of service through repeated crashes
+3. Exposure of security filter configuration
+
+REMEDIATION
+Add bounds checking before String.substring() call at Jenkins.java:4393:
+if (input != null && input.length() > 1) {
+    return input.substring(1);
+}
+
+This is a separate finding from the previously reported SSRF (CWE-918).
+
+Regards,
+Charles

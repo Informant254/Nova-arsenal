@@ -1,0 +1,9 @@
+{
+  "findings": [
+    {
+      "type": "no_sanitization",
+      "detail": "No Angular sanitization active at runtime"
+    }
+  ],
+  "verified": true
+}

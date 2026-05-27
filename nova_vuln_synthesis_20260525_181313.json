@@ -1,0 +1,9 @@
+{
+  "technique": "Compositional Vulnerability Synthesis",
+  "inspiration": "Anthropic Claude iOS vulnerability discovery",
+  "description": "Combining low-severity findings into critical attack chains",
+  "timestamp": "2026-05-25T18:13:13.760151",
+  "chains_identified": 0,
+  "exploitable_chains": 0,
+  "attack_chains": []
+}

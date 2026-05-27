@@ -1,0 +1,16 @@
+{
+  "speed": 11.535370895799916,
+  "real_findings": 1,
+  "findings": [
+    {
+      "endpoint": "/rest/admin/application-configuration",
+      "payload": "",
+      "status": 200,
+      "size": 23442,
+      "indicators": [
+        "EMAIL_EXPOSURE"
+      ],
+      "preview": "{\"config\":{\"server\":{\"port\":3000,\"basePath\":\"\",\"baseUrl\":\"http://localhost:3000\"},\"application\":{\"domain\":\"juice-sh.op\",\"name\":\"OWASP Juice Shop\",\"logo\":\"JuiceShop_Logo.png\",\"favicon\":\"favicon_js.ico\""
+    }
+  ]
+}

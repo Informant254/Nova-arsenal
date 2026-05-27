@@ -1,0 +1,111 @@
+{
+  "technique": "Compositional Vulnerability Synthesis",
+  "timestamp": "2026-05-25T18:14:16.361916",
+  "chains_identified": 5,
+  "chains": [
+    {
+      "name": "XSS \u2192 Session Hijack \u2192 Full Account Takeover",
+      "needs": [
+        "xss",
+        "session_hijack"
+      ],
+      "has": [
+        "xss",
+        "session_hijack"
+      ],
+      "status": "\u2705 READY \u2014 All components confirmed",
+      "severity": "CRITICAL (CVSS 9.8)",
+      "steps": [
+        "1. Inject DOM XSS payload into Juice Shop search",
+        "2. Steal victim's JWT token from localStorage",
+        "3. Use stolen token to access /rest/user/whoami",
+        "4. Change victim's password, lock them out",
+        "5. Full account takeover confirmed"
+      ],
+      "real_world": "Same technique used in GitHub Gist XSS attack (2023)"
+    },
+    {
+      "name": "SQLi \u2192 User Dump \u2192 Admin Login \u2192 Server Takeover",
+      "needs": [
+        "sqli",
+        "auth_bypass"
+      ],
+      "has": [
+        "sqli",
+        "auth_bypass"
+      ],
+      "status": "\u2705 READY \u2014 All components confirmed",
+      "severity": "CRITICAL (CVSS 10.0)",
+      "steps": [
+        "1. SQL injection on /rest/products/search to dump Users table",
+        "2. Extract admin email and password hash",
+        "3. Login as admin with stolen credentials",
+        "4. Access /rest/admin/application-configuration",
+        "5. Full administrative control achieved"
+      ],
+      "real_world": "Same technique used in Equifax breach (2017)"
+    },
+    {
+      "name": "SSRF \u2192 Internal Network \u2192 Cloud Metadata \u2192 Credential Theft",
+      "needs": [
+        "ssrf",
+        "config_exposure"
+      ],
+      "has": [
+        "ssrf",
+        "config_exposure"
+      ],
+      "status": "\u2705 READY \u2014 All components confirmed",
+      "severity": "CRITICAL (CVSS 9.8)",
+      "steps": [
+        "1. SSRF via search endpoint to access internal services",
+        "2. Hit cloud metadata endpoint (169.254.169.254)",
+        "3. Extract IAM credentials from metadata",
+        "4. Use credentials to access cloud resources",
+        "5. Full cloud infrastructure compromise"
+      ],
+      "real_world": "Same technique used in Capital One breach (2019)"
+    },
+    {
+      "name": "JWT Forgery \u2192 Admin API Access \u2192 Data Exfiltration",
+      "needs": [
+        "jwt_forgery",
+        "idor"
+      ],
+      "has": [
+        "jwt_forgery",
+        "idor"
+      ],
+      "status": "\u2705 READY \u2014 All components confirmed",
+      "severity": "CRITICAL (CVSS 9.8)",
+      "steps": [
+        "1. Forge JWT with alg=none and admin role",
+        "2. Use forged JWT to access /api/Users",
+        "3. Enumerate all users via IDOR on basket endpoints",
+        "4. Export user data via /rest/user/data-export",
+        "5. Complete user database exfiltrated"
+      ],
+      "real_world": "Multiple API gateway vulnerabilities (2022-2024)"
+    },
+    {
+      "name": "NoSQL Injection \u2192 Data Manipulation \u2192 Race Condition \u2192 Financial Loss",
+      "needs": [
+        "nosql_injection",
+        "race_condition"
+      ],
+      "has": [
+        "nosql_injection",
+        "race_condition"
+      ],
+      "status": "\u2705 READY \u2014 All components confirmed",
+      "severity": "HIGH (CVSS 8.6)",
+      "steps": [
+        "1. NoSQL injection to manipulate product reviews",
+        "2. Exploit coupon race condition for unlimited discounts",
+        "3. Place orders with manipulated prices",
+        "4. Financial loss to the business confirmed"
+      ],
+      "real_world": "Similar to Starbucks coupon race condition (2019)"
+    }
+  ]
+}

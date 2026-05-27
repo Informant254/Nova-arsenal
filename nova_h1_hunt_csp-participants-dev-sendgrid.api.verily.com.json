@@ -1,0 +1,8 @@
+{
+  "h1_researcher": "Informant254",
+  "target": "https://csp-participants-dev-sendgrid.api.verily.com",
+  "timestamp": "2026-05-27T12:12:45.917397",
+  "findings": [],
+  "total": 0,
+  "safe_harbor": "Traffic identifiable via User-Agent header"
+}

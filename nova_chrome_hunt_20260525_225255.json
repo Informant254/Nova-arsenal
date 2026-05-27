@@ -1,0 +1,38 @@
+{
+  "chrome_zero_days_referenced": [
+    "CVE-2024-7965",
+    "CVE-2024-7971",
+    "CVE-2024-8194",
+    "CVE-2024-8198"
+  ],
+  "patterns_found": 2,
+  "exploit_chain_buildable": false,
+  "findings": [
+    {
+      "file": "./frontend/dist/frontend/chunk-5433N6CC.js",
+      "line": 12,
+      "vulnerability_type": "out_of_bounds_write",
+      "cve_reference": "CVE-2024-7971",
+      "component": "Dawn (WebGPU)",
+      "cvss": "8.8",
+      "explanation": "Array assignment without bounds check",
+      "description": "Writing beyond allocated memory buffer boundaries",
+      "chain_position": "Step 2 \u2014 corrupt adjacent memory",
+      "code": "`:n==\"r\"?\"\\r\":n==\"t\"?\"\t\":\"\\\\\")}eq(e){return this.search==e.search&&this.replace==e.replace&&this.caseSensitive==e.caseSensitive&&this.regexp==e.regexp&&this.wholeWord==e.wholeWord&&this.test==e.test}c",
+      "context": "`,s=i.state.doc.line(s.number+(t?1:-1)),r=i.bidiSpans(s),h=i.visualLineSide(s,!t)}if(a){if(!a(c))return l}else{if(!n)return h;a=n(c)}l=h}}function np(i,e,t){let n=i.state.charCategorizer(e),s=n(t);return r=>{let o=n(r);return s==q.Space&&(s=o),s==o}}function sp(i,e,t,n){let s=e.head,r=t?1:-1;if(s==(t?i.state.doc.length:0))return y.cursor(s,e.assoc);let o=e.goalColumn,l,a=i.contentDOM.getBoundingCl"
+    },
+    {
+      "file": "./frontend/dist/frontend/chunk-BDIM6GZO.js",
+      "line": 1,
+      "vulnerability_type": "out_of_bounds_write",
+      "cve_reference": "CVE-2024-7971",
+      "component": "Dawn (WebGPU)",
+      "cvss": "8.8",
+      "explanation": "Write with user-controlled offset",
+      "description": "Writing beyond allocated memory buffer boundaries",
+      "chain_position": "Step 2 \u2014 corrupt adjacent memory",
+      "code": "import{a as Ae,b as Rt,c as zs,d as L,e as ct,f as at,g as dr,h as ht,i as Bt}from\"./chunk-NUMHA4AJ.js\";var uu=ct(Hs=>{\"use strict\";Hs.byteLength=qx;Hs.toByteArray=Gx;Hs.fromByteArray=Kx;var Dr=[],hr=",
+      "context": "import{a as Ae,b as Rt,c as zs,d as L,e as ct,f as at,g as dr,h as ht,i as Bt}from\"./chunk-NUMHA4AJ.js\";var uu=ct(Hs=>{\"use strict\";Hs.byteLength=qx;Hs.toByteArray=Gx;Hs.fromByteArray=Kx;var Dr=[],hr=[],Lx=typeof Uint8Array<\"u\"?Uint8Array:Array,Z0=\"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\";for(fi=0,cu=Z0.length;fi<cu;++fi)Dr[fi]=Z0[fi],hr[Z0.charCodeAt(fi)]=fi;var fi,cu;hr["
+    }
+  ]
+}
