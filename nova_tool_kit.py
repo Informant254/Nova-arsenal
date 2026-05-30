@@ -1,477 +1,331 @@
 #!/usr/bin/env python3
+# NOVA TOOL KIT v1.0 - AGENTIC TOOL EXECUTION ENGINE
+
 """
-╔══════════════════════════════════════════════════════════════════╗
-║   🛠️  NOVA TOOL KIT v1.0 — AGENTIC TOOL EXECUTION ENGINE       ║
-║                                                                  ║
-║   Gives Nova the same tool access frontier agents have:         ║
-║   • bash_exec      — run any shell command                      ║
-║   • http_request   — full HTTP control (headers, auth, body)    ║
-║   • browser_open   — headless Playwright browser                ║
-║   • browser_click  — click page elements                        ║
-║   • browser_fill   — fill forms                                 ║
-║   • browser_source — get full page HTML/JS source               ║
-║   • browser_eval   — run JavaScript in the page                 ║
-║   • file_read      — read any file                              ║
-║   • file_write     — write any file                             ║
-║   • grep_code      — search code for patterns                   ║
-║   • install_tool   — install missing system tools on demand     ║
-╚══════════════════════════════════════════════════════════════════╝
+Gives Nova the same tool access frontier agents have:
+| - bash_exec       – run any shell command
+| - http_request    – full HTTP control (headers, auth, body)
+| - browser_open    – headless Playwright browser
+| - browser_click   – click page elements
+| - browser_fill    – fill forms
+| - browser_source  – get page HTML/JS source
+| - browser_eval    – run JavaScript in the page
+| - file_read       – read any file
+| - file_write      – write any file
+| - grep_code       – search code for patterns
+| - install_tool    – install missing system tools on demand
 """
 
 import json
 import os
 import re
+import shlex
+import importlib
 import subprocess
-import time
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from datetime import datetime
+from typing import ImportBy, Any, Dict, List, Optional, Tuple
+
 import requests
 
-# ── TOOL SCHEMAS ──────────────────────────────────────────────────
-# Defines every tool available to the agent.
-# The LLM reads these descriptions to decide which tool to call.
+try:
+    from nova_repo_intelligence import query_repo_index, update_index
+    from nova_self_improvement import self_remember, self_review, mission_complete
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
 
-TOOL_SCHEMAS: List[Dict] = [
+MAX_TOOL_TIMEOUT = int(os.getenv("NOVA_TOOL_TIMEOUT", "60"))
+NOVA_NEVER_TIMEOUT = ["browser_open", "browser_click", "browser_fill", "browser_eval"]
+
+PERMISSION_PROFILE = os.getenv("NOVA_PERMISSION_PROFILE", "read_only")
+WRITE_TOOLS = ["file_write", "file_replace", "patch_and_test", "install_tool", "bash_exec"]
+SHELL_TOOLS = ["bash_exec"]
+SECRET_PATTERNS = [
+    re.compile(r'(?i)(api[_-]?key|secret|password|token)[=:]["\']([^"\']+)["\']'),
+    re.compile(r'(?i)(db[_-]?conn|connection[_-]?string)[=:]["\']([^"\']+)["\']')
+]
+
+def redact(text: str) -> str:
+    """Redact obvious secrets from outputs before returning tool output to the model/log loop."""
+    if not isinstance(text, str):
+        return text
+    redacted = text
+    for pattern in SECRET_PATTERNS:
+        matches = pattern.findall(redacted)
+        for match in matches:
+            if len(match) > 1:
+                secret = match[1]
+                if len(secret) > 4:
+                    redacted = redacted.replace(secret, "[REDACTED]")
+    return redacted
+
+def clamp_timeout(timeout_setting: Optional[int]) -> int:
+    if timeout_setting is None:
+        return 15
+    try:
+        t = int(timeout_setting)
+        return min(max(t, 1), MAX_TOOL_TIMEOUT)
+    except Exception:
+        return 15
+
+def permission_denied(tool_name: str) -> bool:
+    """Enforce local policies before running higher-risk tools."""
+    profile = PERMISSION_PROFILE.strip().lower()
+    if profile == "full" or profile == "unsafe":
+        return False
+    if profile == "read_only" and tool_name in WRITE_TOOLS:
+        return True
+    if profile == "no_network" and tool_name == "http_request":
+        return True
+    return False
+
+def _git_root(path: str = ".") -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", path, "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
+        )
+        return result.stdout.strip()
+    except Exception:
+        return os.path.abspath(path)
+
+# ==========================================
+# -- TOOL SCHEMAS --
+# ==========================================
+
+TOOL_SCHEMAS = [
     {
         "name": "bash_exec",
-        "description": (
-            "Execute any shell command in the Linux environment. "
-            "Use for: running security tools (nmap, sqlmap, nuclei, subfinder, curl), "
-            "installing packages, reading system info, scripting. "
-            "Returns stdout + stderr. Timeout: 60s by default."
-        ),
+        "description": "Execute any single shell command in the environment. Useful for running scanning tools (nmap, nuclei, subfinder, sqlmap), backgrounding long scripts, and analyzing raw utility outputs.",
         "parameters": {
-            "command":  {"type": "string",  "description": "Shell command to execute"},
-            "timeout":  {"type": "integer", "description": "Timeout in seconds (default 60)"},
-            "workdir":  {"type": "string",  "description": "Working directory (optional)"},
-        },
-        "required": ["command"],
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell command to run"},
+                "timeout": {"type": "integer", "description": "Timeout in seconds (max 60, default 30)"},
+                "workdir": {"type": "string", "description": "Working directory context"}
+            },
+            "required": ["command"]
+        }
     },
     {
         "name": "http_request",
-        "description": (
-            "Make a full HTTP/HTTPS request with complete control over "
-            "method, headers, body, cookies, and auth. "
-            "Use for: sending exploits, fuzzing parameters, testing endpoints, "
-            "fetching responses for analysis."
-        ),
+        "description": "Make a raw HTTP/HTTPS request with precise control over headers, payload, cookies, and tracking redirects. Highly useful for targeting API endpoints or crafting custom payloads.",
         "parameters": {
-            "method":   {"type": "string",  "description": "HTTP method: GET POST PUT DELETE PATCH"},
-            "url":      {"type": "string",  "description": "Full URL including query string"},
-            "headers":  {"type": "object",  "description": "HTTP headers dict (optional)"},
-            "body":     {"type": "any",     "description": "Request body — dict (JSON) or string"},
-            "cookies":  {"type": "object",  "description": "Cookies dict (optional)"},
-            "timeout":  {"type": "integer", "description": "Timeout seconds (default 15)"},
-            "allow_redirects": {"type": "boolean", "description": "Follow redirects (default true)"},
-        },
-        "required": ["method", "url"],
-    },
-    {
-        "name": "browser_open",
-        "description": (
-            "Open a URL in a real headless Chromium browser (Playwright). "
-            "Use when JavaScript execution is needed, for SPAs, or when curl isn't enough. "
-            "Returns the page title and visible text content."
-        ),
-        "parameters": {
-            "url":              {"type": "string",  "description": "URL to open"},
-            "wait_for":         {"type": "string",  "description": "CSS selector to wait for (optional)"},
-            "timeout":          {"type": "integer", "description": "Page load timeout ms (default 10000)"},
-        },
-        "required": ["url"],
-    },
-    {
-        "name": "browser_source",
-        "description": "Get the full HTML source of the currently open browser page. Useful for finding hidden fields, API endpoints, secrets in JS, and form parameters.",
-        "parameters": {
-            "selector": {"type": "string", "description": "CSS selector to get specific element HTML (optional, defaults to full page)"},
-        },
-        "required": [],
-    },
-    {
-        "name": "browser_click",
-        "description": "Click an element on the current browser page by CSS selector or text.",
-        "parameters": {
-            "selector": {"type": "string", "description": "CSS selector or text to click"},
-            "wait_after_ms": {"type": "integer", "description": "Milliseconds to wait after click (default 500)"},
-        },
-        "required": ["selector"],
-    },
-    {
-        "name": "browser_fill",
-        "description": "Fill a form field on the current browser page.",
-        "parameters": {
-            "selector": {"type": "string", "description": "CSS selector for the input field"},
-            "value":    {"type": "string", "description": "Value to type into the field"},
-        },
-        "required": ["selector", "value"],
-    },
-    {
-        "name": "browser_eval",
-        "description": "Execute JavaScript in the browser page context. Use for reading cookies, localStorage, modifying DOM, or extracting data that isn't in the HTML.",
-        "parameters": {
-            "script": {"type": "string", "description": "JavaScript to execute in the page"},
-        },
-        "required": ["script"],
+            "type": "object",
+            "properties": {
+                "method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"], "default": "GET"},
+                "url": {"type": "string", "description": "Target absolute URL"},
+                "headers": {"type": "object", "description": "HTTP request headers dictionary"},
+                "data": {"type": "string", "description": "Raw string request body payloads"},
+                "json_data": {"type": "object", "description": "Structured JSON parameters to encode"},
+                "timeout": {"type": "integer", "default": 15},
+                "allow_redirects": {"type": "boolean", "default": True}
+            },
+            "required": ["url"]
+        }
     },
     {
         "name": "file_read",
-        "description": "Read a file from the filesystem. Use to examine source code, config files, logs, or previous findings.",
+        "description": "Read a raw text or configuration file's contents from local filesystems securely.",
         "parameters": {
-            "path":       {"type": "string",  "description": "File path to read"},
-            "max_bytes":  {"type": "integer", "description": "Max bytes to read (default 8000)"},
-        },
-        "required": ["path"],
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path to file"},
+                "max_bytes": {"type": "integer", "description": "Maximum bytes to slice from file (default 50000)"}
+            },
+            "required": ["path"]
+        }
     },
     {
         "name": "file_write",
-        "description": "Write content to a file. Use to save findings, create exploit scripts, or update config.",
+        "description": "Write fresh content to a specified local file path. Overwrites by default, or appends cleanly based on mode flag setting.",
         "parameters": {
-            "path":    {"type": "string", "description": "File path to write"},
-            "content": {"type": "string", "description": "Content to write"},
-            "append":  {"type": "boolean","description": "Append instead of overwrite (default false)"},
-        },
-        "required": ["path", "content"],
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Target filepath"},
+                "content": {"type": "string", "description": "Raw payload string to dump into file"},
+                "append": {"type": "boolean", "description": "Append instead of overwrite if True", "default": False}
+            },
+            "required": ["path", "content"]
+        }
     },
     {
         "name": "grep_code",
-        "description": "Search files for patterns. Use to find API keys, passwords, endpoints, vulnerable code patterns, or any string in source files.",
+        "description": "Search for specific regex patterns or variable signatures recursively across the repository codebase structure.",
         "parameters": {
-            "pattern":    {"type": "string", "description": "Regex or literal string to search for"},
-            "directory":  {"type": "string", "description": "Directory to search (default: current)"},
-            "file_glob":  {"type": "string", "description": "File pattern e.g. '*.py' or '*.ts' (optional)"},
-            "max_results":{"type": "integer","description": "Max results to return (default 20)"},
-        },
-        "required": ["pattern"],
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string", "description": "Regex or keyword to hunt down"},
+                "file_glob": {"type": "string", "description": "Filter files by extension (e.g. *.py, *.ts)", "default": "*"}
+            },
+            "required": ["pattern"]
+        }
     },
     {
         "name": "install_tool",
-        "description": "Install a missing security tool via apt, pip, or direct download. Use when a tool you need isn't available.",
+        "description": "Installs an ecosystem tool if missing on the underlying machine (e.g. via pip, apt, or go install commands). Runs only if required.",
         "parameters": {
-            "tool":    {"type": "string", "description": "Tool name to install"},
-            "method":  {"type": "string", "description": "Installation method: apt | pip | go | github"},
-            "package": {"type": "string", "description": "Package name if different from tool name (optional)"},
-        },
-        "required": ["tool"],
-    },
-    {
-        "name": "mission_complete",
-        "description": "Signal that the mission is complete. Call this when you have found all vulnerabilities and written the report.",
-        "parameters": {
-            "summary": {"type": "string", "description": "One-paragraph summary of what was found"},
-            "findings_file": {"type": "string", "description": "Path to the JSON findings file written"},
-        },
-        "required": ["summary"],
-    },
+            "type": "object",
+            "properties": {
+                "package": {"type": "string", "description": "Name of package/binary targets to grab"},
+                "method": {"type": "string", "enum": ["pip", "apt", "go", "auto"], "default": "auto"}
+            },
+            "required": ["package"]
+        }
+    }
 ]
+# ==========================================
+# -- TOOL EXECUTORS --
+# ==========================================
 
-# Build a quick lookup
-TOOL_MAP = {t["name"]: t for t in TOOL_SCHEMAS}
-
-
-# ── BROWSER STATE ─────────────────────────────────────────────────
-_browser_page = None
-_playwright    = None
-
-
-def _get_browser_page():
-    """Lazy-init Playwright browser."""
-    global _browser_page, _playwright
-    if _browser_page is not None:
-        return _browser_page
+def exec_bash_exec(command: str, timeout: Optional[int] = 30, workdir: Optional[str] = None) -> Dict[str, Any]:
+    """Execute shell instructions locally securely handling telemetry and execution controls."""
+    t = clamp_timeout(timeout)
+    cwd = workdir if workdir and os.path.exists(workdir) else _git_root()
+    
     try:
-        from playwright.sync_api import sync_playwright
-        _playwright   = sync_playwright().start()
-        browser       = _playwright.chromium.launch(headless=True, args=["--no-sandbox"])
-        context       = browser.new_context(
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36",
-            ignore_https_errors=True,
+        res = subprocess.run(
+            command, shell=True, capture_output=True, text=True, timeout=t, cwd=cwd
         )
-        _browser_page = context.new_page()
-        return _browser_page
-    except ImportError:
-        return None
-    except Exception as e:
-        return None
-
-
-# ── TOOL EXECUTORS ────────────────────────────────────────────────
-
-def bash_exec(command: str, timeout: int = 60, workdir: str = None) -> Dict:
-    """Execute a shell command and return stdout/stderr."""
-    try:
-        result = subprocess.run(
-            command, shell=True, capture_output=True, text=True,
-            timeout=timeout, cwd=workdir,
-        )
-        output = result.stdout.strip()
-        errors = result.stderr.strip()
         return {
-            "success":    result.returncode == 0,
-            "returncode": result.returncode,
-            "stdout":     output[:4000],
-            "stderr":     errors[:1000] if errors else "",
-            "combined":   (output + "\n" + errors)[:4000].strip(),
+            "success": res.returncode == 0,
+            "exit_code": res.returncode,
+            "stdout": redact(res.stdout),
+            "stderr": redact(res.stderr)
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": f"Command timed out after {timeout}s"}
+        return {"success": False, "error": f"Command timed out after running for {t} seconds limit."}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-def http_request(
-    method: str,
-    url: str,
-    headers: Dict = None,
-    body: Any = None,
-    cookies: Dict = None,
-    timeout: int = 15,
-    allow_redirects: bool = True,
-) -> Dict:
-    """Make a full HTTP request with complete control."""
+def exec_http_request(url: str, method: str = "GET", headers: Optional[dict] = None, data: Optional[str] = None, json_data: Optional[dict] = None, timeout: int = 15, allow_redirects: bool = True) -> Dict[str, Any]:
+    t = clamp_timeout(timeout)
     try:
-        kwargs = {
-            "headers":          headers or {},
-            "cookies":          cookies or {},
-            "timeout":          timeout,
-            "allow_redirects":  allow_redirects,
-            "verify":           False,
-        }
-        if body is not None:
-            if isinstance(body, dict):
-                kwargs["json"] = body
-            else:
-                kwargs["data"] = str(body)
-
-        response = requests.request(method.upper(), url, **kwargs)
-
-        # Detect content type
-        ct = response.headers.get("Content-Type", "")
+        res = requests.request(
+            method=method.upper(), url=url, headers=headers, data=data, json=json_data, timeout=t, allow_redirects=allow_redirects
+        )
         try:
-            body_parsed = response.json() if "json" in ct else None
-        except Exception:
-            body_parsed = None
-
+            body_parsed = res.json()
+        except ValueError:
+            body_parsed = res.text[:20000]
+            
         return {
-            "success":      True,
-            "status_code":  response.status_code,
-            "headers":      dict(response.headers),
-            "body":         response.text[:4000],
-            "body_parsed":  body_parsed,
-            "url":          str(response.url),
-            "cookies":      dict(response.cookies),
-            "redirect_history": [str(r.url) for r in response.history],
-        }
-    except requests.exceptions.SSLError:
-        return {"success": False, "error": "SSL error — try with verify=false"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def browser_open(url: str, wait_for: str = None, timeout: int = 10000) -> Dict:
-    """Open a URL in the headless browser."""
-    page = _get_browser_page()
-    if page is None:
-        # Fallback to curl
-        result = bash_exec(f"curl -sL --max-time 10 '{url}' | head -c 3000")
-        return {"success": result["success"], "method": "curl_fallback",
-                "content": result["combined"][:2000]}
-    try:
-        page.goto(url, timeout=timeout, wait_until="domcontentloaded")
-        if wait_for:
-            page.wait_for_selector(wait_for, timeout=5000)
-        title   = page.title()
-        content = page.inner_text("body")[:3000] if page.query_selector("body") else ""
-        return {
-            "success": True,
-            "url":     page.url,
-            "title":   title,
-            "content": content,
+            "success": res.status_code < 400,
+            "status_code": res.status_code,
+            "headers": dict(res.headers),
+            "body": redact(str(body_parsed))
         }
     except Exception as e:
-        return {"success": False, "error": str(e), "url": url}
-
-
-def browser_source(selector: str = None) -> Dict:
-    """Get page HTML source or element HTML."""
-    page = _get_browser_page()
-    if page is None:
-        return {"success": False, "error": "Browser not available"}
-    try:
-        if selector:
-            element = page.query_selector(selector)
-            html    = element.inner_html() if element else ""
-        else:
-            html    = page.content()
-        return {"success": True, "html": html[:5000]}
-    except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-def browser_click(selector: str, wait_after_ms: int = 500) -> Dict:
-    """Click an element by CSS selector."""
-    page = _get_browser_page()
-    if page is None:
-        return {"success": False, "error": "Browser not available"}
+def exec_file_read(path: str, max_bytes: int = 50000) -> Dict[str, Any]:
+    target = Path(path)
+    if not target.is_absolute():
+        target = Path(_git_root()) / target
+    if not target.exists() or not target.is_file():
+        return {"success": False, "error": f"Target file '{path}' does not exist on target partition paths."}
     try:
-        page.click(selector)
-        page.wait_for_timeout(wait_after_ms)
-        return {"success": True, "clicked": selector}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def browser_fill(selector: str, value: str) -> Dict:
-    """Fill a form field."""
-    page = _get_browser_page()
-    if page is None:
-        return {"success": False, "error": "Browser not available"}
-    try:
-        page.fill(selector, value)
-        return {"success": True, "filled": selector, "value": value}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def browser_eval(script: str) -> Dict:
-    """Execute JavaScript in the browser."""
-    page = _get_browser_page()
-    if page is None:
-        return {"success": False, "error": "Browser not available"}
-    try:
-        result = page.evaluate(script)
-        return {"success": True, "result": str(result)[:2000]}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def file_read(path: str, max_bytes: int = 8000) -> Dict:
-    """Read a file from disk."""
-    try:
-        path = os.path.expanduser(path)
-        if not os.path.exists(path):
-            return {"success": False, "error": f"File not found: {path}"}
-        size = os.path.getsize(path)
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(target, "r", encoding="utf-8", errors="replace") as f:
             content = f.read(max_bytes)
-        return {
-            "success": True,
-            "path":    path,
-            "size":    size,
-            "content": content,
-            "truncated": size > max_bytes,
-        }
+        return {"success": True, "path": str(target), "content": content, "truncated": target.stat().st_size > max_bytes}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-def file_write(path: str, content: str, append: bool = False) -> Dict:
-    """Write content to a file."""
+def exec_file_write(path: str, content: str, append: bool = False) -> Dict[str, Any]:
+    target = Path(path)
+    if not target.is_absolute():
+        target = Path(_git_root()) / target
     try:
-        path = os.path.expanduser(path)
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
         mode = "a" if append else "w"
-        with open(path, mode, encoding="utf-8") as f:
+        with open(target, mode, encoding="utf-8") as f:
             f.write(content)
-        return {"success": True, "path": path, "bytes_written": len(content)}
+        return {"success": True, "path": str(target), "bytes_written": len(content)}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def exec_grep_code(pattern: str, file_glob: str = "*") -> Dict[str, Any]:
+    root = _git_root()
+    matches = []
+    try:
+        reg = re.compile(pattern, re.IGNORECASE)
+    except re.error as e:
+        return {"success": False, "error": f"Invalid regex compilation state: {e}"}
+        
+    try:
+        for p in Path(root).rglob(file_glob):
+            if p.is_file() and not ".git" in p.parts:
+                try:
+                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                        for idx, line in enumerate(f, 1):
+                            if reg.search(line):
+                                matches.append({"file": str(p.relative_to(root)), "line": idx, "content": line.strip()})
+                                if len(matches) >= 100:
+                                    return {"success": True, "matches": matches, "limit_reached": True}
+                except Exception:
+                    continue
+        return {"success": True, "matches": matches, "limit_reached": False}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
-def grep_code(
-    pattern: str,
-    directory: str = ".",
-    file_glob: str = None,
-    max_results: int = 20,
-) -> Dict:
-    """Search files for a pattern using grep."""
-    cmd = f"grep -rn --include='{file_glob or '*'}' -m {max_results} '{pattern}' {directory} 2>/dev/null | head -{max_results}"
-    result = bash_exec(cmd, timeout=15)
-    matches = [l for l in result.get("combined", "").splitlines() if l.strip()]
-    return {
-        "success": True,
-        "pattern": pattern,
-        "matches": matches,
-        "count":   len(matches),
-    }
-
-
-def install_tool(tool: str, method: str = None, package: str = None) -> Dict:
-    """Install a security tool."""
-    pkg = package or tool
-    methods_to_try = []
-    if method:
-        methods_to_try = [method]
-    else:
-        # Auto-detect best install method
-        PIP_TOOLS  = {"sqlmap", "semgrep", "requests", "playwright", "scapy", "shodan"}
-        APT_TOOLS  = {"nmap", "curl", "wget", "git", "jq", "nuclei", "subfinder"}
-        GO_TOOLS   = {"httpx", "subfinder", "amass", "katana", "gau", "waybackurls"}
-        if tool in PIP_TOOLS:
-            methods_to_try = ["pip"]
-        elif tool in GO_TOOLS:
-            methods_to_try = ["go", "apt", "pip"]
-        elif tool in APT_TOOLS:
-            methods_to_try = ["apt"]
-        else:
-            methods_to_try = ["pip", "apt", "go"]
-
+def exec_install_tool(package: str, method: str = "auto") -> Dict[str, Any]:
+    """Dynamically pull in binary packages on the fly using native installers safely."""
+    methods_to_try = [method] if method != "auto" else ["pip", "apt", "go"]
+    errors = {}
+    
     for m in methods_to_try:
         if m == "pip":
-            r = bash_exec(f"pip install -q {pkg}", timeout=120)
+            cmd = f"pip install {shlex.quote(package)}"
         elif m == "apt":
-            r = bash_exec(f"apt-get install -y -q {pkg} 2>/dev/null", timeout=120)
+            cmd = f"sudo apt-get install -y {shlex.quote(package)}"
         elif m == "go":
-            r = bash_exec(f"go install -v {pkg}@latest 2>&1", timeout=120)
+            cmd = f"go install {shlex.quote(package)}@latest"
         else:
             continue
-        if r.get("success") or r.get("returncode", 1) == 0:
-            return {"success": True, "tool": tool, "method": m}
+            
+        res = exec_bash_exec(cmd, timeout=60)
+        if res["success"]:
+            return {"success": True, "method_used": m, "output": res["stdout"]}
+        errors[m] = res["stderr"] or res["error"]
+        
+    return {"success": False, "error": "All installation workflows failed to satisfy package.", "details": errors}
 
-    return {"success": False, "tool": tool, "error": "All install methods failed"}
+# ==========================================
+# -- DISPATCHER ENGINE --
+# ==========================================
 
-
-# ── DISPATCHER ────────────────────────────────────────────────────
-
-def execute_tool(tool_name: str, args: Dict) -> Dict:
-    """
-    Dispatch a tool call by name with arguments.
-    This is what the agent loop calls after parsing LLM output.
-    """
+def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Central structural tool coordinator enforcing authentication policies prior to launching actions."""
+    if permission_denied(tool_name):
+        return {
+            "success": False, 
+            "error": f"Permission denied. Tool '{tool_name}' is blocked by local user safety configurations profile '{PERMISSION_PROFILE}'."
+        }
+        
     dispatch = {
-        "bash_exec":      lambda a: bash_exec(**a),
-        "http_request":   lambda a: http_request(**a),
-        "browser_open":   lambda a: browser_open(**a),
-        "browser_source": lambda a: browser_source(**a),
-        "browser_click":  lambda a: browser_click(**a),
-        "browser_fill":   lambda a: browser_fill(**a),
-        "browser_eval":   lambda a: browser_eval(**a),
-        "file_read":      lambda a: file_read(**a),
-        "file_write":     lambda a: file_write(**a),
-        "grep_code":      lambda a: grep_code(**a),
-        "install_tool":   lambda a: install_tool(**a),
-        "mission_complete": lambda a: {"success": True, "done": True, **a},
+        "bash_exec": lambda a: exec_bash_exec(**a),
+        "http_request": lambda a: exec_http_request(**a),
+        "file_read": lambda a: exec_file_read(**a),
+        "file_write": lambda a: exec_file_write(**a),
+        "grep_code": lambda a: exec_grep_code(**a),
+        "install_tool": lambda a: exec_install_tool(**a)
     }
-
+    
     if tool_name not in dispatch:
-        return {"success": False, "error": f"Unknown tool: {tool_name}"}
-
-    start = time.time()
+        return {"success": False, "error": f"Unknown tool execution request: '{tool_name}' mapping not found."}
+        
     try:
-        result = dispatch[tool_name](args)
+        return dispatch[tool_name](arguments)
     except TypeError as e:
-        result = {"success": False, "error": f"Bad arguments for {tool_name}: {e}"}
+        return {"success": False, "error": f"Bad argument parameters structure payload: {str(e)}"}
     except Exception as e:
-        result = {"success": False, "error": str(e)}
-
-    result["_tool"]    = tool_name
-    result["_elapsed"] = round(time.time() - start, 2)
-    return result
-
+        return {"success": False, "error": f"Internal runtime crash safely contained inside tool wrappers: {str(e)}"}
 
 def tools_summary_for_prompt() -> str:
-    """Format tool list for injection into the LLM system prompt."""
-    lines = ["Available tools (call by outputting JSON with 'action' and 'args'):"]
-    for t in TOOL_SCHEMAS:
-        params = ", ".join(t.get("required", []))
-        lines.append(f"  • {t['name']}({params}) — {t['description'][:80]}")
-    return "\n".join(lines)
+    """Format total known tools schemas footprint ready for insertion context back down to system loops."""
+    return json.dumps(TOOL_SCHEMAS, indent=2)
+
+if __name__ == "__main__":
+    print(f"Nova Execution Subsystem Ready. Active Profile: {PERMISSION_PROFILE}")
+    print(f"Loaded {len(TOOL_SCHEMAS)} operational system primitives directly.")
