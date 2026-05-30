@@ -32,10 +32,11 @@ import requests
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 
-H1_API_BASE  = "https://api.hackerone.com/v1"
-CACHE_DIR    = Path(os.path.expanduser("~/.nova/scope_cache"))
-CACHE_TTL    = 3600          # seconds (1 hour)
-MAX_PROGRAMS = 100           # max programs to fetch per sync
+H1_API_BASE       = "https://api.hackerone.com/v1"
+CACHE_DIR         = Path(os.path.expanduser("~/.nova/scope_cache"))
+LOCAL_CONFIG_PATH = Path(os.path.expanduser("~/.nova/scope_config.json"))
+CACHE_TTL         = 3600          # seconds (1 hour)
+MAX_PROGRAMS      = 100           # max programs to fetch per sync
 
 
 # ── DATA STRUCTURES ───────────────────────────────────────────────────────────
@@ -328,9 +329,16 @@ class NovaScopeManager:
             return True
         except requests.HTTPError as e:
             if e.response.status_code == 401:
-                print("  ❌ Invalid credentials. Check H1_USERNAME and H1_API_TOKEN.")
+                print("  ❌ H1 API: Invalid credentials (401).")
+                print("     To fix: regenerate your token at")
+                print("     https://hackerone.com/settings/api_token/edit")
+                print("     then update H1_API_TOKEN in your environment.")
+                print("  ℹ️  Falling back to local config if available.")
             else:
                 print(f"  ❌ H1 API error: {e}")
+            return False
+        except RuntimeError as e:
+            print(f"  ⚠️  {e}")
             return False
         except Exception as e:
             print(f"  ❌ Connection error: {e}")
@@ -376,6 +384,13 @@ class NovaScopeManager:
         print("=" * 60)
 
         if not self.verify_credentials():
+            # Try local config file as fallback
+            local = self.load_from_local_config()
+            if local:
+                return self._scopes
+            print("\n  💡 No local config found either.")
+            print(f"     Run: python3 nova_scope_manager.py init-config")
+            print(f"     Then edit: {LOCAL_CONFIG_PATH}")
             return {}
 
         handles = self._fetch_all_handles(bounty_only=bounty_only)
@@ -468,6 +483,117 @@ class NovaScopeManager:
                 for t in scope.bounty_eligible_targets():
                     results.append((scope.name, t))
         return results
+
+    # ── LOCAL CONFIG FALLBACK ─────────────────────────────────────
+
+    def load_from_local_config(self, path: Path = None) -> Dict[str, ProgramScope]:
+        """
+        Load scopes from a local JSON config file (fallback when H1 API is
+        unavailable or credentials are invalid).
+
+        Config format (~/.nova/scope_config.json):
+        {
+          "programs": [
+            {
+              "handle": "my-program",
+              "name":   "My Bug Bounty Program",
+              "url":    "https://hackerone.com/my-program",
+              "state":  "public_mode",
+              "offers_bounties": true,
+              "in_scope": [
+                {"identifier": "*.example.com", "asset_type": "WILDCARD",
+                 "eligible_for_bounty": true, "max_severity": "critical"}
+              ],
+              "out_of_scope": [
+                {"identifier": "blog.example.com", "asset_type": "URL",
+                 "eligible_for_bounty": false, "max_severity": "none"}
+              ]
+            }
+          ]
+        }
+        """
+        cfg_path = path or LOCAL_CONFIG_PATH
+        if not cfg_path.exists():
+            return {}
+
+        try:
+            data = json.loads(cfg_path.read_text())
+            programs = data.get("programs", [])
+            loaded = 0
+            for p in programs:
+                in_scope  = [Asset(**a) for a in p.get("in_scope",  [])]
+                out_scope = [Asset(**a) for a in p.get("out_of_scope", [])]
+                scope = ProgramScope(
+                    handle=p.get("handle", ""),
+                    name=p.get("name", p.get("handle", "")),
+                    url=p.get("url", ""),
+                    state=p.get("state", "public_mode"),
+                    in_scope=in_scope,
+                    out_of_scope=out_scope,
+                    offers_bounties=p.get("offers_bounties", False),
+                )
+                if scope.handle:
+                    self._scopes[scope.handle] = scope
+                    loaded += 1
+            if loaded:
+                print(f"  📁 Loaded {loaded} program(s) from local config: {cfg_path}")
+            return self._scopes
+        except Exception as e:
+            print(f"  ⚠️  Could not load local config: {e}")
+            return {}
+
+    @classmethod
+    def create_local_config_template(cls, path: Path = None):
+        """
+        Write a starter scope_config.json template the user can fill in.
+        Run once, then edit the file to add your programs and targets.
+        """
+        cfg_path = path or LOCAL_CONFIG_PATH
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        if cfg_path.exists():
+            print(f"  ℹ️  Config already exists at {cfg_path} — not overwriting.")
+            return
+
+        template = {
+            "_comment": (
+                "Nova Scope Manager — local fallback config. "
+                "Add your H1 programs here for offline / no-API-key use. "
+                "asset_type: URL | WILDCARD | CIDR | ANDROID | IOS | OTHER"
+            ),
+            "programs": [
+                {
+                    "handle": "your-program-handle",
+                    "name":   "Your Program Name",
+                    "url":    "https://hackerone.com/your-program-handle",
+                    "state":  "public_mode",
+                    "offers_bounties": True,
+                    "in_scope": [
+                        {
+                            "identifier":             "*.example.com",
+                            "asset_type":             "WILDCARD",
+                            "eligible_for_bounty":    True,
+                            "eligible_for_submission": True,
+                            "max_severity":           "critical",
+                            "instruction":            ""
+                        }
+                    ],
+                    "out_of_scope": [
+                        {
+                            "identifier":             "blog.example.com",
+                            "asset_type":             "URL",
+                            "eligible_for_bounty":    False,
+                            "eligible_for_submission": False,
+                            "max_severity":           "none",
+                            "instruction":            "No testing"
+                        }
+                    ]
+                }
+            ]
+        }
+        cfg_path.write_text(json.dumps(template, indent=2))
+        print(f"  ✅ Template written to: {cfg_path}")
+        print(f"     Edit it to add your real programs, then run:")
+        print(f"     python3 nova_scope_manager.py sync")
 
     # ── EXPORT ────────────────────────────────────────────────────
 
@@ -614,11 +740,17 @@ if __name__ == "__main__":
     # verify
     sub.add_parser("verify", help="Verify H1 credentials")
 
+    # init-config
+    sub.add_parser("init-config", help="Create ~/.nova/scope_config.json template for offline use")
+
     args = parser.parse_args()
 
     mgr = NovaScopeManager()
 
-    if args.cmd == "verify":
+    if args.cmd == "init-config":
+        NovaScopeManager.create_local_config_template()
+
+    elif args.cmd == "verify":
         mgr.verify_credentials()
 
     elif args.cmd == "sync":
