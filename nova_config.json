@@ -1,0 +1,82 @@
+{
+  "_comment": "Nova Arsenal — default configuration. Copy to ~/nova_workspace/nova_config.json",
+  "version": "2.0",
+
+  "workspace":        "~/nova_workspace",
+  "bin_dir":          "~/nova_workspace/bin",
+  "wordlists_dir":    "~/nova_workspace/wordlists",
+  "reports_dir":      "~/nova_workspace/reports",
+  "logs_dir":         "~/nova_workspace/logs",
+  "screenshots_dir":  "~/nova_workspace/screenshots",
+  "backups_dir":      "~/nova_workspace/backups",
+  "tools_dir":        "~/nova_workspace/tools",
+  "memory_dir":       "~/nova_workspace/memory",
+
+  "llm": {
+    "url":            "http://localhost:11434",
+    "model":          "auto",
+    "fallback_model": "llama3.2",
+    "timeout":        120,
+    "stream":         true
+  },
+
+  "recon": {
+    "subdomain_tools":  ["subfinder", "amass", "assetfinder", "crt.sh"],
+    "probe_tools":      ["httpx"],
+    "url_tools":        ["gau", "waybackurls", "katana"],
+    "max_subdomains":   500,
+    "max_urls":         10000,
+    "threads":          10
+  },
+
+  "attack": {
+    "enabled_chains": [
+      "sqli", "xss", "ssrf", "cors", "http_smuggling",
+      "jwt", "ssti", "xxe", "prototype_pollution",
+      "open_redirect", "subdomain_takeover"
+    ],
+    "severity_threshold": "low",
+    "max_payloads_per_param": 50,
+    "follow_redirects": true,
+    "respect_robots":   false
+  },
+
+  "tools": {
+    "install_on_demand": true,
+    "tier1_on_start":    true,
+    "parallel_installs": 4
+  },
+
+  "notifications": {
+    "on_start":         true,
+    "on_critical":      true,
+    "on_complete":      true,
+    "on_evolution":     true,
+    "min_severity":     "high"
+  },
+
+  "evolution": {
+    "enabled":           true,
+    "require_tests":     true,
+    "backup_before":     true,
+    "forbidden_files": [
+      "nova_evolution.py",
+      "nova_memory_system.py",
+      "nova_config.json"
+    ]
+  },
+
+  "reporting": {
+    "formats":           ["html", "md", "json"],
+    "auto_generate":     true,
+    "commit_to_repo":    true
+  },
+
+  "rate_limiting": {
+    "requests_per_second": 10,
+    "delay_between_hosts": 0.5,
+    "max_concurrent":      5
+  },
+
+  "platform":        "local"
+}
