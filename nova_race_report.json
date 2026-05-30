@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-24T14:30:04.794764",
+  "timestamp": "2026-05-30T04:56:15.235065",
   "target": "http://localhost:3000",
   "attacks": [
     {
@@ -16,108 +16,25 @@
       "attack_type": "rate_limit_bypass",
       "endpoint": "/rest/products/search",
       "total_requests": 50,
-      "successful": 50,
+      "successful": 0,
       "rate_limited": 0,
       "errors": 0,
-      "bypass_ratio": 100.0,
-      "vulnerable": true
+      "bypass_ratio": 0.0,
+      "vulnerable": false
     },
     {
       "attack_type": "toctou",
-      "check_endpoint": "/rest/user/whoami",
-      "action_endpoint": "/rest/user/change-password",
-      "total_attempts": 10,
-      "successful": 0,
       "vulnerable": false,
-      "evidence": []
+      "error": "Pre-check failed"
     },
     {
       "attack_type": "session_flood",
       "endpoint": "/api/Users",
       "total_attempts": 20,
-      "successful": 20,
-      "vulnerable": true,
-      "evidence": [
-        {
-          "session_id": 0,
-          "endpoint": "/api/Users",
-          "method": "POST",
-          "status_code": 201,
-          "response_length": 314,
-          "response_time_ms": 3219.97,
-          "response_body": "{\"status\":\"success\",\"data\":{\"username\":\"\",\"role\":\"customer\",\"deluxeToken\":\"\",\"lastLoginIp\":\"0.0.0.0\",\"profileImage\":\"/assets/public/images/uploads/default.svg\",\"isActive\":true,\"id\":25,\"email\":\"nova_test+0@juice-sh.op\",\"updatedAt\":\"2026-05-24T11:30:13.806Z\",\"createdAt\":\"2026-05-24T11:30:13.806Z\",\"deletedAt\":null}}",
-          "headers": {
-            "Access-Control-Allow-Origin": "*",
-            "X-Content-Type-Options": "nosniff",
-            "X-Frame-Options": "SAMEORIGIN",
-            "Feature-Policy": "payment 'self'",
-            "X-Recruiting": "/#/jobs",
-            "Location": "/api/Users/25",
-            "Content-Type": "application/json; charset=utf-8",
-            "Content-Length": "314",
-            "ETag": "W/\"13a-+QyDvlZ39EFW6xn//HDnB3cflo0\"",
-            "Vary": "Accept-Encoding",
-            "Date": "Sun, 24 May 2026 11:30:16 GMT",
-            "Connection": "keep-alive",
-            "Keep-Alive": "timeout=5"
-          },
-          "success": true,
-          "error": null
-        },
-        {
-          "session_id": 2,
-          "endpoint": "/api/Users",
-          "method": "POST",
-          "status_code": 201,
-          "response_length": 314,
-          "response_time_ms": 3251.73,
-          "response_body": "{\"status\":\"success\",\"data\":{\"username\":\"\",\"role\":\"customer\",\"deluxeToken\":\"\",\"lastLoginIp\":\"0.0.0.0\",\"profileImage\":\"/assets/public/images/uploads/default.svg\",\"isActive\":true,\"id\":26,\"email\":\"nova_test+2@juice-sh.op\",\"updatedAt\":\"2026-05-24T11:30:13.842Z\",\"createdAt\":\"2026-05-24T11:30:13.842Z\",\"deletedAt\":null}}",
-          "headers": {
-            "Access-Control-Allow-Origin": "*",
-            "X-Content-Type-Options": "nosniff",
-            "X-Frame-Options": "SAMEORIGIN",
-            "Feature-Policy": "payment 'self'",
-            "X-Recruiting": "/#/jobs",
-            "Location": "/api/Users/26",
-            "Content-Type": "application/json; charset=utf-8",
-            "Content-Length": "314",
-            "ETag": "W/\"13a-i16eVhR0g3+TYY2RKg1LXVeB9BI\"",
-            "Vary": "Accept-Encoding",
-            "Date": "Sun, 24 May 2026 11:30:16 GMT",
-            "Connection": "keep-alive",
-            "Keep-Alive": "timeout=5"
-          },
-          "success": true,
-          "error": null
-        },
-        {
-          "session_id": 4,
-          "endpoint": "/api/Users",
-          "method": "POST",
-          "status_code": 201,
-          "response_length": 314,
-          "response_time_ms": 3312.84,
-          "response_body": "{\"status\":\"success\",\"data\":{\"username\":\"\",\"role\":\"customer\",\"deluxeToken\":\"\",\"lastLoginIp\":\"0.0.0.0\",\"profileImage\":\"/assets/public/images/uploads/default.svg\",\"isActive\":true,\"id\":27,\"email\":\"nova_test+4@juice-sh.op\",\"updatedAt\":\"2026-05-24T11:30:13.870Z\",\"createdAt\":\"2026-05-24T11:30:13.870Z\",\"deletedAt\":null}}",
-          "headers": {
-            "Access-Control-Allow-Origin": "*",
-            "X-Content-Type-Options": "nosniff",
-            "X-Frame-Options": "SAMEORIGIN",
-            "Feature-Policy": "payment 'self'",
-            "X-Recruiting": "/#/jobs",
-            "Location": "/api/Users/27",
-            "Content-Type": "application/json; charset=utf-8",
-            "Content-Length": "314",
-            "ETag": "W/\"13a-GciNNGxVybHnMWaf5npRR/O5lPs\"",
-            "Vary": "Accept-Encoding",
-            "Date": "Sun, 24 May 2026 11:30:16 GMT",
-            "Connection": "keep-alive",
-            "Keep-Alive": "timeout=5"
-          },
-          "success": true,
-          "error": null
-        }
-      ]
+      "successful": 0,
+      "vulnerable": false,
+      "evidence": []
     }
   ],
-  "vulnerable_count": 2
+  "vulnerable_count": 0
 }

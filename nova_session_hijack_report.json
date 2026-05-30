@@ -1,22 +1,19 @@
 {
-  "timestamp": "2026-05-24T13:23:55.071760",
+  "timestamp": "2026-05-30T04:56:14.401202",
   "sessions_extracted": [],
   "fixation_results": [
     {
       "endpoint": "/rest/user/whoami",
       "fixation_attempted": true,
-      "success": true,
+      "success": false,
       "responses": [
         {
           "method": "cookie_fixation",
-          "status": 200,
-          "length": 11,
-          "authenticated": true
+          "error": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: /rest/user/whoami (C"
         },
         {
           "method": "url_parameter",
-          "status": 200,
-          "authenticated": true
+          "error": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: /rest/user/whoami?to"
         }
       ]
     }
@@ -24,21 +21,15 @@
   "cross_user_findings": [
     {
       "auth_method": "Bearer",
-      "status": 200,
-      "body_preview": "{\"user\":{}}",
-      "authenticated": false
+      "error": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: /rest/user/whoami (C"
     },
     {
       "auth_method": "Cookie_token",
-      "status": 200,
-      "body_preview": "{\"user\":{}}",
-      "authenticated": false
+      "error": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: /rest/user/whoami (C"
     },
     {
       "auth_method": "Cookie_sid",
-      "status": 200,
-      "body_preview": "{\"user\":{}}",
-      "authenticated": false
+      "error": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: /rest/user/whoami (C"
     }
   ],
   "idor_findings": []

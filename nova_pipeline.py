@@ -53,7 +53,9 @@ class PipelineResult:
     def record(self, name: str, result: Any, elapsed: float):
         self.phases[name] = {"result": result, "elapsed": round(elapsed,2), "ok": bool(result)}
         if isinstance(result, dict):
-            for f in (result.get("findings",[]) or result.get("confirmed",[])):
+            findings_list = result.get("findings",[]) or result.get("confirmed",[])
+            if isinstance(findings_list, int): findings_list = [{}] * findings_list
+            for f in findings_list:
                 if isinstance(f, dict):
                     f.setdefault("phase", name)
                     self.findings.append(f)
