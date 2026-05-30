@@ -1,7 +1,7 @@
 import request from 'supertest'
 import * as security from './lib/insecurity'
 
-async function main() {
+async function main () {
   const { createApp } = await import('./server')
   const { app } = await createApp({ inMemoryDb: true })
 

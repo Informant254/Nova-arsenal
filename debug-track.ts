@@ -1,6 +1,6 @@
 import request from 'supertest'
 
-async function main() {
+async function main () {
   const { createApp } = await import('./server')
   const { app } = await createApp({ inMemoryDb: true })
   const res = await request(app).get('/rest/track-order/%27%20%7C%7C%20true%20%7C%7C%20%27')

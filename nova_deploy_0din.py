@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-NOVA 0DIN DEPLOYMENT MODULE
-Sends exploitation payloads to live AI endpoints.
-Records responses for bounty submission evidence.
+NOVA 0DIN LOCAL EVALUATION MODULE
+Evaluates payloads with the user's local Ollama model only.
+No Claude, OpenAI, Cursor, or other cloud AI endpoints are called.
 """
 
 import json, time, re, os, hashlib
+import requests
 from datetime import datetime
 from typing import Dict, List, Optional
+
+OLLAMA_URL = os.getenv("NOVA_LLM_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("NOVA_LLM_MODEL", "llama3.1")
 
 class NovaDeploy:
     def __init__(self):
@@ -27,105 +31,53 @@ class NovaDeploy:
         except:
             return []
 
-    def deploy_to_claude(self, prompt: str, api_key: str = None) -> Dict:
-        """Deploy payload to Anthropic Claude API."""
-        print(f"\n🚀 DEPLOYING TO CLAUDE")
+    def deploy_to_ollama(self, prompt: str, label: str = "local-ollama") -> Dict:
+        """Evaluate a payload against the local Ollama model only."""
+        print(f"\n🚀 DEPLOYING LOCALLY VIA OLLAMA ({label})")
         print(f"   Prompt: {prompt[:100]}...")
-        
+
         try:
-            # Use Anthropic Python SDK if available
-            try:
-                import anthropic
-                client = anthropic.Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
-                
-                response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
-                    max_tokens=1024,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                
-                result = {
-                    "status": "success",
-                    "model": "claude-sonnet-4-20250514",
-                    "response": response.content[0].text[:500],
-                    "stop_reason": response.stop_reason,
-                }
-            except ImportError:
-                # Fallback: log as simulated with clear marking
-                result = {
-                    "status": "simulated",
-                    "note": "Anthropic SDK not installed. Install with: pip install anthropic",
-                    "response": f"[SIMULATED] Claude would process prompt: '{prompt[:80]}...'",
-                }
-            
-            # Check for exploitation indicators
-            indicators = self.analyze_response(result.get("response", ""), prompt)
-            result["exploitation_indicators"] = indicators
-            
-            if indicators:
-                print(f"   🔥 EXPLOITATION INDICATORS: {indicators}")
-            else:
-                print(f"   📋 Response received (no indicators)")
-            
-            return result
-            
+            response = requests.post(
+                f"{OLLAMA_URL}/api/chat",
+                json={
+                    "model": OLLAMA_MODEL,
+                    "stream": False,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "options": {"temperature": 0.1, "num_predict": 1024},
+                },
+                timeout=120,
+            )
+            if response.status_code != 200:
+                return {"status": "error", "model": OLLAMA_MODEL, "error": f"Ollama returned HTTP {response.status_code}"}
+            text = response.json().get("message", {}).get("content", "")
+            result = {
+                "status": "success",
+                "provider": "ollama",
+                "model": OLLAMA_MODEL,
+                "response": text[:500],
+            }
         except Exception as e:
-            return {"status": "error", "error": str(e)[:200]}
+            return {"status": "error", "provider": "ollama", "model": OLLAMA_MODEL, "error": str(e)[:200]}
+
+        indicators = self.analyze_response(result.get("response", ""), prompt)
+        result["exploitation_indicators"] = indicators
+        if indicators:
+            print(f"   🔥 EXPLOITATION INDICATORS: {indicators}")
+        else:
+            print("   📋 Local Ollama response received (no indicators)")
+        return result
+
+    def deploy_to_claude(self, prompt: str, api_key: str = None) -> Dict:
+        """Cloud Claude deployment is disabled; use local Ollama instead."""
+        return self.deploy_to_ollama(prompt, "claude-target-local-eval")
 
     def deploy_to_openai(self, prompt: str, api_key: str = None) -> Dict:
-        """Deploy payload to OpenAI API (Codex CLI base)."""
-        print(f"\n🚀 DEPLOYING TO OPENAI")
-        print(f"   Prompt: {prompt[:100]}...")
-        
-        try:
-            try:
-                import openai
-                client = openai.OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-                
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=1024,
-                )
-                
-                result = {
-                    "status": "success",
-                    "model": "gpt-4o",
-                    "response": response.choices[0].message.content[:500],
-                    "finish_reason": response.choices[0].finish_reason,
-                }
-            except ImportError:
-                result = {
-                    "status": "simulated",
-                    "note": "OpenAI SDK not installed. Install with: pip install openai",
-                    "response": f"[SIMULATED] GPT-4o would process prompt: '{prompt[:80]}...'",
-                }
-            
-            indicators = self.analyze_response(result.get("response", ""), prompt)
-            result["exploitation_indicators"] = indicators
-            
-            if indicators:
-                print(f"   🔥 EXPLOITATION INDICATORS: {indicators}")
-            
-            return result
-            
-        except Exception as e:
-            return {"status": "error", "error": str(e)[:200]}
+        """Cloud OpenAI deployment is disabled; use local Ollama instead."""
+        return self.deploy_to_ollama(prompt, "openai-target-local-eval")
 
     def deploy_to_generic(self, prompt: str, endpoint: str) -> Dict:
-        """Deploy payload to a generic AI API endpoint."""
-        print(f"\n🚀 DEPLOYING TO: {endpoint}")
-        print(f"   Prompt: {prompt[:100]}...")
-        
-        # For endpoints that require browser interaction
-        result = {
-            "status": "requires_browser",
-            "endpoint": endpoint,
-            "prompt_sent": prompt[:200],
-            "note": "This endpoint requires browser automation. Use Nova Browser Agent.",
-        }
-        
-        return result
+        """Generic cloud endpoints are not called; use local Ollama instead."""
+        return self.deploy_to_ollama(prompt, f"generic-target-local-eval:{endpoint}")
 
     def analyze_response(self, response: str, original_prompt: str) -> List[str]:
         """Analyze AI response for exploitation indicators."""
@@ -153,8 +105,8 @@ class NovaDeploy:
         """Execute full deployment of all 25 payloads."""
         print("""
 ╔══════════════════════════════════════════════════════════╗
-║   🚀 NOVA 0DIN DEPLOYMENT — LIVE PAYLOAD DELIVERY     ║
-║   Claude · GPT · Codex · Cursor · Open Interpreter   ║
+║   🚀 NOVA 0DIN DEPLOYMENT — LOCAL OLLAMA EVALUATION   ║
+║   No cloud APIs · No external agent calls             ║
 ╚══════════════════════════════════════════════════════════╝
         """)
         
