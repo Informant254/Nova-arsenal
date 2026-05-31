@@ -1,13 +1,38 @@
 #!/usr/bin/env python3
 """
-NOVA CONTINUOUS v3.0 — REAL BUGS ONLY
+NOVA CONTINUOUS v3.0 — REAL BUGS ONLY + SELF-IMPROVEMENT
 Full Titan pipeline in every scan:
 Pattern → Data Flow → Sanitization Check → Context Verify → Report
 Zero false positives. Only exploitable vulnerabilities.
+
+After every SELF_IMPROVE_EVERY cycles: collect run signals → Ollama proposes
+improvements → patch candidates saved → outcomes remembered.
 """
 
 import json, os, time, subprocess, tempfile, random, re, hashlib
 from datetime import datetime
+from pathlib import Path
+
+# ── Self-improvement integration ──────────────────────────────────────────────
+WORKSPACE = Path(os.path.expanduser(os.getenv("NOVA_WORKSPACE", "~/nova_workspace")))
+SELF_IMPROVE_EVERY = int(os.getenv("NOVA_SELF_IMPROVE_EVERY", "5"))  # cycles between improvements
+
+try:
+    from nova_self_improvement import (
+        generate_improvement_plan,
+        remember_outcome,
+        collect_run_signals,
+    )
+    _SELF_IMPROVE_AVAILABLE = True
+except ImportError:
+    _SELF_IMPROVE_AVAILABLE = False
+
+try:
+    from nova_repo_intelligence import build_repo_index
+    _REPO_INTEL_AVAILABLE = True
+except ImportError:
+    _REPO_INTEL_AVAILABLE = False
+
 
 class NovaContinuousV3:
     def __init__(self):
@@ -16,7 +41,8 @@ class NovaContinuousV3:
         self.real_findings = []
         self.false_positives_filtered = 0
         self.start_time = datetime.now()
-        
+        self.cycle_count = 0
+
         self.targets = [
             "https://github.com/spring-projects/spring-framework.git",
             "https://github.com/django/django.git",
@@ -28,8 +54,7 @@ class NovaContinuousV3:
             "https://github.com/OWASP/WebGoat.git",
             "https://github.com/juice-shop/juice-shop.git",
         ]
-        
-        # Each bug class now has source markers, sink markers, AND sanitizer markers
+
         self.bug_classes = {
             "sql_injection": {
                 "severity": "CRITICAL", "cvss": "9.8", "cwe": "CWE-89",
@@ -100,8 +125,13 @@ class NovaContinuousV3:
         try:
             with open(self.brain_file) as f:
                 self.brain = json.load(f)
-        except:
-            self.brain = {"total_real_bugs": 0, "critical_bugs": 0, "false_positives_filtered": 0, "repos_scanned": [], "mission_count": 0, "started": datetime.now().isoformat(), "top_real_findings": []}
+        except Exception:
+            self.brain = {
+                "total_real_bugs": 0, "critical_bugs": 0,
+                "false_positives_filtered": 0, "repos_scanned": [],
+                "mission_count": 0, "self_improve_cycles": 0,
+                "started": datetime.now().isoformat(), "top_real_findings": [],
+            }
 
     def save_brain(self):
         self.brain["total_real_bugs"] += len(self.real_findings)
@@ -118,135 +148,210 @@ class NovaContinuousV3:
         return random.choice(list(self.bug_classes.keys()))
 
     def trace_data_flow(self, lines, source_line, sink_line, vuln_data):
-        """Trace if user input actually reaches the dangerous sink."""
-        # Get the code between source and sink
         if source_line >= sink_line:
             return False
-        
         between = lines[source_line:min(sink_line + 1, len(lines))]
         between_text = "\n".join(between)
-        
-        # Check for sanitization anywhere between source and sink
         for sanitizer in vuln_data["sanitizers"]:
             if sanitizer.lower() in between_text.lower():
-                return False  # Sanitized — not exploitable
-        
-        return True  # No sanitization — potentially exploitable
+                return False
+        return True
 
     def check_context(self, filepath):
-        """Skip test files, generated code, and vendor libraries."""
-        skip_patterns = ["test", "spec", "__pycache__", "node_modules", "vendor", "third_party", ".min.js", "bootstrap", "jquery", "lodash", "three.js"]
+        skip_patterns = ["test", "spec", "__pycache__", "node_modules", "vendor",
+                         "third_party", ".min.js", "bootstrap", "jquery", "lodash", "three.js"]
         return not any(p in filepath.lower() for p in skip_patterns)
 
     def scan_target(self, repo_url, technique):
         name = repo_url.split("/")[-1].replace(".git", "")
-        bug = self.bug_classes[technique]
+        bug  = self.bug_classes[technique]
         print(f"🔍 [{technique}] {name} | {bug['severity']} | {bug['cwe']}")
-        
+
         tmp = tempfile.mkdtemp(prefix=f"nc3_{name}_")
         try:
-            subprocess.run(["git", "clone", "--depth", "1", repo_url, tmp], capture_output=True, check=True, timeout=120)
-        except:
+            subprocess.run(["git", "clone", "--depth", "1", repo_url, tmp],
+                           capture_output=True, check=True, timeout=120)
+        except Exception:
             return {"repo": name, "findings": 0, "real": 0}
-        
+
         real_found = 0
         noise_filtered = 0
-        
+
         for root, dirs, files in os.walk(tmp):
-            dirs[:] = [d for d in dirs if d not in ["node_modules", ".git", "__pycache__", "test", "tests", "third_party", "vendor"]]
+            dirs[:] = [d for d in dirs if d not in
+                       ["node_modules", ".git", "__pycache__", "test", "tests", "third_party", "vendor"]]
             for file in files:
-                if file.endswith((".py", ".js", ".ts", ".java", ".rb", ".php")):
-                    filepath = os.path.join(root, file)
-                    rel_path = filepath.replace(tmp, "")
-                    
-                    if not self.check_context(rel_path):
-                        continue
-                    
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            lines = f.readlines()
-                    except:
-                        continue
-                    
-                    # Find all sources and sinks
-                    sources = [(i, l) for i, l in enumerate(lines) if any(s.lower() in l.lower() for s in bug["sources"])]
-                    sinks = [(i, l) for i, l in enumerate(lines) if any(s.lower() in l.lower() for s in bug["sinks"])]
-                    
-                    # Only report if source flows to sink WITHOUT sanitization
-                    for src_line, src_code in sources:
-                        for sink_line, sink_code in sinks:
-                            if self.trace_data_flow(lines, src_line, sink_line, bug):
-                                # Real finding — user input reaches dangerous sink unsanitized
-                                finding = {
-                                    "technique": technique,
-                                    "severity": bug["severity"],
-                                    "cvss": bug["cvss"],
-                                    "cwe": bug["cwe"],
-                                    "patch": bug["patch"],
-                                    "file": rel_path,
-                                    "source_line": src_line + 1,
-                                    "sink_line": sink_line + 1,
-                                    "source_code": src_code.strip()[:150],
-                                    "sink_code": sink_code.strip()[:150],
-                                    "repo": name,
-                                    "id": hashlib.md5(f"{rel_path}{src_line}{sink_line}".encode()).hexdigest()[:12],
-                                    "exploitable": True,
-                                }
-                                self.real_findings.append(finding)
-                                if bug["severity"] == "CRITICAL":
-                                    self.brain["critical_bugs"] += 1
-                                    self.brain["top_real_findings"].insert(0, finding)
-                                real_found += 1
-                            else:
-                                noise_filtered += 1
-        
+                if not file.endswith((".py", ".js", ".ts", ".java", ".rb", ".php")):
+                    continue
+                filepath = os.path.join(root, file)
+                rel_path = filepath.replace(tmp, "")
+                if not self.check_context(rel_path):
+                    continue
+                try:
+                    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
+                except Exception:
+                    continue
+                sources = [(i, l) for i, l in enumerate(lines)
+                           if any(s.lower() in l.lower() for s in bug["sources"])]
+                sinks   = [(i, l) for i, l in enumerate(lines)
+                           if any(s.lower() in l.lower() for s in bug["sinks"])]
+                for src_line, src_code in sources:
+                    for sink_line, sink_code in sinks:
+                        if self.trace_data_flow(lines, src_line, sink_line, bug):
+                            finding = {
+                                "technique": technique, "severity": bug["severity"],
+                                "cvss": bug["cvss"], "cwe": bug["cwe"],
+                                "patch": bug["patch"], "file": rel_path,
+                                "source_line": src_line + 1, "sink_line": sink_line + 1,
+                                "source_code": src_code.strip()[:150],
+                                "sink_code": sink_code.strip()[:150],
+                                "repo": name, "exploitable": True,
+                                "id": hashlib.md5(f"{rel_path}{src_line}{sink_line}".encode()).hexdigest()[:12],
+                            }
+                            self.real_findings.append(finding)
+                            if bug["severity"] == "CRITICAL":
+                                self.brain["critical_bugs"] += 1
+                                self.brain["top_real_findings"].insert(0, finding)
+                            real_found += 1
+                        else:
+                            noise_filtered += 1
+
         self.false_positives_filtered += noise_filtered
         subprocess.run(["rm", "-rf", tmp])
-        
         print(f"   💀 Real: {real_found} | 🚫 Filtered: {noise_filtered} | Patch: {bug['patch'][:50]}...")
         return {"repo": name, "real": real_found, "filtered": noise_filtered}
 
+    # ── SELF-IMPROVEMENT CYCLE ──────────────────────────────────────────────────
+
+    def run_self_improvement_cycle(self):
+        """
+        After every SELF_IMPROVE_EVERY hunt cycles:
+        1. collect_run_signals — reads recent agent reports + verification logs
+        2. generate_improvement_plan — Ollama proposes code patches (no cloud)
+        3. Log top proposals to brain
+        4. remember_outcome — persist the cycle result to long-term memory
+        """
+        if not _SELF_IMPROVE_AVAILABLE:
+            print("  ⚠️  nova_self_improvement not available — skipping cycle")
+            return
+
+        print("\n" + "─" * 60)
+        print(f"  🔄 SELF-IMPROVEMENT CYCLE #{self.brain.get('self_improve_cycles', 0) + 1}")
+        print(f"     Real bugs found so far: {self.brain['total_real_bugs'] + len(self.real_findings)}")
+        print(f"     False positives filtered: {self.brain['false_positives_filtered']}")
+        print("─" * 60)
+
+        try:
+            # Step 1 — collect signals from recent runs
+            signals = collect_run_signals(str(WORKSPACE))
+            n_reports = len(signals.get("reports", []))
+            print(f"  📂 Collected signals from {n_reports} recent run reports")
+
+            # Step 2 — generate improvement plan via local Ollama
+            plan = generate_improvement_plan(root=".", workspace=str(WORKSPACE))
+            proposals = plan.get("proposals", [])
+            print(f"  📝 Generated {len(proposals)} improvement proposal(s):")
+            for p in proposals[:5]:
+                title  = p.get("title",  "")[:70]
+                status = p.get("status", "pending")
+                files  = ", ".join(p.get("target_files", []))[:50]
+                print(f"     [{status}] {title}")
+                if files:
+                    print(f"            → {files}")
+
+            # Step 3 — save proposals to brain
+            self.brain["self_improve_cycles"] = self.brain.get("self_improve_cycles", 0) + 1
+            self.brain["last_improvement_plan"] = {
+                "ts":        datetime.utcnow().isoformat(),
+                "proposals": proposals[:10],
+            }
+
+            # Step 4 — remember this cycle
+            remember_outcome(
+                proposal_id=f"continuous-cycle-{int(time.time())}",
+                success=True,
+                notes=(
+                    f"Continuous cycle {self.brain['self_improve_cycles']} complete. "
+                    f"Real bugs total: {self.brain['total_real_bugs'] + len(self.real_findings)}. "
+                    f"Proposals generated: {len(proposals)}."
+                ),
+            )
+            print(f"  ✅ Improvement cycle complete — proposals saved, outcome remembered")
+
+        except Exception as e:
+            print(f"  ⚠️  Self-improvement cycle error: {e}")
+
+        print("─" * 60 + "\n")
+
+    # ── MAIN HUNT LOOP ──────────────────────────────────────────────────────────
+
     def run(self, max_iter=10):
         print("""
-╔══════════════════════════════════════════════════════════╗
-║   🦅 NOVA CONTINUOUS v3.0 — REAL BUGS ONLY              ║
-║   Pattern → Data Flow → Sanitize → Context → Report    ║
-║   Zero False Positives. Only Exploitable Vulns.        ║
-╚══════════════════════════════════════════════════════════╝
-        """)
-        
+╔══════════════════════════════════════════════════════════════╗
+║   🦅 NOVA CONTINUOUS v3.0 — REAL BUGS + SELF-IMPROVEMENT   ║
+║   Pattern → DataFlow → Sanitize → Context → Report         ║
+║   + Self-improvement every {every} cycles                    ║
+╚══════════════════════════════════════════════════════════════╝
+        """.format(every=SELF_IMPROVE_EVERY))
+
+        # Build repo intelligence index once at startup
+        if _REPO_INTEL_AVAILABLE:
+            try:
+                print("  🗂️  Building repo intelligence index...")
+                build_repo_index(".")
+                print("  ✅ Repo index ready\n")
+            except Exception as e:
+                print(f"  ⚠️  Repo index skipped: {e}\n")
+
         for i in range(max_iter):
-            target = self.pick_target()
+            self.cycle_count += 1
+            target    = self.pick_target()
             technique = self.pick_technique()
             self.scan_target(target, technique)
+
             if target not in self.brain["repos_scanned"]:
                 self.brain["repos_scanned"].append(target)
+
+            # Periodic brain save + stats
             if i % 5 == 4:
                 self.save_brain()
                 total = self.brain["total_real_bugs"] + len(self.real_findings)
-                print(f"\n🧠 Saved | Real Bugs: {total} | Critical: {self.brain['critical_bugs']} | Noise Filtered: {self.brain['false_positives_filtered']}\n")
+                print(f"\n🧠 Brain saved | Real Bugs: {total} | Critical: {self.brain['critical_bugs']} "
+                      f"| Noise Filtered: {self.brain['false_positives_filtered']}\n")
+
+            # Self-improvement every SELF_IMPROVE_EVERY cycles
+            if self.cycle_count % SELF_IMPROVE_EVERY == 0:
+                self.run_self_improvement_cycle()
+
             time.sleep(1)
-        
+
+        # Final self-improvement cycle before shutdown
+        self.run_self_improvement_cycle()
         self.save_brain()
+
         total = self.brain["total_real_bugs"] + len(self.real_findings)
+        si_cycles = self.brain.get("self_improve_cycles", 0)
         print(f"""
-╔══════════════════════════════════════════════════════════╗
-║   🦅 v3.0 COMPLETE — ONLY REAL BUGS                     ║
-╠══════════════════════════════════════════════════════════╣
-║  Real Exploitable: {total:<5}                                    ║
-║  Critical: {self.brain['critical_bugs']:<5}                                         ║
-║  False Positives Filtered: {self.brain['false_positives_filtered']:<5}                          ║
-║  Repos Scanned: {len(self.brain['repos_scanned'])}                                        ║
-╚══════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════╗
+║   🦅 NOVA CONTINUOUS v3.0 — SESSION COMPLETE                ║
+╠══════════════════════════════════════════════════════════════╣
+║  Real Exploitable Bugs : {total:<5}                                ║
+║  Critical              : {self.brain['critical_bugs']:<5}                                ║
+║  False Positives Filtered: {self.brain['false_positives_filtered']:<5}                            ║
+║  Repos Scanned         : {len(self.brain['repos_scanned']):<5}                                ║
+║  Self-Improvement Cycles: {si_cycles:<5}                                ║
+╚══════════════════════════════════════════════════════════════╝
         """)
-        
+
         if self.brain["top_real_findings"]:
             print("💀 TOP REAL EXPLOITABLE VULNERABILITIES:")
             for f in self.brain["top_real_findings"][:5]:
                 print(f"   🔥 [{f['severity']}] {f['cwe']} | CVSS {f['cvss']}")
-                print(f"      {f['repo']}/{f['file']}")
+                print(f"      {f['repo']}{f['file']}")
                 print(f"      Source line {f['source_line']} → Sink line {f['sink_line']}")
                 print(f"      Patch: {f['patch'][:80]}...")
+
 
 if __name__ == "__main__":
     import sys
