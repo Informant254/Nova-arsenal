@@ -1,402 +1,478 @@
-<div align="center">
+# Nova Arsenal v4.0
+### Autonomous AI-Powered Cybersecurity Platform
 
-```
-███╗   ██╗ ██████╗ ██╗   ██╗  █████╗
-████╗  ██║██╔═══██╗██║   ██║ ██╔══██╗
-██╔██╗ ██║██║   ██║██║   ██║ ███████║
-██║╚██╗██║██║   ██║╚██╗ ██╔╝ ██╔══██║
-██║ ╚████║╚██████╔╝ ╚████╔╝  ██║  ██║
-╚═╝  ╚═══╝ ╚═════╝   ╚═══╝   ╚═╝  ╚═╝
-         A R S E N A L  v4.0
-```
-
-**Fully Autonomous AI-Powered Cybersecurity Platform**
-
-*Tell Nova what you want in plain English. She plans, probes, verifies, and reports — fully autonomously.*
-
-[![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
-[![Ollama](https://img.shields.io/badge/LLM-Ollama%20Local-green)](https://ollama.com)
-[![Cost](https://img.shields.io/badge/LLM%20Cost-%240%2Frun-brightgreen)](#)
-[![Parity](https://img.shields.io/badge/Frontier%20Gap-8%2F8%20Closed-red)](#8-capability-parity-table)
-
-</div>
+> **One command. Full coverage.** Nova takes a plain-English instruction, parses intent with a local LLM, routes to the right specialist modules, and orchestrates a complete offensive/defensive security workflow — all locally, zero cost, zero cloud dependency.
 
 ---
 
-## Table of Contents
-
-1. [What Nova Is](#1-what-nova-is)
-2. [Architecture Overview](#2-architecture-overview)
-3. [Installation](#3-installation)
-4. [Talking to Nova in Plain English](#4-talking-to-nova-in-plain-english)
-5. [v3.5 Gap-Closing Capabilities](#5-v35-gap-closing-capabilities)
-6. [v4.0 NEW — Mythos + Daybreak Parity](#6-v40-new--mythos--daybreak-parity)
-   - [File Prioritization](#61-file-prioritization--nova_file_prioritizerpy)
-   - [Threat Modeling](#62-threat-modeling--nova_threat_modelpy)
-   - [Patch Generator](#63-patch-generator--nova_patch_generatorpy)
-   - [SCA Scanner](#64-sca-scanner--nova_sca_scannerpy)
-   - [Git History Scanner](#65-git-history-scanner--nova_git_scannerpy)
-   - [Sandbox Validator](#66-sandbox-validator--nova_sandbox_validatorpy)
-   - [Detection Engineer](#67-detection-engineer--nova_detection_engineerpy)
-   - [Audit Reporter](#68-audit-reporter--nova_audit_reporterpy)
-7. [Module Reference](#7-module-reference)
-8. [Capability Parity Table](#8-capability-parity-table)
-9. [Configuration](#9-configuration)
-10. [HackerOne Integration](#10-hackerone-integration)
-
----
-
-## 1. What Nova Is
-
-Nova is a **fully autonomous, locally-run AI security research system**. Talk to her in plain English. She decides what to do and does it — no confirmation prompts, no menus, no configuration.
-
-```
-You:  "Run full-stack Mythos+Daybreak pipeline on ./juice-shop"
-Nova: [1/7] prioritize files (Mythos 1-5 scoring)
-      [2/7] build threat model (attack surface + trust boundaries)
-      [3/7] audit source code (TypeScript + Python taint tracing)
-      [4/7] SCA — scan 127 npm packages for CVEs
-      [5/7] git history — 3 leaked AWS keys found, rotate now
-      [6/7] generate 23 auto-patches
-      [7/7] generate Sigma/Splunk/Elastic/Suricata rules + audit report
-```
-
-Everything runs **100% locally**. Zero cloud cost. Zero API keys for LLM.
-
----
-
-## 2. Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         NOVA ARSENAL v4.0                               │
-│                                                                          │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │             NATURAL LANGUAGE ENTRY POINT  (nova.py)               │  │
-│  │   "Hunt X"  "Threat model Y"  "SCA scan"  "Full stack pipeline"   │  │
-│  │   LLM intent parser → keyword fallback → dispatch                 │  │
-│  └─────────────────────────────┬─────────────────────────────────────┘  │
-│                                 │                                        │
-│   ┌────────────────┐   ┌────────▼───────────┐   ┌─────────────────┐   │
-│   │ nova_          │   │ nova_agent_core v2  │   │ launch_swarm    │   │
-│   │ continuous_v3  │   │ (ReAct loop)        │   │ (10 parallel)   │   │
-│   │ (24/7 + self-  │   └────────────────────-┘   └─────────────────┘   │
-│   │  improvement)  │                                                     │
-│   └────────────────┘                                                     │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │              v3.5 GAP-CLOSING MODULES                              │ │
-│  │  nova_planner        — structured multi-phase planning  [Code]    │ │
-│  │  nova_vision         — screenshot + LLM visual analysis [Mythos]  │ │
-│  │  nova_verify_engine  — triple-confirm + CVSS + H1 pack  [Daybreak]│ │
-│  │  nova_web_researcher — NVD/GitHub/OSV CVE + PoC lookup  [All 3]   │ │
-│  │  nova_context_manager— rolling compression, 200+ steps  [Code]    │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │              v4.0 NEW — MYTHOS + DAYBREAK PARITY (8 modules)       │ │
-│  │                                                                    │ │
-│  │  nova_file_prioritizer   — Mythos 1-5 risk scoring before scan    │ │
-│  │  nova_threat_model       — editable threat model + attack paths   │ │
-│  │  nova_patch_generator    — auto-patch confirmed findings           │ │
-│  │  nova_sca_scanner        — npm/pip/go CVE scan via OSV.dev         │ │
-│  │  nova_git_scanner        — git history secret + regression scan   │ │
-│  │  nova_sandbox_validator  — isolated exploit validation             │ │
-│  │  nova_detection_engineer — Sigma/Splunk/Elastic/Suricata rules    │ │
-│  │  nova_audit_reporter     — enterprise audit report + CVSS         │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │              SOURCE AUDITOR v2.0 (updated)                         │ │
-│  │  nova_source_auditor — TypeScript/JS/Python multi-language sinks  │ │
-│  │                        + Mythos-style file prioritization (1-5)   │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 3. Installation
+## Quick Start
 
 ```bash
-git clone https://github.com/Informant254/Nova-arsenal
-cd Nova-arsenal
-pip3 install -r requirements.txt    # requests, beautifulsoup4, etc.
+# 1. One-shot install (installs Ollama, LLM, dependencies, verifies every module)
+bash nova_install.sh
 
-# Install Ollama + a model (optional — keyword fallback works without it)
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen3:8b                # or llama3.2, mistral, etc.
-```
-
----
-
-## 4. Talking to Nova in Plain English
-
-```bash
-# Original modes
-python3 nova.py "Hunt hackerone.com for SQL injection and SSRF"
-python3 nova.py "Run a full swarm on localhost:3000"
-python3 nova.py "Assess notion.so with Daybreak"
-python3 nova.py "Recon target.com — subdomains and ports"
-python3 nova.py "Improve yourself"
-python3 nova.py "Run 24/7 continuous hunting"
-python3 nova.py "Code review audit of ./src"
-
-# v4.0 NEW modes
-python3 nova.py "Build a threat model for ./juice-shop"
-python3 nova.py "Scan dependencies for CVEs"
-python3 nova.py "Scan git history for leaked secrets"
-python3 nova.py "Patch all confirmed findings"
-python3 nova.py "Generate SIEM detection rules"
-python3 nova.py "Generate an enterprise audit report"
+# 2. Run anything in plain English
+python3 nova.py "Hunt http://localhost:3000 for SQL injection"
 python3 nova.py "Run full-stack Mythos+Daybreak pipeline on ./juice-shop"
+python3 nova.py "Scan git history for leaked secrets"
+python3 nova.py "Build a threat model for ./my-app"
+python3 nova.py "Test GraphQL endpoint at http://api.example.com"
+python3 nova.py "Check supply chain risk in ."
+python3 nova.py "Scan CI/CD pipelines and Dockerfiles in ."
+python3 nova.py "Show vulnerability tracker dashboard"
+python3 nova.py "Check health of all Nova modules"
 
-# Direct module usage
-python3 nova_threat_model.py ./juice-shop
-python3 nova_sca_scanner.py ./juice-shop
-python3 nova_git_scanner.py ./juice-shop
-python3 nova_audit_reporter.py nova_*_report.json
-python3 nova_detection_engineer.py nova_audit_report.json
+# 3. Verify full-power installation
+python3 nova_bootstrap.py
 ```
 
 ---
 
-## 5. v3.5 Gap-Closing Capabilities
+## Architecture: Everything Tied Together
 
-### 5.1 Pre-Hunt Strategic Planning — `nova_planner.py`
-Generates a structured 8-phase attack plan before any tool call — matching Claude Code's planning capability.
+```
+                   ┌─────────────────────────────────┐
+                   │    nova.py  (single entry point) │
+                   │  natural language → NLP parser   │
+                   └────────────┬────────────────────┘
+                                │ intent + target
+                                ▼
+              ┌─────────────────────────────────────────┐
+              │         dispatch()  engine               │
+              │  routes to 1 or N specialist modules    │
+              └──┬──────────┬──────────┬────────────────┘
+                 │          │          │
+    ┌────────────▼──┐  ┌────▼────┐  ┌─▼──────────────────┐
+    │  Static/Code  │  │ Active  │  │ Intelligence Layer  │
+    │  Analysis     │  │ Probing │  │                     │
+    │               │  │         │  │ nova_threat_model   │
+    │ nova_source_  │  │nova_    │  │ nova_zero_day_      │
+    │  auditor      │  │fuzzer   │  │  correlator         │
+    │ nova_sca_     │  │nova_    │  │ nova_web_researcher │
+    │  scanner      │  │idor_    │  │ nova_planner        │
+    │ nova_git_     │  │scanner  │  └─────────────────────┘
+    │  scanner      │  │nova_    │
+    │ nova_cicd_    │  │graphql_ │  ┌──────────────────────┐
+    │  scanner      │  │tester   │  │  Detection/Report    │
+    │ nova_container│  │nova_    │  │                      │
+    │  _scanner     │  │csrf_    │  │ nova_detection_      │
+    │ nova_supply_  │  │tester   │  │  engineer            │
+    │  chain_scorer │  │nova_    │  │ nova_audit_reporter  │
+    │ nova_file_    │  │business_│  │ nova_patch_generator │
+    │  prioritizer  │  │logic    │  │ nova_sandbox_        │
+    └───────────────┘  │nova_llm_│  │  validator           │
+                       │injection│  └──────────────────────┘
+                       └─────────┘
+                                          │
+                              ┌───────────▼──────────────┐
+                              │  nova_vuln_tracker.py    │
+                              │  SQLite persistence      │
+                              │  regression detection    │
+                              │  trend dashboards        │
+                              └──────────────────────────┘
+```
 
-### 5.2 Visual Screenshot Analysis — `nova_vision.py`
-Screenshots the target and uses a vision-capable Ollama model to identify forms, auth state, admin links, and attack vectors.
-
-### 5.3 Triple-Verify Engine — `nova_verify_engine.py`
-Before reporting any finding: HTTP re-probe → browser re-probe → parameter variation test. Eliminates false positives.
-Scores every confirmed finding with CVSS 3.1 and packages a HackerOne-ready bug report.
-
-### 5.4 CVE/PoC Web Research — `nova_web_researcher.py`
-Detects the tech stack (Express, Django, Rails, etc.), then queries NVD, GitHub Security Advisories, and OSV.dev for known CVEs and PoC exploits. Injects results into the agent context before the first tool call.
-
-### 5.5 Context Window Compression — `nova_context_manager.py`
-Rolling token budget manager. When the context exceeds 70% of the model's limit, it summarises and compresses older steps — enabling 200+ step hunts without context overflow.
-
-### 5.6 20-Tool Agent Kit — `nova_tool_kit.py`
-Full tool suite: bash, browser_navigate, http_request, take_screenshot, read_file, write_file, grep_code, install_package, self_review_code, self_remember, repo_index, run_nuclei, run_sqlmap, run_ffuf, run_nmap, run_nikto, check_cve, generate_poc, search_exploitdb, validate_finding.
+All modules share a **common findings schema** and automatically feed into `nova_vuln_tracker` — so every scan, across every mode, builds a persistent vulnerability history.
 
 ---
 
-## 6. v4.0 NEW — Mythos + Daybreak Parity
+## All Dispatch Modes
 
-### 6.1 File Prioritization — `nova_file_prioritizer.py`
-
-Replicates Mythos's critical capability: score every file 1–5 before scanning so the agent focuses on high-risk surfaces first.
-
-| Score | Meaning | Examples |
+| Command phrase | Mode | What runs |
 |---|---|---|
-| 5 | Direct user-input → sink | route handlers, auth, DB queries |
-| 4 | Indirect high-risk | redirects, crypto, CORS config |
-| 3 | Business logic | controllers, middleware |
-| 2 | Utility / model | helpers, schemas |
-| 1 | Static | constants, config reads |
+| `full-stack` / `everything` / `v4` | `full_stack` | All 19 modules in sequence — Mythos+Daybreak parity |
+| `hunt` / `bug bounty` / `pentest` | `hunt` | ReAct agent loop + SAST + IDOR + GraphQL + CSRF + BL |
+| `sast` / `source code` / `code audit` | `sast` | File prioritizer + multi-language source auditor |
+| `threat model` / `attack surface` | `threat_model` | Entry points + trust boundaries + STRIDE |
+| `dependency` / `sca` / `npm audit` | `sca` | OSV + NVD advisory scan + supply chain scorer |
+| `supply chain` / `typosquat` | `supply_chain` | Typosquatting + maintainer risk + OSV |
+| `git history` / `leaked secret` | `git_scan` | 20-pattern git log secret scan |
+| `ci/cd` / `github actions` | `cicd` | Pipeline secret + injection + unpinned action scan |
+| `docker` / `container` / `k8s` | `container` | Dockerfile + compose + K8s manifest scan |
+| `zero day` / `cve` / `osv` | `zero_day` | Live NVD + OSV CVE correlation against tech stack |
+| `idor` / `access control` / `bola` | `idor` | Horizontal + vertical privilege escalation testing |
+| `graphql` / `gql` | `graphql` | Introspection + injection + depth attack + batch |
+| `csrf` / `samesite` | `csrf` | Cookie flags + origin + JSON CSRF + CORS |
+| `business logic` / `negative price` | `business_logic` | Negative values + race conditions + workflow bypass |
+| `llm injection` / `prompt injection` | `llm_injection` | Jailbreak + system prompt leak + tool abuse |
+| `jwt` / `bearer token` | `jwt` | alg:none + key confusion + weak secret |
+| `sql injection` / `sqli` | `sqli` | Union + boolean + time-based blind SQLi |
+| `prototype pollution` | `proto_pollution` | `__proto__` + constructor abuse |
+| `race condition` / `toctou` | `race` | 10-thread concurrent request races |
+| `fuzz` / `directory` | `fuzz` | Parameter + directory + endpoint fuzzing |
+| `recon` / `subdomain` | `recon` | DNS + crt.sh + passive footprint |
+| `patch` / `auto fix` | `patch` | LLM-guided safe code fix for 10 vuln classes |
+| `detection rules` / `sigma` | `detect` | Sigma + Splunk SPL + Elastic KQL + Suricata |
+| `audit report` / `compliance` | `audit_report` | CVSS 3.1 + SLA + PCI/SOC2/ISO27001 notes |
+| `tracker` / `dashboard` | `vuln_track` | SQLite trend + regression dashboard |
+| `swarm` | `swarm` | 10-agent parallel hunt |
+| `bootstrap` / `health check` | `bootstrap` | Module + tool + API connectivity verification |
+| `continuous` | `continuous` | 24/7 scheduled hunting loop |
 
-```bash
-python3 nova_file_prioritizer.py ./juice-shop
-```
+---
 
-### 6.2 Threat Modeling — `nova_threat_model.py`
+## Module Reference
 
-Daybreak-style editable threat model. Scans the codebase and outputs:
+### Offense / Active Testing
 
-- **Entry points** — all HTTP routes, WebSocket events, CLI handlers
-- **Trust boundaries** — DB, filesystem, external HTTP, session layer
-- **Sensitive data flows** — passwords, keys, PII, payment data
-- **Prioritised attack paths** — CRITICAL/HIGH ranked by type
+| Module | Version | Description |
+|---|---|---|
+| `nova_agent_core.py` | v2.0 | ReAct agentic hunt loop — plan, act, observe, reflect |
+| `nova_fuzzer.py` | v3.5 | HTTP parameter + SQLi + XSS fuzzing |
+| `nova_jwt_forge.py` | v3.5 | JWT alg:none, weak secret, kid injection |
+| `nova_race_engine.py` | v3.5 | Concurrent HTTP race condition testing |
+| `nova_session_hijacker.py` | v3.5 | Session token analysis + fixation |
+| `nova_proto_polluter.py` | v3.5 | JavaScript prototype pollution |
+| `nova_idor_scanner.py` | v4.0 | IDOR + BOLA + privilege escalation |
+| `nova_graphql_tester.py` | v4.0 | GraphQL introspection + injection + depth DoS |
+| `nova_csrf_tester.py` | v4.0 | CSRF + CORS + cookie flag analysis |
+| `nova_business_logic.py` | v4.0 | Negative values + race + workflow bypass |
+| `nova_llm_injection.py` | v4.0 | Prompt injection + jailbreak + tool abuse |
+| `nova_sandbox_validator.py` | v4.0 | Confirm exploitability before reporting |
+| `nova_browser_agent.py` | v3.5 | Playwright browser-based XSS/auth testing |
+| `nova_url_smuggling.py` | v3.5 | HTTP request smuggling |
 
-Outputs JSON + Markdown. Directly editable and shareable.
+### Static Analysis / Code Review
 
-```bash
-python3 nova_threat_model.py ./juice-shop
-# → nova_threat_model_report.json
-# → nova_threat_model_report.md
-```
+| Module | Version | Description |
+|---|---|---|
+| `nova_source_auditor.py` | v2.0 | Multi-language SAST: Python, JS/TS, PHP, Ruby, Go, Java |
+| `nova_file_prioritizer.py` | v4.0 | Scores every file 1–5 for risk before scanning |
+| `nova_sca_scanner.py` | v4.0 | npm/pip/go/maven CVE scan via OSV.dev + NVD |
+| `nova_supply_chain_scorer.py` | v4.0 | Typosquatting + maintainer risk + OSV per-package |
+| `nova_git_scanner.py` | v4.0 | Git history scan for 20 secret patterns |
+| `nova_cicd_scanner.py` | v4.0 | GitHub Actions / GitLab CI / Jenkins / Travis / CircleCI |
+| `nova_container_scanner.py` | v4.0 | Dockerfile + docker-compose + Kubernetes manifests |
 
-### 6.3 Patch Generator — `nova_patch_generator.py`
+### Intelligence & Planning
 
-For every confirmed finding, generates a safe code fix. Two modes:
+| Module | Version | Description |
+|---|---|---|
+| `nova_threat_model.py` | v4.0 | Entry points + trust boundaries + STRIDE + attack paths |
+| `nova_zero_day_correlator.py` | v4.0 | Live NVD + OSV + GHSA CVE correlation |
+| `nova_web_researcher.py` | v3.5 | CVE / PoC / exploit research via web |
+| `nova_planner.py` | v3.5 | Pre-hunt plan: recon → map → attack → report |
+| `nova_context_manager.py` | v3.5 | Context compression for long-running hunts |
+| `nova_memory_system.py` | v3.5 | Persistent cross-session memory |
+| `nova_chain_of_thought.py` | v3.5 | Reasoning traces for complex analysis |
+| `nova_reasoning_core.py` | v3.5 | LLM-guided vulnerability reasoning |
 
-- **AUTO-APPLIED** — regex-matched fix with high confidence (e.g. `innerHTML =` → `textContent =`)
-- **GENERIC GUIDANCE** — correct-by-construction template for the vuln class
+### Detection & Reporting
 
-Supports: SQL injection, XSS, path traversal, open redirect, command injection, SSRF, XXE, insecure deserialization, auth bypass, prototype pollution.
+| Module | Version | Description |
+|---|---|---|
+| `nova_detection_engineer.py` | v4.0 | Sigma + Splunk SPL + Elastic KQL + Suricata |
+| `nova_audit_reporter.py` | v4.0 | CVSS 3.1 + SLA timelines + PCI/SOC2/ISO notes |
+| `nova_patch_generator.py` | v4.0 | Auto-generates safe code fixes for 10 vuln classes |
+| `nova_vuln_tracker.py` | v4.0 | SQLite persistence — regressions + trend dashboard |
+| `nova_report.py` | v3.5 | Base report generation |
+| `nova_verify_engine.py` | v3.5 | Triple-verify engine — eliminates false positives |
 
-```bash
-python3 nova_patch_generator.py nova_audit_report.json
-# → nova_patches.json
-# → nova_patches.md
-```
+### Autonomous Operation
 
-### 6.4 SCA Scanner — `nova_sca_scanner.py`
+| Module | Version | Description |
+|---|---|---|
+| `nova_swarm_v3.py` | v3.5 | 10-agent parallel hunt swarm |
+| `nova_continuous_v3.py` | v3.5 | 24/7 scheduled hunting loop |
+| `nova_self_improvement.py` | v3.5 | Nova improves its own prompts from findings |
+| `nova_adaptive_brain.py` | v3.5 | Adapts strategy based on target responses |
+| `nova_model_router.py` | v3.5 | Routes between available LLM models |
 
-Software Composition Analysis — scans `package.json`, `requirements.txt`, `go.mod`, `pom.xml` and more.
+### Bootstrap & Setup
 
-- Built-in DB of 25+ high-impact npm/pip CVEs (lodash, axios, express, jsonwebtoken, etc.)
-- Live OSV.dev API queries for packages not in the built-in DB
-- Zero API keys required
+| Module | Version | Description |
+|---|---|---|
+| `nova_install.sh` | v4.0 | One-shot installer: Ollama + LLM + dependencies + verify |
+| `nova_bootstrap.py` | v4.0 | Health check + module verification + capability report |
+| `nova.py` | v4.0 | Single entry point — all modes, all modules |
 
-```bash
-python3 nova_sca_scanner.py ./juice-shop
-# → nova_sca_report.json
-```
+---
 
-### 6.5 Git History Scanner — `nova_git_scanner.py`
+## Capability Gap Closure vs Claude Mythos & OpenAI Daybreak
 
-Scans **all git commits** (not just the working tree) for:
+| Capability | Mythos | Daybreak | Nova v4.0 | Notes |
+|---|:---:|:---:|:---:|---|
+| Natural language → security action | ✅ | ✅ | ✅ | Ollama-powered + keyword fallback |
+| Autonomous agentic hunt loop | ✅ | ✅ | ✅ | nova_agent_core: ReAct loop |
+| Multi-language SAST | ✅ | ✅ | ✅ | Python, JS/TS, PHP, Ruby, Go, Java |
+| Risk-based file prioritization | ✅ | — | ✅ | Score 1–5 before scanning |
+| Threat modeling (STRIDE) | — | ✅ | ✅ | Entry pts + trust zones + paths |
+| Auto patch generation | — | ✅ | ✅ | 10 vuln classes, language-aware |
+| SCA / dependency CVE scan | — | ✅ | ✅ | OSV.dev + NVD, 4 ecosystems |
+| Supply chain risk scoring | — | — | ✅ | Typosquatting + maintainer + OSV |
+| Git history secret scan | ✅ | — | ✅ | 20 patterns across all commits |
+| CI/CD pipeline security | — | — | ✅ | GH Actions + Jenkins + Travis |
+| Container / K8s security | — | — | ✅ | Dockerfile + compose + manifests |
+| Live CVE correlation (NVD/OSV) | — | ✅ | ✅ | Real-time CRITICAL CVE feed |
+| Exploit sandbox validation | ✅ | — | ✅ | Confirm before reporting |
+| SIEM detection rules | — | ✅ | ✅ | Sigma + Splunk + ELK + Suricata |
+| Enterprise audit report | — | ✅ | ✅ | CVSS + SLA + PCI/SOC2/ISO |
+| IDOR / Broken Access Control | ✅ | ✅ | ✅ | Horizontal + vertical + mass assign |
+| GraphQL security | ✅ | — | ✅ | Introspection + injection + depth |
+| CSRF + CORS analysis | ✅ | — | ✅ | Cookie flags + origin + JSON CSRF |
+| Business logic testing | ✅ | — | ✅ | Negative vals + race + workflow |
+| LLM prompt injection | — | — | ✅ | Industry-first: AI app security |
+| Persistent vuln tracking | — | — | ✅ | SQLite + regression detection |
+| JWT testing | ✅ | ✅ | ✅ | alg:none + key confusion |
+| HTTP request smuggling | — | ✅ | ✅ | nova_url_smuggling |
+| Prototype pollution | ✅ | — | ✅ | nova_proto_polluter |
+| Race conditions | ✅ | — | ✅ | nova_race_engine |
+| Session hijacking | ✅ | — | ✅ | nova_session_hijacker |
+| Browser automation | — | ✅ | ✅ | nova_browser_agent (Playwright) |
+| 10-agent parallel swarm | ✅ | — | ✅ | nova_swarm_v3 |
+| 24/7 continuous hunt | ✅ | — | ✅ | nova_continuous_v3 |
+| Self-improvement engine | ✅ | — | ✅ | nova_self_improvement |
+| Zero-cost (100% local) | ❌ | ❌ | ✅ | Ollama + open-source LLMs |
 
-- 20 secret patterns: AWS keys, GitHub tokens, Stripe keys, RSA private keys, DB URLs, JWT secrets, etc.
-- Security regression patterns: `eval()`, `innerHTML`, wildcard CORS, debug mode, disabled SSL
-- Working tree scan as well
+**Gap score: 32/32 capabilities covered. Nova v4.0 closes all gaps AND adds 5 capabilities neither Mythos nor Daybreak have.**
 
-Masked output (no actual secrets printed).
+---
 
-```bash
-python3 nova_git_scanner.py ./juice-shop
-# → nova_git_scan_report.json
-```
+## Unique Nova Advantages
 
-### 6.6 Sandbox Validator — `nova_sandbox_validator.py`
+1. **100% local / zero-cost** — Ollama + open-source LLMs. Claude/GPT-4 is optional, never required.
+2. **LLM prompt injection testing** — no other platform tests AI-enabled apps for prompt injection.
+3. **Persistent vulnerability tracker** — SQLite database tracks every finding across runs, detects regressions.
+4. **Supply chain typosquatting detector** — Levenshtein edit-distance detection against 25 top packages.
+5. **Full pipeline from "scan" to "SIEM rule"** — discovers vuln → confirms → patches → writes Sigma rule → generates audit report, all in one command.
 
-Mythos-style isolated exploit validation. For each confirmed finding, fires up to 3 targeted probes against a live target and checks responses for positive indicators.
+---
 
-```bash
-python3 nova_sandbox_validator.py http://localhost:3000 nova_findings.json
-# → nova_sandbox_validation.json
-```
+## Installation
 
-### 6.7 Detection Engineer — `nova_detection_engineer.py`
+### Requirements
 
-Converts confirmed findings into detection rules in **4 SIEM formats simultaneously**:
-
-| Format | Use |
+| Requirement | Notes |
 |---|---|
-| **Sigma** | Universal — import to any SIEM |
-| **Splunk SPL** | Direct paste into Splunk |
-| **Elastic KQL** | Elastic Security / Kibana |
-| **Suricata** | IDS/IPS rule file |
+| Python 3.10+ | Core runtime |
+| Ollama | Local LLM inference (installed by `nova_install.sh`) |
+| LLM model | `qwen3:8b` (default) or any Ollama model |
+| 8 GB RAM | Minimum for LLM inference |
+| 4 GB disk | For model weights |
 
-Covers: SQLi, XSS, path traversal, SSRF, command injection, open redirect, XXE, auth bypass.
-
-```bash
-python3 nova_detection_engineer.py nova_audit_report.json
-# → nova_detection_rules.json
-# → nova_detection_rules_sigma.yml
-# → nova_detection_rules_suricata.rules
-```
-
-### 6.8 Audit Reporter — `nova_audit_reporter.py`
-
-Enterprise-grade compliance report aggregating all Nova findings:
-
-- **CVSS 3.1 base scores** for every finding
-- **Remediation SLA timeline** (Critical: 7d, High: 30d, Medium: 90d)
-- **Compliance notes** — PCI DSS, SOC 2, ISO 27001, OWASP ASVS
-- **Executive summary** with risk rating
-- **Remediation roadmap** with due dates
-- JSON + Markdown output
+### One-shot install
 
 ```bash
-python3 nova_audit_reporter.py nova_*_report.json
-# → nova_audit_report.json
-# → nova_audit_report.md
+git clone https://github.com/Informant254/Nova-arsenal.git
+cd Nova-arsenal
+bash nova_install.sh
+```
+
+The installer:
+1. Detects your OS and Python version
+2. Installs Python dependencies from `requirements.txt`
+3. Installs Ollama
+4. Pulls the default LLM (`qwen3:8b`)
+5. Creates `~/nova_workspace/` for output files
+6. Creates a `.env` config file
+7. Verifies every Nova module compiles
+8. Runs a self-test and prints a capability summary
+
+### Manual install (minimal)
+
+```bash
+pip install requests beautifulsoup4 lxml pyyaml
+# Install Ollama from https://ollama.com
+ollama pull qwen3:8b
+python3 nova_bootstrap.py  # verify everything
+```
+
+### Optional tools (boost coverage)
+
+```bash
+# Network/web scanning
+sudo apt-get install nmap
+pip install sqlmap
+
+# Go-based tools (fastest)
+go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install github.com/ffuf/ffuf/v2@latest
+go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+
+# Container scanning
+brew install trivy  # or apt-get install trivy
 ```
 
 ---
 
-## 7. Module Reference
+## Configuration
 
-| Module | Version | Purpose | Gap Closed |
-|---|---|---|---|
-| `nova.py` | v4.0 | Natural language entry point + dispatcher | — |
-| `nova_agent_core.py` | v2 | ReAct hunt loop, 20 tools | — |
-| `nova_continuous_v3.py` | v3 | 24/7 hunting with self-improvement | — |
-| `launch_swarm.py` | v1 | 10-agent parallel swarm | — |
-| `nova_planner.py` | v1 | Pre-hunt 8-phase planning | Code |
-| `nova_vision.py` | v1 | Screenshot + visual LLM analysis | Mythos |
-| `nova_verify_engine.py` | v1 | Triple-verify + CVSS + H1 report | Daybreak |
-| `nova_web_researcher.py` | v1 | CVE/PoC web research | All 3 |
-| `nova_context_manager.py` | v1 | Rolling context compression | Code |
-| `nova_tool_kit.py` | v2 | 20-tool agent kit | All 3 |
-| `nova_source_auditor.py` | **v2.0** | Multi-language taint tracing (TS+JS+Python) + file prioritization | Mythos |
-| `nova_file_prioritizer.py` | **v1.0 NEW** | Mythos 1-5 risk scoring before scan | **Mythos** |
-| `nova_threat_model.py` | **v1.0 NEW** | Attack surface + trust boundary + attack paths | **Daybreak** |
-| `nova_patch_generator.py` | **v1.0 NEW** | Auto-patch generation for confirmed findings | **Daybreak** |
-| `nova_sca_scanner.py` | **v1.0 NEW** | SCA — npm/pip/go/maven CVE scanning | **Daybreak** |
-| `nova_git_scanner.py` | **v1.0 NEW** | Git history secret + regression scanning | **Mythos** |
-| `nova_sandbox_validator.py` | **v1.0 NEW** | Isolated exploit validation | **Mythos** |
-| `nova_detection_engineer.py` | **v1.0 NEW** | Sigma/Splunk/Elastic/Suricata rule generation | **Daybreak** |
-| `nova_audit_reporter.py` | **v1.0 NEW** | Enterprise audit report + CVSS + SLA | **Daybreak** |
+All config via environment variables or `.env` file:
+
+```bash
+NOVA_LLM_URL=http://localhost:11434    # Ollama endpoint
+NOVA_LLM_MODEL=qwen3:8b               # LLM model name
+NOVA_WORKSPACE=~/nova_workspace        # Output directory
+NOVA_MAX_STEPS=40                      # Max agent steps per hunt
+NOVA_TARGET=http://localhost:3000      # Default target
+NOVA_DB=~/nova_workspace/nova_vulns.db # Vulnerability tracker DB
+```
 
 ---
 
-## 8. Capability Parity Table
+## Usage Examples
 
-| Capability | Claude Mythos | OpenAI Daybreak | Nova v3.5 | **Nova v4.0** |
-|---|---|---|---|---|
-| File risk prioritization (1-5) | ✅ | ❌ | ❌ | **✅** |
-| Editable threat modeling | ❌ | ✅ | ❌ | **✅** |
-| Auto patch generation | ❌ | ✅ | ❌ | **✅** |
-| SCA / dependency CVE scan | ❌ | ✅ | ❌ | **✅** |
-| Git history secret scanning | ✅ | ❌ | ❌ | **✅** |
-| Sandbox exploit validation | ✅ | ❌ | ❌ | **✅** |
-| SIEM detection rule generation | ❌ | ✅ | ❌ | **✅** |
-| Enterprise audit report | ❌ | ✅ | ❌ | **✅** |
-| Pre-hunt strategic planning | ✅ | ✅ | ✅ | ✅ |
-| Visual screenshot analysis | ✅ | ✅ | ✅ | ✅ |
-| Triple-verify findings | ✅ | ✅ | ✅ | ✅ |
-| CVE/PoC web research | ✅ | ✅ | ✅ | ✅ |
-| Context window compression | ✅ | ✅ | ✅ | ✅ |
-| 20-tool agent kit | ✅ | ✅ | ✅ | ✅ |
-| TypeScript taint tracing | ✅ | ✅ | partial | **✅** |
-| Zero LLM cost | ❌ | ❌ | ✅ | ✅ |
-| **Gap score** | | | **7/8 gaps** | **0/8 gaps** |
+### Full-power pipeline (all 19 modules)
+
+```bash
+python3 nova.py "Run full-stack Mythos+Daybreak pipeline on ./juice-shop"
+# Runs: SAST → prioritizer → threat model → SCA → supply chain →
+#       git scan → CI/CD → container → zero-day correlation →
+#       IDOR → GraphQL → CSRF → business logic → patch →
+#       detection rules → audit report → vuln tracker
+```
+
+### Target a live app
+
+```bash
+python3 nova.py "Hunt http://testphp.vulnweb.com for SQL injection and XSS"
+python3 nova.py "Test IDOR on http://localhost:3000 with token abc123"
+python3 nova.py "Run GraphQL security tests on http://localhost:4000"
+python3 nova.py "Check CSRF and cookie security on http://localhost:8080"
+python3 nova.py "Business logic tests on http://juice-shop.local"
+```
+
+### Scan a codebase
+
+```bash
+python3 nova.py "SAST scan of ./src"
+python3 nova.py "Find hardcoded secrets in git history of ."
+python3 nova.py "Scan all Dockerfiles and GitHub Actions in ."
+python3 nova.py "Dependency CVE scan for ./package.json"
+python3 nova.py "Supply chain risk score for ./node_modules"
+```
+
+### Intelligence
+
+```bash
+python3 nova.py "Build a threat model for ./api-server"
+python3 nova.py "Correlate findings with live CVEs from NVD"
+python3 nova.py "Generate Sigma detection rules from ./nova_findings.json"
+python3 nova.py "Generate auto-patches for findings in ./nova_sast_report.json"
+python3 nova.py "Write an enterprise audit report for ./nova_findings.json"
+```
+
+### AI app security (LLM injection)
+
+```bash
+python3 nova.py "Test http://localhost:3000 for LLM prompt injection"
+# Tests: direct injection, system prompt leak, jailbreaks, tool abuse, output XSS
+```
+
+### Tracking & operations
+
+```bash
+python3 nova.py "Show vulnerability tracker dashboard"   # SQLite trend + regressions
+python3 nova.py "Launch 10-agent parallel swarm on http://target.com"
+python3 nova.py "Start continuous 24/7 hunt on http://target.com"
+python3 nova.py "Check health of all Nova modules"
+```
 
 ---
 
-## 9. Configuration
+## Vulnerability Tracker
 
-| Environment Variable | Default | Purpose |
-|---|---|---|
-| `NOVA_LLM_URL` | `http://localhost:11434` | Ollama endpoint |
-| `NOVA_LLM_MODEL` | auto-detect | Override LLM model |
-| `NOVA_WORKSPACE` | `~/nova_workspace` | Output directory |
-| `NOVA_MAX_STEPS` | `40` | Max ReAct loop steps |
-| `NOVA_TARGET` | `http://localhost:3000` | Default target |
-| `NOVA_ORG_NAME` | `Target Organization` | Audit report org name |
-| `HACKERONE_PROGRAM` | _(required for H1)_ | HackerOne program handle |
+Nova automatically persists every finding to SQLite across all runs:
+
+```
+~/nova_workspace/nova_vulns.db
+```
+
+Features:
+- **Regression detection** — alerts when a previously-fixed vuln reappears
+- **Trend analysis** — open/fixed counts over time
+- **SIEM-style timeline** — `FIRST_SEEN → SEEN_AGAIN → FIXED → REGRESSED`
+- **Dashboard export** — Markdown dashboard to `nova_tracker_dashboard.md`
+
+```bash
+python3 nova.py "Show vulnerability tracker dashboard"
+# or direct:
+python3 nova_vuln_tracker.py ~/nova_workspace/nova_*_report.json
+```
 
 ---
 
-## 10. HackerOne Integration
+## Output Files
 
-Nova's `nova_verify_engine.py` produces HackerOne-ready bug reports automatically:
+All outputs are saved to `~/nova_workspace/` (configurable via `NOVA_WORKSPACE`):
 
-```json
+| File | Contents |
+|---|---|
+| `nova_{mode}_{timestamp}.json` | Raw findings from each scan |
+| `nova_threat_model.json` | Threat model — entry points, paths, STRIDE |
+| `nova_sca_report.json` | Dependency CVE scan results |
+| `nova_supply_chain_report.json` | Per-package supply chain risk scores |
+| `nova_git_report.json` | Git history secret scan |
+| `nova_cicd_report.json` | CI/CD pipeline findings |
+| `nova_container_report.json` | Dockerfile + K8s findings |
+| `nova_zero_day_report.json` | Live CVE correlation |
+| `nova_idor_report.json` | IDOR / access control findings |
+| `nova_graphql_report.json` | GraphQL security findings |
+| `nova_csrf_report.json` | CSRF / CORS / cookie findings |
+| `nova_business_logic_report.json` | Business logic findings |
+| `nova_llm_injection_report.json` | Prompt injection findings |
+| `nova_patches.json` | Auto-generated code patches |
+| `nova_detection_rules.json` | Sigma + SIEM detection rules |
+| `nova_audit_report.json` | Enterprise audit report with CVSS |
+| `nova_tracker_report.json` | SQLite vuln tracker full report |
+| `nova_tracker_dashboard.md` | Markdown trend dashboard |
+| `nova_bootstrap_status.json` | Module health check status |
+
+---
+
+## Adding a New Module
+
+Every Nova module follows this pattern so it integrates automatically:
+
+```python
+class NovaYourModule:
+    def __init__(self, target: str, **kwargs): ...
+    def run(self) -> List[Dict]: ...           # returns findings list
+    def save(self, path: str): ...            # saves JSON report
+
+# Findings schema (use these keys for auto-tracker integration):
 {
-  "title": "SQL Injection in /rest/products/search",
-  "severity": "critical",
-  "cvss_score": 9.8,
-  "weakness": "CWE-89",
-  "description": "...",
-  "steps_to_reproduce": "...",
-  "impact": "...",
-  "proof_of_concept": "curl ..."
+    "type": "Vuln Type",          # e.g. "SQL Injection"
+    "severity": "CRITICAL",       # CRITICAL / HIGH / MEDIUM / LOW / INFO
+    "file": "src/app.py",         # for SAST findings
+    "line": 42,                   # line number
+    "endpoint": "/api/users",     # for DAST findings
+    "snippet": "code here",       # context snippet (≤300 chars)
+    "cve": "CVE-2023-XXXXX",      # if applicable
+    "cvss": 9.8,                  # CVSS v3 score
+    "description": "...",         # clear description
 }
 ```
 
-Set `HACKERONE_PROGRAM` and Nova will format every confirmed finding as a submission-ready JSON object.
+Then register in `nova.py`'s `dispatch()` with a new mode keyword.
 
 ---
 
-<div align="center">
+## Security & Ethics
 
-*Nova Arsenal v4.0 — Built for small enterprises. Rivaling frontier AI security systems. Zero cost.*
+- **Always get explicit written authorization** before testing any system you don't own.
+- Use `NOVA_TARGET` to set your authorized scope; Nova will default to it.
+- The `nova_sandbox_validator` module is designed for safe, read-only exploit confirmation — it does NOT write files, execute shells, or create persistence.
+- All output stays local. Nova never phones home.
 
-</div>
+---
+
+## Contributing
+
+1. Fork → branch → PR
+2. Follow module pattern above
+3. Findings must use the shared schema (auto-tracker integration)
+4. Add your module to the `MODULES` dict in `nova_bootstrap.py`
+5. Add dispatch keywords to `KEYWORD_MODES` in `nova.py`
+6. Update this README
+
+---
+
+## License
+
+See `LICENSE`. Use responsibly, with authorization.
+
+---
+
+*Nova Arsenal v4.0 — Built to rival Claude Mythos and OpenAI Daybreak. Runs entirely locally. Costs nothing.*
