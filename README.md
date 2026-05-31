@@ -14,12 +14,12 @@ Nova is a production-grade autonomous security research agent that:
 - **Supports OpenAI, Anthropic, Gemini, and Ollama** — auto-fallback chain, zero single-provider lock-in
 - Runs a real headless browser (Playwright) for JS-heavy targets
 - Chains vulnerabilities together (SSRF → metadata, SQLi → RCE, XSS → account takeover)
-- **Orchestrates multi-agent pipelines** with handoffs, guardrails, typed context, and full execution tracing
+- **Orchestrates multi-agent pipelines** with hooks, typed context, sessions, and full span-based tracing — wired into every run automatically
 - **Lifecycle hooks** (PreRun, PostRun, PreTool, PostTool, OnFinding, OnError…) — same pattern as Anthropic Claude Agent SDK
 - **Persistent sessions** across runs — Nova remembers everything she learned
 - **Structured outputs** with JSON schema validation across all providers
 - **Streaming support** across all LLM providers
-- **Reusable Skills** — parameterised prompt templates for every attack class
+- **Reusable Skills** — 20+ parameterised prompt templates for every attack class
 - AI-triages and ranks all findings so you always work the highest-impact bugs first
 - Runs 24/7 on GitHub Actions (free cloud Linux)
 
@@ -30,7 +30,7 @@ Nova is a production-grade autonomous security research agent that:
 ```
 nova.py                         ← Single plain-English entry point (NLP → dispatch)
 │
-├── 🔀 Provider Layer (NEW v4.1)
+├── 🔀 Provider Layer (v4.1)
 │   ├── nova_llm_router.py          ← Multi-provider LLM: OpenAI · Anthropic · Gemini · Ollama
 │   │     Auto-fallback · Streaming · Structured outputs · Cost tracking · Circuit breaker
 │   ├── nova_hooks.py               ← Lifecycle hook system (Anthropic Agent SDK pattern)
@@ -40,14 +40,15 @@ nova.py                         ← Single plain-English entry point (NLP → di
 │   ├── nova_sessions.py            ← Persistent session management
 │   │     Conversation history · Cross-run findings · Working memory · Cost accounting
 │   ├── nova_retry.py               ← Retry + circuit breaker
-│   │     Exponential backoff · Per-service circuit breaker · Budget enforcement
+│   │     Exponential backoff · Per-tool circuit breaker · Budget enforcement
 │   ├── nova_skills.py              ← Reusable skill/prompt templates (Anthropic Skills pattern)
 │   │     20+ built-in skills: SQLi · XSS · IDOR · SSRF · JWT · STRIDE · H1 reports
 │   └── nova_observability.py       ← OpenTelemetry-compatible execution tracing
 │         Span trees · Token attribution · Cost per span · HTML + JSON export
 │
 ├── 🧠 Agent Layer
-│   ├── nova_orchestrator.py    ← Multi-agent engine (Agents · Handoffs · Guardrails · Tracing)
+│   ├── nova_orchestrator.py    ← v2.0: all 7 provider-layer modules wired in automatically
+│   │     LLMRouter · HookBus · RunContext · Session · Tracer · Retry on every run
 │   ├── nova_mcp_client.py      ← Model Context Protocol client
 │   └── nova_triage.py          ← AI-powered findings prioritiser
 │
@@ -116,8 +117,6 @@ cd Nova-arsenal
 
 ### Step 2 — Run the Setup Script
 
-The setup script installs everything: Python venv, all dependencies, security tools, Playwright, and Ollama models.
-
 ```bash
 chmod +x nova_setup.sh
 ./nova_setup.sh
@@ -132,8 +131,7 @@ chmod +x nova_setup.sh
 
 The script installs:
 - Python virtual environment with all pip dependencies
-- Ollama (local LLM runtime)
-- Recommended Ollama models: `qwen3:8b` (primary), `llama3.2` (fallback), `nomic-embed-text` (RAG)
+- Ollama (local LLM runtime) + recommended models: `qwen3:8b`, `llama3.2`, `nomic-embed-text`
 - System security tools: `nmap`, `nuclei`, `subfinder`, `httpx`, `gau`, `katana`, `ffuf`
 - Playwright headless browser (Chromium)
 - Nova workspace at `~/nova_workspace/`
@@ -144,11 +142,8 @@ The script installs:
 
 ```bash
 source ~/nova_workspace/.venv/bin/activate
-```
 
-Add this to your `~/.bashrc` or `~/.zshrc` to activate automatically:
-
-```bash
+# Optional: auto-activate in every terminal session
 echo 'source ~/nova_workspace/.venv/bin/activate' >> ~/.bashrc
 ```
 
@@ -156,63 +151,52 @@ echo 'source ~/nova_workspace/.venv/bin/activate' >> ~/.bashrc
 
 ### Step 4 — Configure LLM Providers
 
-Nova supports four LLM providers with automatic fallback. Ollama is always the final fallback (free, local).
+Nova supports four providers with automatic fallback. Ollama is always the final fallback (free, local, zero data leakage).
 
-#### Option A: Local Only (Ollama — zero cost, zero data leakage)
+#### Option A — Local Only (Ollama, zero cost)
 
 ```bash
-# Ollama is started automatically. Verify it's running:
-ollama list
-
-# Pull the recommended model if not already installed:
-ollama pull qwen3:8b
+ollama list                   # verify models are available
+ollama pull qwen3:8b          # pull if missing
+python3 nova_llm_router.py "Hello"   # test
 ```
 
-#### Option B: OpenAI (GPT-4o, o3)
+#### Option B — OpenAI (GPT-4o, o3)
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-export NOVA_OPENAI_MODEL="gpt-4o"          # default
-# or: gpt-4o-mini (faster/cheaper), o3 (most powerful)
+export NOVA_OPENAI_MODEL="gpt-4o"        # default; or gpt-4o-mini / o3
 ```
 
-#### Option C: Anthropic (Claude Sonnet 4, Claude Opus 4)
+#### Option C — Anthropic (Claude Sonnet 4, Claude Opus 4)
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
-export NOVA_ANTHROPIC_MODEL="claude-sonnet-4-5"   # default
-# or: claude-opus-4-5 (most powerful), claude-haiku-3-5 (fastest)
+export NOVA_ANTHROPIC_MODEL="claude-sonnet-4-5"   # or claude-opus-4-5 / claude-haiku-3-5
 ```
 
-#### Option D: Google Gemini
+#### Option D — Google Gemini
 
 ```bash
 export GEMINI_API_KEY="AIza..."
-export NOVA_GEMINI_MODEL="gemini-2.0-flash"       # default
-# or: gemini-2.5-pro (most powerful)
+export NOVA_GEMINI_MODEL="gemini-2.0-flash"       # or gemini-2.5-pro
 ```
 
-#### Recommended: Set Multiple Providers (Auto-Fallback)
+#### Recommended — Multiple Providers (Auto-Fallback Chain)
+
+Nova tries: **OpenAI → Anthropic → Gemini → Ollama**
 
 ```bash
-# Nova tries providers in this order: OpenAI → Anthropic → Gemini → Ollama
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-export GEMINI_API_KEY="AIza..."
-
-# Persist to shell profile:
 cat >> ~/.bashrc << 'EOF'
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 export GEMINI_API_KEY="AIza..."
 EOF
-```
+source ~/.bashrc
 
-#### Test Your LLM Setup
-
-```bash
-python3 nova_llm_router.py "Hello Nova. What providers are available?"
-python3 nova_llm_router.py --stream "Summarise OWASP Top 10 in 5 bullets"
+# Test the router
+python3 nova_llm_router.py "What providers are available?"
+python3 nova_llm_router.py --stream "Summarise OWASP Top 10"
 python3 nova_llm_router.py --provider anthropic "What is SSRF?"
 ```
 
@@ -220,14 +204,12 @@ python3 nova_llm_router.py --provider anthropic "What is SSRF?"
 
 ### Step 5 — Configure Notifications (Optional)
 
-#### Telegram
+#### Telegram (real-time CRITICAL/HIGH alerts)
 
 ```bash
 export NOVA_TELEGRAM_TOKEN="bot123:ABC..."
 export NOVA_TELEGRAM_CHAT_ID="123456789"
 ```
-
-Nova will send real-time alerts for CRITICAL/HIGH findings and agent errors.
 
 #### Discord
 
@@ -245,35 +227,19 @@ export NOVA_SLACK_WEBHOOK="https://hooks.slack.com/services/..."
 
 ### Step 6 — Configure the Workspace (Optional)
 
-Copy and edit the default config:
-
 ```bash
 cp nova_config.json ~/nova_workspace/nova_config.json
 nano ~/nova_workspace/nova_config.json
 ```
 
-Key settings:
+Key settings to review:
 
 ```json
 {
-  "llm": {
-    "model":          "auto",
-    "fallback_model": "llama3.2",
-    "timeout":        120
-  },
-  "recon": {
-    "max_subdomains": 500,
-    "max_urls":       10000,
-    "threads":        10
-  },
-  "attack": {
-    "severity_threshold": "low",
-    "max_payloads_per_param": 50,
-    "respect_robots": false
-  },
-  "notifications": {
-    "min_severity": "high"
-  }
+  "llm": { "model": "auto", "fallback_model": "llama3.2", "timeout": 120 },
+  "recon": { "max_subdomains": 500, "max_urls": 10000, "threads": 10 },
+  "attack": { "severity_threshold": "low", "max_payloads_per_param": 50 },
+  "notifications": { "min_severity": "high" }
 }
 ```
 
@@ -288,7 +254,7 @@ python3 nova.py "health check"
 Expected output:
 ```
 🦅 Nova Arsenal v4.1 — Health Check
-  ✅ LLM router: 3 providers available (openai, anthropic, ollama)
+  ✅ LLM router: 3 providers (openai, anthropic, ollama)
   ✅ Hooks system: ready
   ✅ Session store: ~/nova_workspace/sessions/
   ✅ Observability: tracing ready
@@ -304,10 +270,8 @@ Nova is ready. 🦅
 ## Quick Start
 
 ```bash
-# Activate venv first
 source ~/nova_workspace/.venv/bin/activate
 
-# Single command — Nova figures out everything else
 python3 nova.py "Hunt https://target.com for all bugs"
 python3 nova.py "Daybreak AI assessment on https://target.com"
 python3 nova.py "Orchestrate multi-agent hunt on https://target.com"
@@ -317,12 +281,12 @@ python3 nova.py "Full stack scan of https://target.com"
 
 ---
 
-## Dispatch Modes — Plain English Commands
+## Dispatch Modes
 
 | Say something like… | Mode | What runs |
 |---|---|---|
 | `"daybreak assessment on target.com"` | `daybreak` | NovaDaybreak + NovaScopeManager |
-| `"orchestrate multi-agent hunt"` | `orchestrate` | NovaOrchestrator → ReconAgent → AttackAgent → ReportAgent |
+| `"orchestrate multi-agent hunt"` | `orchestrate` | NovaOrchestrator v2.0 (all modules wired) |
 | `"triage my findings"` | `triage` | NovaTriage: dedup → LLM score → chain → H1 ranking |
 | `"hunt target.com for bugs"` | `hunt` | NovaAgentCore full ReAct loop |
 | `"everything / full stack"` | `full_stack` | All 27+ modules + auto-triage |
@@ -351,207 +315,231 @@ python3 nova.py "Full stack scan of https://target.com"
 
 ---
 
-## v4.1 Provider Layer — New in This Release
+## nova_orchestrator.py v2.0 — All Modules Wired In
 
-### 🔀 nova_llm_router.py — Multi-Provider with Auto-Fallback
+Every `build_security_network()` call and `Runner` automatically uses all 7 provider-layer modules. No extra setup needed.
 
-The same provider-agnostic pattern used by OpenAI Agents SDK, running on any LLM:
+### What happens on every run
+
+```
+nova_orchestrator.Runner.run("Hunt example.com")
+│
+├── LLMRouter       — picks best available provider (OpenAI → Anthropic → Gemini → Ollama)
+│                     with exponential backoff and circuit breaker per provider
+│
+├── HookBus         — fires PreRun at start; PostRun on completion
+│   │                 PreTool/PostTool wraps every tool call
+│   └── logging     — writes all events to ~/nova_workspace/nova_events.jsonl
+│   └── telegram    — fires CRITICAL/HIGH findings to Telegram (if configured)
+│
+├── RunContext       — typed shared state flows through all 3 agents
+│   ├── scope check — blocks out-of-scope URLs before every tool call
+│   ├── findings    — deduplicated findings merged from all agents
+│   └── audit trail — every mutation recorded with agent + timestamp
+│
+├── Session          — persisted to ~/nova_workspace/sessions/<id>.json
+│   ├── messages    — full conversation history survives restarts
+│   ├── findings    — cross-run deduplication
+│   └── cost/tokens — per-run accounting
+│
+├── Tracer           — span tree: Run → Agent → Tool/LLM spans
+│   ├── timing      — ms for every operation
+│   ├── tokens/cost — attributed to each LLM span
+│   └── export      — JSON + HTML flame graph saved after every run
+│
+└── ResilientCaller  — wraps every tool with retry (3 attempts, exponential backoff)
+                       + per-tool circuit breaker (opens after 3 consecutive failures)
+```
+
+### Using the orchestrator directly
+
+```python
+from nova_orchestrator import build_security_network, Runner, Agent, Tool, Guardrail
+
+# Quickstart — full wired network
+runner = build_security_network(
+    target="https://example.com",
+    scope=["example.com", "*.example.com"])
+result = runner.run("Hunt for IDOR, SQLi, and XSS vulnerabilities")
+
+print(f"Findings: {len(result.findings)}")
+print(f"Cost:     ${result.cost_usd:.5f}")
+print(f"Tokens:   {result.tokens_used}")
+
+# With session resume
+from nova_sessions import SessionStore
+store   = SessionStore()
+session = store.create(target="https://example.com", mission="full_stack")
+
+runner = build_security_network(
+    "https://example.com",
+    scope=["example.com"],
+    session=session)
+result = runner.run("Orchestrate multi-agent hunt")
+
+# Resume next time
+session2 = store.load(session.session_id)
+print(f"Previous findings: {len(session2.findings)}")
+```
+
+### Injecting custom hooks
+
+```python
+from nova_hooks import get_bus
+
+bus = get_bus()
+
+@bus.on("OnFinding")
+def alert_on_critical(ctx):
+    f = ctx["finding"]
+    if f.get("severity") == "CRITICAL":
+        send_pagerduty_alert(f)
+
+@bus.on("PreTool")
+def block_out_of_scope(ctx):
+    url = ctx.get("args", {}).get("url", "")
+    if "forbidden.com" in url:
+        ctx["_hook_event"].cancelled = True
+
+runner = build_security_network("https://example.com")
+# bus is already wired in — hooks fire automatically
+result = runner.run("Full scan")
+```
+
+### Parallel agent fan-out
+
+```python
+runner = build_security_network("https://example.com")
+results = runner.run_parallel(
+    task="Hunt for XSS, SQLi, and IDOR",
+    agent_names=["ReconAgent", "AttackAgent"])  # run both in parallel
+
+all_findings = [f for r in results for f in r.findings]
+```
+
+---
+
+## Provider Layer — Reference
+
+### nova_llm_router.py
 
 ```python
 from nova_llm_router import LLMRouter, Provider
 
 router = LLMRouter()
-print("Available:", router.available_providers())
+print(router.available_providers())   # ['openai', 'anthropic', 'ollama']
 
-# Auto-selects best available provider
 resp = router.chat("Analyse this JWT: eyJhbGci...")
 print(f"[{resp.provider}/{resp.model}] {resp.latency_ms:.0f}ms ${resp.cost_usd:.5f}")
-print(resp.content)
 
-# Force a specific provider
+# Force provider
 resp = router.chat("...", provider=Provider.ANTHROPIC)
 
 # Streaming
-for token in router.stream("Summarise these findings: ..."):
+for token in router.stream("Summarise these findings"):
     print(token, end="", flush=True)
 
-# Structured output (JSON schema enforced)
-schema = {
-    "type": "object",
-    "properties": {
-        "severity": {"type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
-        "cvss":     {"type": "number"},
-        "summary":  {"type": "string"}
-    },
-    "required": ["severity", "cvss", "summary"]
-}
-result = router.chat_structured("Score this finding: SQL injection in /api/search", schema=schema)
-print(result)  # {"severity": "HIGH", "cvss": 8.2, "summary": "..."}
+# Structured output
+result = router.chat_structured(
+    "Score this finding",
+    schema={"type":"object","properties":{"severity":{"type":"string"},"cvss":{"type":"number"}}})
 ```
 
----
-
-### 🪝 nova_hooks.py — Lifecycle Hooks (Anthropic Agent SDK Pattern)
+### nova_hooks.py
 
 ```python
 from nova_hooks import HookBus, attach_logging_hooks, attach_telegram_hooks
 
 bus = HookBus(verbose=True)
-attach_logging_hooks(bus)  # writes events to nova_events.jsonl
-attach_telegram_hooks(bus, token=TELEGRAM_TOKEN, chat_id=CHAT_ID)
+attach_logging_hooks(bus)
 
-# Custom hooks
 @bus.on("OnFinding")
-def save_to_db(ctx):
-    finding = ctx["finding"]
-    if finding["severity"] in ("CRITICAL", "HIGH"):
-        my_db.insert(finding)
+def on_finding(ctx):
+    print(f"  🐛 [{ctx['finding']['severity']}] {ctx['finding']['type']}")
 
 @bus.on("PreTool", priority=0)
-def check_scope(ctx):
-    if "out-of-scope.com" in ctx.get("args", {}).get("url", ""):
-        ctx["_hook_event"].cancelled = True   # block the tool call
-        print("⛔ Blocked out-of-scope request")
-
-# Fire hooks manually
-bus.fire("PreRun", {"agent": "ReconAgent", "target": "example.com"})
-bus.fire_finding({"type": "XSS", "severity": "HIGH", "endpoint": "/search"})
+def scope_check(ctx):
+    if "evil.com" in str(ctx.get("args", {})):
+        ctx["_hook_event"].cancelled = True
 ```
 
----
-
-### 📦 nova_context.py — Typed Context (OpenAI Agents SDK Pattern)
+### nova_context.py
 
 ```python
 from nova_context import RunContext
 
-ctx = RunContext(
-    target="https://example.com",
-    scope=["example.com", "*.example.com"],
-    max_steps=40,
-    verbose=True
-)
-
-# Set / get typed values
-ctx.set("phase", "recon")
+ctx = RunContext(target="https://example.com", scope=["example.com"])
+ctx.set("phase", "attack")
 ctx.append("subdomains", "api.example.com", dedupe=True)
 ctx.add_finding({"type": "SQLi", "severity": "HIGH", "endpoint": "/api/search"})
-
-# Scope enforcement
-print(ctx.in_scope("https://api.example.com/users"))  # True
-print(ctx.in_scope("https://evil.com"))               # False
-
-# Child context per agent
-recon_ctx = ctx.child("ReconAgent")
-attack_ctx = ctx.child("AttackAgent")
-
-# Merge results back
-ctx.sync_from_child(recon_ctx)
-ctx.sync_from_child(attack_ctx)
-
-# Persist
-ctx.save()  # ~/nova_workspace/context_{session_id}.json
+print(ctx.in_scope("https://api.example.com"))   # True
 print(ctx.summary())
+ctx.save()
 ```
 
----
-
-### 🗂️ nova_sessions.py — Persistent Sessions
+### nova_sessions.py
 
 ```python
 from nova_sessions import SessionStore
 
-store = SessionStore()
-
-# Create a session for a target
+store   = SessionStore()
 session = store.create(target="https://example.com", mission="full_stack")
-
-# Conversation history (survives restarts)
-session.add_message("user", "Hunt example.com for IDOR and SQLi")
-session.add_message("assistant", "Starting multi-mode scan...")
-
-# Persistent findings (deduplicated)
-session.add_finding({"type": "SQLi", "severity": "HIGH", "endpoint": "/api/users"})
-
-# Working memory
-session.remember("admin_endpoint", "/api/admin/users")
-endpoint = session.recall("admin_endpoint")
-
-# Run tracking
-run = session.start_run("sqli")
-# ... run the scan ...
-session.end_run(run, findings_count=3, cost_usd=0.04, token_total=12000)
-
+session.add_finding({"type": "XSS", "severity": "HIGH", "endpoint": "/search"})
+session.remember("admin_token", "Bearer abc123")
 store.save(session)
 
-# Resume later
 session = store.load(session.session_id)
 print(session.all_findings(min_severity="HIGH"))
 ```
 
----
+### nova_retry.py
 
-### 🔭 nova_observability.py — Execution Tracing
+```python
+from nova_retry import retry, CircuitBreaker, ResilientCaller
+
+@retry(max_attempts=5, base_delay=1.0, max_delay=30.0)
+def call_nuclei(target):
+    ...
+
+cb = CircuitBreaker("nuclei", threshold=3, reset_after=60)
+if cb.is_open():
+    print("nuclei is down, skipping")
+```
+
+### nova_observability.py
 
 ```python
 from nova_observability import Tracer
 
 tracer = Tracer(run_id="hunt_20260601", verbose=True)
 
-with tracer.span("ReconAgent", kind="agent") as recon_span:
-    recon_span.set("target", "example.com")
+with tracer.span("ReconAgent", kind="agent") as span:
+    span.set("target", "example.com")
+    with tracer.tool_span("subfinder", parent=span) as t:
+        t.set("result_count", 42)
+    with tracer.llm_span("gpt-4o", "openai", parent=span) as llm:
+        llm.tokens_in = 800; llm.tokens_out = 300
 
-    with tracer.tool_span("subfinder", args={"domain": "example.com"},
-                          parent=recon_span) as tool:
-        # ... run subfinder ...
-        tool.set("result_count", 42)
-
-    with tracer.llm_span("gpt-4o", "openai", parent=recon_span) as llm:
-        llm.tokens_in  = 800
-        llm.tokens_out = 300
-        llm.cost_usd   = 0.005
-
-tracer.print_tree()        # coloured tree in terminal
-tracer.save()              # ~/nova_workspace/trace_hunt_20260601.json
-tracer.export_html()       # ~/nova_workspace/trace_hunt_20260601.html
-print(tracer.summary())
+tracer.print_tree()
+tracer.save()          # JSON spans
+tracer.export_html()   # HTML flame graph
 ```
 
----
-
-### 🎯 nova_skills.py — Reusable Skills (Anthropic Skills Pattern)
+### nova_skills.py
 
 ```python
 from nova_skills import SkillLibrary
 
 lib = SkillLibrary()
-print(lib.list_skills())                    # all 20+ built-in skills
+print(lib.list_skills(category="attack"))
 
-# Render a skill with parameters → get system + user prompts
 prompts = lib.render("sqli_analysis",
-    target="example.com",
-    endpoint="/api/search",
-    param="q",
-    method="GET",
-    request_sample="GET /api/search?q=test HTTP/1.1\nHost: example.com")
+    target="example.com", endpoint="/api/search",
+    param="q", method="GET",
+    request_sample="GET /api/search?q=test HTTP/1.1")
 
-# Feed directly to the LLM router
 from nova_llm_router import get_router
-router = get_router()
-resp = router.chat(prompts["user"], system=prompts["system"])
-import json
-payloads = json.loads(resp.content)
-
-# Register custom skill
-from nova_skills import Skill
-lib.register(Skill(
-    name="my_custom_skill",
-    category="attack",
-    description="My custom attack template",
-    system="You are a security expert...",
-    template="Target: {target}\nAnalyse for: {vuln_type}",
-    params=["target", "vuln_type"],
-))
+resp = get_router().chat(prompts["user"], system=prompts["system"])
 ```
 
 ---
@@ -559,15 +547,13 @@ lib.register(Skill(
 ## Cloud: GitHub Actions (24/7 Free)
 
 ```bash
-# Set repository secrets in GitHub:
-# GITHUB_TOKEN (already set), OPENAI_API_KEY, ANTHROPIC_API_KEY, NOVA_TELEGRAM_TOKEN
+# Set in GitHub → Settings → Secrets:
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY, NOVA_TELEGRAM_TOKEN
 
 python3 nova_cloud.py hunt https://target.com
 python3 nova_cloud.py watch <run-id>
 python3 nova_cloud.py results
 ```
-
-The workflow runs on `ubuntu-latest` with all dependencies pre-installed.
 
 ---
 
@@ -579,10 +565,10 @@ The workflow runs on `ubuntu-latest` with all dependencies pre-installed.
 | `ANTHROPIC_API_KEY` | — | Anthropic API key |
 | `GEMINI_API_KEY` | — | Google Gemini API key |
 | `NOVA_LLM_URL` | `http://localhost:11434` | Ollama server URL |
-| `NOVA_LLM_MODEL` | `qwen3:8b` | Ollama model name |
-| `NOVA_OPENAI_MODEL` | `gpt-4o` | OpenAI model to use |
-| `NOVA_ANTHROPIC_MODEL` | `claude-sonnet-4-5` | Anthropic model to use |
-| `NOVA_GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model to use |
+| `NOVA_LLM_MODEL` | `qwen3:8b` | Ollama model |
+| `NOVA_OPENAI_MODEL` | `gpt-4o` | OpenAI model |
+| `NOVA_ANTHROPIC_MODEL` | `claude-sonnet-4-5` | Anthropic model |
+| `NOVA_GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model |
 | `NOVA_WORKSPACE` | `~/nova_workspace` | Nova workspace directory |
 | `NOVA_MAX_STEPS` | `40` | Max ReAct loop steps |
 | `NOVA_TARGET` | `http://localhost:3000` | Default target |
@@ -606,62 +592,51 @@ ollama pull qwen3:8b
 ### "All LLM providers failed"
 
 ```bash
-# Check Ollama is running
-curl http://localhost:11434/api/tags
-
-# Check API keys
-echo $OPENAI_API_KEY
-echo $ANTHROPIC_API_KEY
-
-# Test router directly
-python3 nova_llm_router.py "test"
+curl http://localhost:11434/api/tags   # check Ollama
+echo $OPENAI_API_KEY                  # check keys
+python3 nova_llm_router.py "test"     # test router
 ```
 
 ### Module import errors
 
 ```bash
 source ~/nova_workspace/.venv/bin/activate
-pip install -r requirements.txt    # if requirements.txt exists
-# or re-run setup:
+pip install -r requirements.txt
 ./nova_setup.sh --minimal
 ```
 
 ### Playwright browser not found
 
 ```bash
-playwright install chromium
-playwright install-deps chromium
+playwright install chromium && playwright install-deps chromium
 ```
 
-### Circuit breaker open (provider temporarily blocked)
+### Circuit breaker open for a tool
 
-Circuit breakers reset automatically after 60 seconds. Or restart Nova:
-
-```bash
-# The circuit breaker is in-process; restarting clears it.
-python3 nova.py "health check"
-```
+Circuit breakers reset after 60 seconds automatically. Restart Nova to clear immediately.
 
 ---
 
-## Comparison: Nova vs OpenAI Agents SDK vs Anthropic Agent SDK
+## Feature Comparison
 
 | Feature | Nova Arsenal v4.1 | OpenAI Agents SDK | Anthropic Agent SDK |
 |---|---|---|---|
 | **Multi-agent orchestration** | ✅ | ✅ | ✅ |
 | **Agent handoffs** | ✅ | ✅ | ✅ |
-| **Input/output guardrails** | ✅ | ✅ | ✅ |
-| **Lifecycle hooks** | ✅ | Partial | ✅ (PreToolUse, PostToolUse…) |
+| **Input / output guardrails** | ✅ | ✅ | ✅ |
+| **Lifecycle hooks** | ✅ PreRun · PostRun · PreTool · PostTool · OnFinding | Partial | ✅ PreToolUse · PostToolUse · Stop |
 | **Typed context variables** | ✅ | ✅ | — |
-| **Structured outputs** | ✅ All providers | ✅ OpenAI only | ✅ Claude only |
-| **Streaming** | ✅ All providers | ✅ | ✅ |
-| **Execution tracing** | ✅ | ✅ | Partial |
+| **Structured outputs** | ✅ All 4 providers | ✅ OpenAI only | ✅ Claude only |
+| **Streaming** | ✅ All 4 providers | ✅ | ✅ |
+| **Span-based tracing** | ✅ + HTML export | ✅ | Partial |
 | **Persistent sessions** | ✅ | ✅ | — |
 | **Skills / prompt templates** | ✅ 20+ built-in | — | ✅ |
 | **Multi-provider LLM** | ✅ 4 providers | Partial | ❌ Claude only |
+| **Per-tool circuit breaker** | ✅ | ❌ | ❌ |
+| **Retry with backoff** | ✅ | Partial | Partial |
+| **Cost tracking per span** | ✅ | Partial | ❌ |
 | **Local / offline mode** | ✅ Ollama | ❌ | ❌ |
 | **Security domain built-in** | ✅ 80+ modules | ❌ General purpose | ❌ General purpose |
-| **Circuit breaker** | ✅ | ❌ | ❌ |
 | **GitHub Actions 24/7** | ✅ | Partial | — |
 | **Zero cost option** | ✅ Ollama | ❌ | ❌ |
 | **HackerOne integration** | ✅ | — | — |
