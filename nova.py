@@ -63,7 +63,13 @@ def _ask_llm(prompt: str, system: str = "", temperature: float = 0.1) -> str:
 KEYWORD_MODES = {
     # ── Active scanning ──────────────────────────────────────────────────────
     "full_stack":       ["full stack","full-stack","everything","all modules","complete scan",
-                         "mythos","daybreak","v4","comprehensive","do everything","full power"],
+                         "mythos","v4","comprehensive","do everything","full power"],
+    "daybreak":         ["daybreak","ai assessment","h1 report","hackerone report",
+                         "ai threat","bounty report","scope check","daybreak pipeline"],
+    "orchestrate":      ["orchestrate","multi agent","agent network","agent handoff",
+                         "autonomous agent","run agents","agent pipeline"],
+    "triage":           ["triage","prioritise","prioritize","rank findings","sort findings",
+                         "what to report","best findings","top findings","h1 ready"],
     "hunt":             ["hunt","bug bounty","bounty","find bugs","exploit","pentest","hack"],
     "recon":            ["recon","reconn","subdomain","enumerate","discover","footprint","crt.sh"],
     "fuzz":             ["fuzz","fuzzing","brute force","directory","endpoint","wordlist"],
@@ -478,6 +484,77 @@ def dispatch(intent: dict) -> List[Dict]:
                 print(f"  📊 Tracker: {report['trend']['total_open']} open | {report['trend']['total_fixed']} fixed")
             except Exception as e: print(f"  ⚠️  Tracker: {e}")
 
+    # ── Daybreak AI Assessment ────────────────────────────────────────────────
+    if mode in ("daybreak", "full_stack"):
+        Cls = _load("nova_daybreak", "NovaDaybreak")
+        if Cls:
+            try:
+                # Auto-load scope via nova_scope_manager if available
+                scope = None
+                ScopeMgr = _load("nova_scope_manager", "NovaScopeManager")
+                if ScopeMgr:
+                    try:
+                        sm    = ScopeMgr()
+                        scope = sm.load_scope_for_target(target)
+                        if scope:
+                            print(f"  🔭 Scope loaded: {scope.get('program','?')} "
+                                  f"({len(scope.get('in_scope',[]))} in-scope entries)")
+                    except Exception as se:
+                        print(f"  ⚠️  Scope manager: {se}")
+                db = Cls(target, scope=scope)
+                db_findings = db.run()
+                findings.extend(db_findings if isinstance(db_findings, list) else [])
+                db.save(str(WORKSPACE / "nova_daybreak_report.json"))
+            except Exception as e: print(f"  ⚠️  Daybreak: {e}")
+
+    # ── Multi-Agent Orchestrator ───────────────────────────────────────────────
+    if mode in ("orchestrate",):
+        OrcMod = _load("nova_orchestrator")
+        if OrcMod:
+            try:
+                url    = target if target.startswith("http") else DEFAULT_TARGET
+                runner = OrcMod.build_security_network(url)
+                result = runner.run(query, start="ReconAgent")
+                findings.extend(result.findings)
+                print(f"  🧠 Orchestrator: {result.steps} steps, "
+                      f"{len(result.findings)} findings")
+            except Exception as e: print(f"  ⚠️  Orchestrator: {e}")
+
+    # ── AI Triage & Prioritiser ────────────────────────────────────────────────
+    if mode in ("triage",) and findings:
+        TriCls = _load("nova_triage", "NovaTriage")
+        if TriCls:
+            try:
+                triage  = TriCls()
+                triage.ingest(findings, source=mode)
+                ranked  = triage.run()
+                triage.print_summary()
+                triage.save(str(WORKSPACE / "nova_triage_report.json"))
+                # Replace findings with ranked list
+                findings = [
+                    {"type": f.type, "severity": f.severity,
+                     "endpoint": f.endpoint, "file": f.file,
+                     "triage_score": f.triage_score,
+                     "priority": f.priority_label,
+                     "llm_reasoning": f.llm_reasoning,
+                     "h1_report_ready": f.h1_report_ready,
+                     "chain_id": f.chain_id}
+                    for f in ranked
+                ]
+            except Exception as e: print(f"  ⚠️  Triage: {e}")
+
+    # ── Auto-triage on full_stack if findings found ────────────────────────────
+    if mode in ("full_stack",) and findings:
+        TriCls = _load("nova_triage", "NovaTriage")
+        if TriCls:
+            try:
+                triage = TriCls(skip_llm=False)
+                triage.ingest(findings, source="full_stack")
+                ranked = triage.run()
+                triage.save(str(WORKSPACE / "nova_triage_report.json"))
+                print(f"  🎯 Auto-triage: {len(ranked)} ranked findings saved")
+            except Exception as e: print(f"  ⚠️  Auto-triage: {e}")
+
     # ── Bootstrap ─────────────────────────────────────────────────────────────
     if mode in ("bootstrap",):
         try:
@@ -548,7 +625,10 @@ def main():
         print("Usage: python3 nova.py \"Your security task in plain English\"")
         print("\nExamples:")
         print("  python3 nova.py \"Hunt http://localhost:3000 for SQL injection\"")
-        print("  python3 nova.py \"Run full-stack Mythos+Daybreak pipeline on ./juice-shop\"")
+        print("  python3 nova.py \"Run full-stack pipeline on ./juice-shop\"")
+        print("  python3 nova.py \"Daybreak AI assessment on https://target.com\"")
+        print("  python3 nova.py \"Orchestrate multi-agent recon+attack on https://target.com\"")
+        print("  python3 nova.py \"Triage and prioritise these findings\"")
         print("  python3 nova.py \"Scan git history for leaked secrets in .\"")
         print("  python3 nova.py \"Build a threat model for ./my-app\"")
         print("  python3 nova.py \"Check supply chain risk for ./package.json\"")
