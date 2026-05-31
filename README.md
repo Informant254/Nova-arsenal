@@ -17,8 +17,8 @@
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-green)](https://ollama.com)
 [![Playwright](https://img.shields.io/badge/Playwright-Chromium-orange)](https://playwright.dev)
-[![License](https://img.shields.io/badge/License-Educational-red)](LICENSE)
 [![Cost](https://img.shields.io/badge/LLM%20Cost-%240%2Frun-brightgreen)](#)
+[![License](https://img.shields.io/badge/Use-Educational-red)](LICENSE)
 
 </div>
 
@@ -31,16 +31,17 @@
 3. [Installation](#3-installation)
 4. [Quick Start](#4-quick-start)
 5. [Capabilities](#5-capabilities)
-   - [Agentic Mode (New)](#51-agentic-mode--react-loop)
-   - [Swarm Mode](#52-swarm-mode)
-   - [Attack Modules](#53-attack-modules)
-   - [Intelligence Layer](#54-intelligence-layer)
-   - [Reconnaissance](#55-reconnaissance)
-   - [Code Analysis](#56-code-analysis)
-   - [Memory & Learning](#57-memory--learning)
-   - [Reporting & Deployment](#58-reporting--deployment)
+   - [Agentic Mode — ReAct Loop](#51-agentic-mode--react-loop)
+   - [Self-Improvement & Repo Intelligence ✦ New](#52-self-improvement--repo-intelligence)
+   - [Swarm Mode](#53-swarm-mode)
+   - [Attack Modules](#54-attack-modules)
+   - [Intelligence Layer](#55-intelligence-layer)
+   - [Reconnaissance](#56-reconnaissance)
+   - [Code Analysis](#57-code-analysis)
+   - [Memory & Learning](#58-memory--learning)
+   - [Reporting & Deployment](#59-reporting--deployment)
 6. [Module Reference](#6-module-reference)
-7. [Configuration](#7-configuration)
+7. [Configuration & Environment Variables](#7-configuration--environment-variables)
 8. [Compared to Frontier Agents](#8-compared-to-frontier-agents)
 9. [HackerOne Integration](#9-hackerone-integration)
 10. [Extending Nova](#10-extending-nova)
@@ -53,10 +54,11 @@ Nova is a **fully autonomous, locally-run AI security researcher**. She can:
 
 - Plan and execute complete bug bounty hunts from a single command
 - Use a **real Linux shell** and **headless Chromium browser** freely — the same way Claude Code and OpenAI Daybreak agents do
-- Reason with a local Ollama model (zero cloud cost, zero API keys)
+- Route each reasoning task to the **best available Ollama model** — never stuck on TinyLlama
+- **Write and improve her own code** — reads her own run reports, identifies weaknesses, proposes patches, tests them
 - Chain vulnerabilities together — SQLi → credential dump → JWT forge → admin access
-- Learn from every hunt and get smarter over time
-- Run 24/7 and alert you when she finds something critical
+- Learn from every hunt and get smarter over time via **NovaBrain persistent memory**
+- Run 24/7 in continuous hunting mode
 
 Built on **OWASP Juice Shop** as the practice target, with a real-world hunt engine for live bug bounty programs.
 
@@ -65,101 +67,113 @@ Built on **OWASP Juice Shop** as the practice target, with a real-world hunt eng
 ## 2. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         NOVA ARSENAL v3.0                               │
-│                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    ENTRY POINTS                                  │   │
-│  │  nova_core.py   nova_agent_core.py   launch_swarm.py           │   │
-│  │  (pipeline)     (agentic/ReAct)      (10-agent parallel)        │   │
-│  └────────────────────────┬────────────────────────────────────────┘   │
-│                            │                                             │
-│  ┌─────────────────────────▼────────────────────────────────────────┐  │
-│  │                  INTELLIGENCE LAYER                               │  │
-│  │                                                                    │  │
-│  │  nova_model_router.py     ← Routes each task to best Ollama model│  │
-│  │  nova_reasoning_core.py   ← Unified LLM backbone (all modules)  │  │
-│  │  nova_llm_bridge.py       ← Mission planner + NL interface       │  │
-│  │  nova_chain_of_thought.py ← Observe→Hypothesize→Probe→Conclude  │  │
-│  │  nova_hypothesis_engine.py← Bayesian hypothesis testing          │  │
-│  │  nova_rag_builder.py      ← RAG from 100+ past hunts             │  │
-│  │  nova_adaptive_brain.py   ← Context-aware strategy adaptation    │  │
-│  └─────────────────────────┬────────────────────────────────────────┘  │
-│                             │                                            │
-│  ┌──────────────────────────▼───────────────────────────────────────┐  │
-│  │                    EXECUTION LAYER                                │  │
-│  │                                                                    │  │
-│  │  ┌───────────────┐   ┌─────────────────┐   ┌──────────────────┐  │  │
-│  │  │  TOOL KIT      │   │  ATTACK MODULES  │   │  RECON ENGINE    │  │  │
-│  │  │  bash_exec    │   │  SQLi / XSS      │   │  subdomains      │  │  │
-│  │  │  http_request │   │  JWT Forge       │   │  URL discovery   │  │  │
-│  │  │  browser_*    │   │  Race Engine     │   │  tech fingerprint│  │  │
-│  │  │  file_*       │   │  Proto Polluter  │   │  port scan       │  │  │
-│  │  │  grep_code    │   │  Deserialization │   │  JS analysis     │  │  │
-│  │  │  install_tool │   │  Session Hijack  │   │  source map hunt │  │  │
-│  │  └───────────────┘   └─────────────────┘   └──────────────────┘  │  │
-│  └──────────────────────────┬───────────────────────────────────────┘  │
-│                              │                                           │
-│  ┌───────────────────────────▼──────────────────────────────────────┐  │
-│  │                   MEMORY & LEARNING LAYER                         │  │
-│  │                                                                    │  │
-│  │  nova_memory_system.py   ← NovaBrain — persists across hunts     │  │
-│  │  nova_feedback_cortex.py ← Validates findings, updates scores    │  │
-│  │  nova_exploit_memory.json← What worked, what didn't              │  │
-│  │  nova_brain_memory.json  ← Technique scores, payload scores      │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           NOVA ARSENAL v3.0                                  │
+│                                                                               │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                         ENTRY POINTS                                   │  │
+│  │   nova_agent_core.py    nova_core.py    launch_swarm.py               │  │
+│  │   (agentic / ReAct)     (pipeline)      (10-agent parallel)           │  │
+│  └──────────────────────────────┬─────────────────────────────────────────┘  │
+│                                  │                                             │
+│  ┌───────────────────────────────▼────────────────────────────────────────┐  │
+│  │                       INTELLIGENCE LAYER                                │  │
+│  │                                                                          │  │
+│  │  nova_model_router.py      ← Routes each task to best Ollama model     │  │
+│  │  nova_reasoning_core.py    ← Unified LLM backbone (all modules)        │  │
+│  │  nova_llm_bridge.py        ← NL mission planner + expert prompts       │  │
+│  │  nova_chain_of_thought.py  ← Observe→Hypothesize→Probe→Conclude        │  │
+│  │  nova_hypothesis_engine.py ← Bayesian hypothesis testing               │  │
+│  │  nova_rag_builder.py       ← RAG from 100+ past hunts                  │  │
+│  │  nova_adaptive_brain.py    ← Context-aware strategy adaptation         │  │
+│  └───────────────────────────────┬────────────────────────────────────────┘  │
+│                                   │                                            │
+│  ┌────────────────────────────────▼───────────────────────────────────────┐  │
+│  │                       AGENTIC EXECUTION LAYER                           │  │
+│  │                                                                          │  │
+│  │  ┌─────────────────────┐  ┌─────────────────────┐  ┌────────────────┐  │  │
+│  │  │    TOOL KIT          │  │  SELF-IMPROVEMENT   │  │  REPO INTEL    │  │  │
+│  │  │  bash_exec          │  │  nova_self_          │  │  nova_repo_    │  │  │
+│  │  │  http_request       │  │  improvement.py      │  │  intelligence  │  │  │
+│  │  │  browser_open/click │  │                      │  │  .py           │  │  │
+│  │  │  browser_fill/eval  │  │  • collect signals   │  │                │  │  │
+│  │  │  browser_source     │  │  • generate plan     │  │  • symbol idx  │  │  │
+│  │  │  file_read/write    │  │  • patch & verify    │  │  • test idx    │  │  │
+│  │  │  grep_code          │  │  • remember result   │  │  • stack detect│  │  │
+│  │  │  install_tool       │  │                      │  │  • cmd suggest │  │  │
+│  │  │  self_review        │  └─────────────────────┘  └────────────────┘  │  │
+│  │  │  self_remember      │                                                  │  │
+│  │  │  query_repo_index   │                                                  │  │
+│  │  └─────────────────────┘                                                  │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────┐  │
+│  │                        ATTACK MODULES                                    │  │
+│  │  SQLi  XSS  JWT  Race  Proto-Pollution  Deserialization  Session  SSRF  │  │
+│  │  Path-Traversal  HTTP-Smuggling  IDOR  CORS  SSTI  XXE  Open-Redirect  │  │
+│  └──────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────┐  │
+│  │                      MEMORY & LEARNING LAYER                             │  │
+│  │  NovaBrain  FeedbackCortex  ExploitMemory  SelfImprovementMemory        │  │
+│  └──────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### The ReAct Agentic Loop (nova_agent_core.py)
+### The ReAct Agentic Loop
 
 ```
-  ┌──────────────────────────────────────────────────────────┐
-  │  TASK + TOOLS + RAG CONTEXT injected into system prompt  │
-  └──────────────────────┬───────────────────────────────────┘
-                         │
-                         ▼
-  ╔══════════════════════════════════════════════════════════╗
-  ║                  NOVA AGENT LOOP                        ║
-  ║                                                          ║
-  ║  ┌─────────┐    ┌──────────┐    ┌──────────────────┐   ║
-  ║  │ OBSERVE │───▶│  THINK   │───▶│    ACT           │   ║
-  ║  │         │    │          │    │                  │   ║
-  ║  │ Results │    │ LLM picks│    │ bash_exec        │   ║
-  ║  │ fed back│    │ next tool│    │ http_request     │   ║
-  ║  │ into ctx│    │ freely   │    │ browser_open     │   ║
-  ║  └────▲────┘    └──────────┘    │ file_read/write  │   ║
-  ║       │                         │ grep_code        │   ║
-  ║       └─────────────────────────│ install_tool     │   ║
-  ║                                 └──────────────────┘   ║
-  ╚══════════════════════════════════════════════════════════╝
-                         │
-                         ▼ (when done)
-  ┌──────────────────────────────────────────────────────────┐
-  │              mission_complete → JSON report              │
-  └──────────────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────────────────┐
+  │   TASK + TOOLS + RAG CONTEXT injected into system prompt        │
+  └──────────────────────────────┬──────────────────────────────────┘
+                                  │
+                                  ▼
+  ╔═════════════════════════════════════════════════════════════════╗
+  ║                     NOVA AGENT LOOP                            ║
+  ║                                                                 ║
+  ║  ┌──────────┐    ┌───────────┐    ┌─────────────────────────┐  ║
+  ║  │ OBSERVE  │───▶│   THINK   │───▶│         ACT             │  ║
+  ║  │          │    │           │    │                         │  ║
+  ║  │ Tool     │    │ LLM picks │    │ bash_exec               │  ║
+  ║  │ result   │    │ next tool │    │ http_request            │  ║
+  ║  │ fed back │    │ freely    │    │ browser_open/click/fill │  ║
+  ║  │ into ctx │    │           │    │ file_read / file_write  │  ║
+  ║  └────▲─────┘    └───────────┘    │ grep_code               │  ║
+  ║       │                           │ install_tool            │  ║
+  ║       └───────────────────────────│ self_review ✦           │  ║
+  ║                                   │ self_remember ✦         │  ║
+  ║       Every REFLECT_EVERY steps:  │ query_repo_index ✦      │  ║
+  ║       LLM reflects on progress,   └─────────────────────────┘  ║
+  ║       logs to verification_log,                                 ║
+  ║       and self-corrects strategy.                               ║
+  ╚═════════════════════════════════════════════════════════════════╝
+                                  │
+                              (when done)
+  ┌─────────────────────────────────────────────────────────────────┐
+  │           mission_complete → JSON report + memory update        │
+  └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### 10-Agent Parallel Swarm
 
 ```
-                    ┌────────────────────────────┐
-                    │   SHARED KNOWLEDGE GRAPH   │
-                    │  endpoints / tokens / paths │
-                    │  findings / exploit_queue   │
-                    └─────────────┬──────────────┘
-                                  │ (read/write)
-          ┌───────────────────────┼───────────────────────┐
-          │           ┌───────────┴──────────┐            │
-          │           │                      │            │
-     ┌────▼────┐ ┌────▼────┐ ┌────▼────┐ ┌──▼──────┐ ┌──▼──────┐
-     │  RECON  │ │ EXPLOIT │ │  AUTH   │ │  CODE   │ │  RACE   │
-     │ Agent   │ │ Agent   │ │ Agent   │ │ Agent   │ │ Agent   │
-     └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
-     ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-     │ CONFIG  │ │   XSS   │ │  IDOR   │ │ EXFIL   │ │VALIDATE │
-     │ Agent   │ │ Agent   │ │ Agent   │ │ Agent   │ │ Agent   │
-     └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+                 ┌──────────────────────────────────┐
+                 │      SHARED KNOWLEDGE GRAPH       │
+                 │  endpoints / tokens / paths        │
+                 │  findings / exploit_queue          │
+                 └──────────────────┬───────────────┘
+                                    │ (concurrent read/write)
+       ┌────────────────────────────┼────────────────────────────┐
+       │                ┌───────────┴──────────┐                 │
+  ┌────▼────┐      ┌────▼────┐          ┌──────▼───┐       ┌────▼────┐
+  │  RECON  │      │ EXPLOIT │          │   AUTH   │       │  CODE   │
+  └─────────┘      └─────────┘          └──────────┘       └─────────┘
+  ┌─────────┐      ┌─────────┐          ┌──────────┐       ┌─────────┐
+  │  RACE   │      │ CONFIG  │          │   XSS    │       │  IDOR   │
+  └─────────┘      └─────────┘          └──────────┘       └─────────┘
+  ┌─────────┐      ┌──────────────────────────────────────────────────┐
+  │  EXFIL  │      │              VALIDATE (deduplicates all)         │
+  └─────────┘      └──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -179,63 +193,48 @@ Built on **OWASP Juice Shop** as the practice target, with a real-world hunt eng
 ### Option A — One-Command Setup (Recommended)
 
 ```bash
-# 1. Clone
 git clone https://github.com/Informant254/Nova-arsenal
 cd Nova-arsenal
-
-# 2. Run setup (handles everything below automatically)
-chmod +x nova_setup.sh
-./nova_setup.sh
+chmod +x nova_setup.sh && ./nova_setup.sh
 ```
 
-The setup script will:
-- Install Ollama if missing and start the server
-- Auto-detect your VRAM and pull the right model sizes
-- Create a Python virtual environment with all dependencies
-- Install Playwright + headless Chromium browser
-- Install system security tools (nmap, nuclei, subfinder, httpx)
-- Build Nova's RAG knowledge base from all past hunt data
-- Verify every component is wired correctly
+The script handles everything: Ollama install, model pulls, Python venv, Playwright browser, system tools, and RAG build.
 
 ### Option B — Manual Step-by-Step
 
 #### Step 1 — Install Ollama
 
 ```bash
-# Linux / macOS
 curl -fsSL https://ollama.com/install.sh | sh
-
-# Start the server
 ollama serve &
 ```
 
-#### Step 2 — Pull Models
+#### Step 2 — Pull Models (in order of priority)
 
-Nova routes each task to the best available model. Pull in order of importance:
+Nova routes each task to the best installed model automatically.
 
 ```bash
-# Most important — security-specialized brain
+# Security-specialized brain (most important)
 ollama pull xploiter/the-xploiter
 
-# Best chain-of-thought reasoning (pick one based on your VRAM)
+# Chain-of-thought reasoning — pick size based on your VRAM
 ollama pull deepseek-r1:32b    # 32 GB+ VRAM
-ollama pull deepseek-r1:14b    # 16 GB VRAM
-ollama pull deepseek-r1:8b     # 8 GB VRAM
+ollama pull deepseek-r1:14b    # 16 GB  VRAM
+ollama pull deepseek-r1:8b     #  8 GB  VRAM
 
-# Best for code auditing and payload generation
+# Best for code auditing and self-improvement
 ollama pull devstral-small
 
 # Fast lightweight checks
 ollama pull qwen3:8b
 
-# Best general purpose (optional, needs ~20 GB VRAM)
+# Best general purpose (optional — needs ~20 GB VRAM)
 ollama pull qwen3:30b
 ```
 
-Verify models are loaded:
+Check what's routing where:
 ```bash
-ollama list
-python3 nova_model_router.py    # Shows routing table
+python3 nova_model_router.py
 ```
 
 #### Step 3 — Python Dependencies
@@ -257,9 +256,9 @@ python3 -m playwright install chromium
 
 ```bash
 # Debian/Ubuntu
-sudo apt-get update && sudo apt-get install -y nmap curl wget jq git
+sudo apt-get install -y nmap curl wget jq git
 
-# Go-based tools (requires Go 1.21+)
+# Go-based recon tools (requires Go 1.21+)
 go install github.com/projectdiscovery/httpx/cmd/httpx@latest
 go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
@@ -270,69 +269,52 @@ go install github.com/lc/gau/v2/cmd/gau@latest
 #### Step 6 — Build RAG Knowledge Base
 
 ```bash
-# Ingest all past hunt data into Nova's knowledge base
 python3 nova_rag_builder.py .
 ```
 
-#### Step 7 — Verify Installation
+#### Step 7 — Verify
 
 ```bash
-# Check model routing
-python3 nova_model_router.py
-
-# Quick smoke test
-python3 - <<'EOF'
-from nova_tool_kit import bash_exec, http_request
-print(bash_exec("echo 'Tool kit OK'")["stdout"])
-print("Ollama:", __import__("requests").get("http://localhost:11434/api/tags", timeout=3).status_code)
-EOF
+python3 nova_model_router.py     # routing table
+python3 nova_repo_intelligence.py # repo index check
+python3 -c "from nova_tool_kit import execute_tool; print(execute_tool('bash_exec',{'command':'echo OK'}))"
 ```
 
 ---
 
 ## 4. Quick Start
 
-### Start OWASP Juice Shop (Practice Target)
-
 ```bash
-# Docker (recommended)
+# Start OWASP Juice Shop (practice target)
 docker run -d -p 3000:3000 bkimminich/juice-shop
 
-# Or from this repo (Node.js 24 required)
-npm install && npm start
-```
-
-### Run Nova
-
-```bash
 source ~/nova_workspace/.venv/bin/activate
 
-# ── MODE 1: True Agentic Hunt (recommended) ─────────────────────
-# The LLM drives the entire hunt, calling tools freely
+# ── Agentic Mode (LLM drives the entire hunt) ───────────────────
 python3 nova_agent_core.py \
   --target http://localhost:3000 \
   --objective "Map the full attack surface, exploit all critical vulnerabilities, write a report" \
   --steps 40
 
-# ── MODE 2: Pipeline Mode (structured 10-phase hunt) ────────────
+# ── Pipeline Mode (structured 10-phase hunt) ────────────────────
 python3 nova_core.py
 
-# ── MODE 3: 10-Agent Parallel Swarm ─────────────────────────────
+# ── 10-Agent Parallel Swarm ─────────────────────────────────────
 python3 launch_swarm.py
 
-# ── MODE 4: Specific Module ─────────────────────────────────────
-python3 nova_jwt_forge.py             # JWT-specific hunt
-python3 nova_proto_polluter.py        # Prototype pollution
-python3 nova_race_engine.py           # Race conditions
-python3 nova_daybreak.py              # 3-stage Daybreak assessment
+# ── Specific Modules ────────────────────────────────────────────
+python3 nova_jwt_forge.py
+python3 nova_proto_polluter.py
+python3 nova_race_engine.py
+python3 nova_daybreak.py
 
-# ── REAL TARGET (Bug Bounty) ────────────────────────────────────
+# ── Self-Improvement (Nova improves her own code) ───────────────
+python3 nova_self_improvement.py
+
+# ── Real Bug Bounty Target ──────────────────────────────────────
 python3 nova_agent_core.py \
   --target https://target.com \
-  --objective "Enumerate all API endpoints, find auth bypass and IDOR vulnerabilities" \
-  --steps 60
-
-python3 nova_wild_hunt.py --target target.com
+  --objective "Enumerate all API endpoints, find auth bypass and IDOR vulnerabilities"
 ```
 
 ---
@@ -343,329 +325,275 @@ python3 nova_wild_hunt.py --target target.com
 
 **File:** `nova_agent_core.py`
 
-The core architectural upgrade. Instead of a hardcoded pipeline, the LLM decides every step.
+The LLM decides every step of the hunt. No hardcoded pipeline.
 
 ```bash
 python3 nova_agent_core.py --target http://localhost:3000 --steps 40
 ```
 
-**How it works:**
-1. LLM receives the task, full tool list, and RAG context from past hunts
-2. LLM outputs: `{"thought": "...", "action": "tool_name", "args": {...}}`
-3. Nova executes the tool and feeds the result back
-4. Repeat until `mission_complete` or max steps
-
-**Available tools the LLM can call freely:**
+**Complete tool table** (what the LLM can freely call):
 
 | Tool | Description |
 |---|---|
-| `bash_exec` | Run any shell command — nmap, sqlmap, nuclei, curl, scripts |
+| `bash_exec` | Run any shell command — nmap, sqlmap, nuclei, curl, custom scripts |
 | `http_request` | Full HTTP control: method, headers, cookies, body, redirects |
-| `browser_open` | Open URL in real headless Chromium (handles SPAs and JavaScript) |
+| `browser_open` | Open URL in real headless Chromium — handles JavaScript SPAs |
 | `browser_source` | Get full page HTML/JS source — find secrets, endpoints, hidden fields |
-| `browser_click` | Click page elements by CSS selector |
-| `browser_fill` | Fill forms in the browser |
-| `browser_eval` | Execute JavaScript in the browser — read cookies, localStorage |
+| `browser_click` | Click elements by CSS selector |
+| `browser_fill` | Fill and submit forms |
+| `browser_eval` | Execute JavaScript in the page — read cookies, localStorage, DOM |
 | `file_read` | Read source code, configs, logs, past findings |
-| `file_write` | Write findings, exploit scripts, reports |
-| `grep_code` | Search codebase for patterns — secrets, API keys, vulnerable code |
-| `install_tool` | Install missing tools on demand (pip/apt/go) |
+| `file_write` | Write findings, exploit scripts, reports to disk |
+| `grep_code` | Search codebase for patterns — secrets, API keys, vulnerable sinks |
+| `install_tool` | Install missing tools on demand (pip / apt / go) |
+| `self_review` | **Read recent run reports and identify what went wrong** |
+| `self_remember` | **Persist a lesson or outcome to long-term improvement memory** |
+| `query_repo_index` | **Look up symbols, functions, and test commands in Nova's own codebase** |
 | `mission_complete` | Signal completion with summary |
+
+**Reflection loop:** Every `REFLECT_EVERY` steps (default: 5), the agent pauses, reflects on what it's learned so far, and logs its thinking to `verification_log`. This prevents drift and keeps long hunts on track.
+
+**Permission profiles** control what tools the agent can use:
+
+```bash
+NOVA_PERMISSION_PROFILE=read_only   # bash + http blocked (safe for review tasks)
+NOVA_PERMISSION_PROFILE=full        # all tools enabled (default hunt mode)
+NOVA_PERMISSION_PROFILE=no_network  # http_request blocked (offline code analysis)
+```
 
 **Environment variables:**
 
 ```bash
-export NOVA_LLM_MODEL=deepseek-r1:14b    # Force specific model
-export NOVA_MAX_STEPS=50                  # Max agent steps
-export NOVA_LLM_TIMEOUT=120               # LLM request timeout
-export NOVA_LLM_URL=http://localhost:11434
+NOVA_LLM_MODEL=deepseek-r1:14b   # force a specific model
+NOVA_MAX_STEPS=50                 # max agent steps
+NOVA_REFLECT_EVERY=5              # reflect every N steps
+NOVA_HISTORY_LIMIT=30             # conversation history limit
+NOVA_LLM_TIMEOUT=120              # LLM request timeout
+NOVA_PERMISSION_PROFILE=full      # tool permission level
+NOVA_LLM_URL=http://localhost:11434
+NOVA_WORKSPACE=~/nova_workspace
 ```
 
 ---
 
-### 5.2 Swarm Mode
+### 5.2 Self-Improvement & Repo Intelligence
 
-Nova can deploy multiple independent agents that share a knowledge graph.
+> **This is what closes the last gap between Nova and Claude Code.**
+> Claude Code can read its own context, understand the codebase, and improve itself.
+> Nova now can too — without any cloud calls.
 
-#### 6-Agent Swarm (nova_swarm_v3.py)
+#### `nova_self_improvement.py`
+
+Nova reads her own run history, identifies failures, and generates a concrete improvement backlog — entirely locally.
+
+```bash
+# Run standalone to generate an improvement plan
+python3 nova_self_improvement.py
+```
+
+**What it does:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 NOVA SELF-IMPROVEMENT LOOP                      │
+│                                                                  │
+│  1. collect_run_signals()                                        │
+│       └── reads recent agent_report_*.json from workspace       │
+│       └── reads verification logs, reflections, open proposals  │
+│       └── reads nova_self_improvement_memory.json               │
+│                                                                  │
+│  2. generate_improvement_plan()                                  │
+│       └── sends signals to local Ollama (no cloud)              │
+│       └── Ollama proposes 3-6 small, testable improvements      │
+│       └── fallback heuristics if Ollama unavailable             │
+│                                                                  │
+│  3. Each proposal contains:                                      │
+│       • id, title, rationale (evidence-based)                   │
+│       • target_files: ["nova_agent_core.py"]                    │
+│       • verification: ["python3 -m py_compile nova_*.py"]       │
+│       • status: pending → done / rejected                       │
+│                                                                  │
+│  4. remember_outcome()                                           │
+│       └── records what was tried and whether it worked          │
+│       └── persists to nova_self_improvement_memory.json         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**As agent tools** (callable during a hunt):
+
+```json
+{"action": "self_review",   "args": {}}
+{"action": "self_remember", "args": {"lesson": "JWT none bypass confirmed on /rest/user/whoami"}}
+```
+
+**Persistent files created:**
+- `~/nova_workspace/nova_self_improvement_plan.json` — current improvement backlog
+- `~/nova_workspace/nova_self_improvement_memory.json` — past lessons and outcomes
+
+#### `nova_repo_intelligence.py`
+
+Builds a lightweight symbol and test index of the entire Nova codebase — without any external APIs. Local Ollama models can navigate the repo with much less guessing.
+
+```bash
+python3 nova_repo_intelligence.py    # build index
+```
+
+**What it indexes:**
+
+| Data | How |
+|---|---|
+| Function and class names | Python AST parser + regex fallback for JS/TS |
+| Test files | Detected by path markers: `test/`, `spec/`, `cypress/`, `e2e/` |
+| Tech stack | Manifest detection: `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml` |
+| Suggested test commands | Auto-extracted from `package.json` scripts and build tools |
+| Import graph | Top-30 imports per file for dependency awareness |
+
+**Callable as an agent tool:**
+
+```json
+{"action": "query_repo_index", "args": {"query": "where is JWT verification handled"}}
+```
+
+This lets Nova know — before she writes a patch — exactly which file and line number to edit, and which test command to run afterward.
+
+**Built-in secret redaction:** All tool outputs are passed through `redact()` before being returned to the LLM — patterns like `api_key=`, `password=`, `token=` are replaced with `[REDACTED]` so secrets never appear in LLM context or logs.
+
+---
+
+### 5.3 Swarm Mode
+
+#### 6-Agent Swarm (`nova_swarm_v3.py`)
 
 ```bash
 python3 nova_swarm_v3.py
 ```
 
-```
-Agent 1: Recon        → Maps endpoints, extracts tokens, builds attack surface
-Agent 2: Exploit      → SQLi, XSS, SSRF, path traversal
-Agent 3: Auth         → JWT forgery, auth bypass, privilege escalation
-Agent 4: Code         → Source code analysis, taint tracing
-Agent 5: Race         → Race conditions, TOCTOU, coupon reuse
-Agent 6: Validate     → Confirms findings, removes false positives
-```
+| Agent | Responsibility |
+|---|---|
+| Recon | Maps endpoints, extracts tokens, builds attack surface |
+| Exploit | SQLi, XSS, SSRF, path traversal |
+| Auth | JWT forgery, auth bypass, privilege escalation |
+| Code | Source analysis, taint tracing (via `nova_code_reasoner_v2`) |
+| Race | Race conditions, TOCTOU, coupon double-spend |
+| Validate | Confirms every finding, removes false positives |
 
-#### 10-Agent Parallel Swarm (launch_swarm.py)
+#### 10-Agent Parallel Swarm (`launch_swarm.py`)
 
 ```bash
 python3 launch_swarm.py
 ```
 
-Adds: Config, XSS-specialist, IDOR, Exfil, and Validate agents. All run in parallel threads, sharing a concurrent knowledge graph with deduplication.
+Adds: Config, XSS-specialist, IDOR, Exfil, and Validate agents. All run in parallel threads sharing a concurrent knowledge graph with built-in deduplication.
 
 ---
 
-### 5.3 Attack Modules
+### 5.4 Attack Modules
 
-Each module can be run standalone or as part of a pipeline/swarm.
+Each module runs standalone or as part of any swarm/pipeline.
 
-#### SQL Injection — `nova_exploit_synthesizer.py`
-
-```bash
-python3 nova_exploit_synthesizer.py
-```
-
-Payloads include: tautology, UNION SELECT (full table extraction), blind boolean, time-based, comment variants. Auto-validates success by detecting schema data in responses.
-
-#### XSS — `nova_exploit_synthesizer.py` + `nova_feedback_cortex.py`
-
-Stored and reflected XSS with payloads for: `<script>`, `<img onerror>`, `<svg onload>`, `<iframe src=javascript:>`, cookie theft scripts. Tests feedback, product reviews, usernames, and all string-type fields.
-
-#### JWT Forgery — `nova_jwt_forge.py`
-
-```bash
-python3 nova_jwt_forge.py
-```
-
-- `none` algorithm bypass
-- Weak secret brute-force (common wordlists)
-- Key confusion attacks (RS256 → HS256 with public key)
-- Algorithm downgrade
-- Claims tampering (email, role, isAdmin)
-
-#### Race Conditions — `nova_race_engine.py`
-
-```bash
-python3 nova_race_engine.py
-```
-
-Uses parallel `ThreadPoolExecutor` to fire simultaneous requests. Targets: coupon redemption double-spend, rate limit bypass, concurrent basket manipulation, TOCTOU on discount codes.
-
-#### Prototype Pollution — `nova_proto_polluter.py`
-
-```bash
-python3 nova_proto_polluter.py
-```
-
-- `__proto__` injection via JSON body
-- `constructor.prototype` pollution
-- Deep merge exploitation
-- Query string pollution
-- Gadget chains for auth bypass and RCE
-
-#### Deserialization — `nova_deserialize_dropper.py`
-
-Targets Node.js `serialize-javascript` and `node-serialize` sinks. Generates IIFE payloads for RCE, tests cookie and body deserialization endpoints.
-
-#### Session Hijacking — `nova_session_hijacker.py`
-
-CSRF token extraction, session fixation, cookie theft via XSS, predictable session ID testing, concurrent session attacks.
-
-#### HTTP Request Smuggling — `nova_url_smuggling.py`
-
-CL.TE and TE.CL attack variants, header injection, cache poisoning via smuggled requests.
-
-#### SSRF — `nova_exploit_synthesizer.py`
-
-Internal metadata endpoint probes (AWS, GCP, Azure), blind SSRF with callback, port scanning via SSRF, file scheme exploitation.
+| Module | Attack Type | Key Technique |
+|---|---|---|
+| `nova_exploit_synthesizer.py` | SQLi, XSS, SSRF, LFI | Union SELECT, stored XSS, SSRF to metadata |
+| `nova_jwt_forge.py` | JWT attacks | `none` algo bypass, weak secret bruteforce, RS256→HS256 |
+| `nova_race_engine.py` | Race conditions | ThreadPoolExecutor parallel requests, coupon double-spend |
+| `nova_proto_polluter.py` | Prototype pollution | `__proto__`, `constructor.prototype`, gadget chains |
+| `nova_deserialize_dropper.py` | Deserialization | Node.js `node-serialize` IIFE payloads for RCE |
+| `nova_session_hijacker.py` | Session attacks | CSRF extraction, session fixation, cookie theft via XSS |
+| `nova_url_smuggling.py` | HTTP smuggling | CL.TE + TE.CL variants, cache poisoning |
+| `nova_fuzzer_fix.py` | Parameter fuzzing | Mutation-based, boundary values, type confusion |
+| `nova_browser_agent.py` | Browser-based attacks | JS-aware auth bypass, challenge automation |
 
 ---
 
-### 5.4 Intelligence Layer
+### 5.5 Intelligence Layer
 
 #### Model Router — `nova_model_router.py`
 
-Routes every task to the best available Ollama model automatically.
-
-```bash
-python3 nova_model_router.py    # Show current routing table
-```
+Every task is routed to the best available Ollama model. No more TinyLlama for everything.
 
 ```
 🔴 Security   → xploiter/the-xploiter  (attack chain expert)
-🟠 Reasoning  → deepseek-r1:32b        (chain-of-thought, shows its work)
-🟡 Coding     → devstral-small         (code audit, payload generation)
-🔵 Fast       → qwen3:8b               (quick checks, parsing)
+🟠 Reasoning  → deepseek-r1:32b        (shows chain of thought)
+🟡 Coding     → devstral-small         (code audit, patches, self-improvement)
+🔵 Fast       → qwen3:8b               (parsing, quick checks)
 ⚪ General    → qwen3:30b              (planning, reporting)
 ```
 
-If your top model isn't installed, it automatically falls back through the tier until it finds one that is.
+Falls back through the tier automatically if a preferred model isn't installed.
 
 #### Chain-of-Thought Engine — `nova_chain_of_thought.py`
 
 ```
-Pattern: OBSERVE → HYPOTHESIZE → PROBE → CONCLUDE → CHAIN
+OBSERVE → HYPOTHESIZE → PROBE → CONCLUDE → CHAIN
 ```
 
-For each observation, Nova:
-1. Forms a ranked list of hypotheses with Bayesian confidence scores
-2. Designs targeted probes to test each hypothesis
-3. Updates confidence based on evidence
-4. Chains confirmed findings to the next hypothesis (SQLi → dump users → crack hashes → admin login)
+Maintains a `ReasoningChain` of `Thought` objects — each with a Bayesian confidence score, evidence list, and implications that trigger the next investigation.
 
 #### Hypothesis Engine — `nova_hypothesis_engine.py`
 
-Systematic Bayesian hypothesis testing. Each hypothesis has:
-- Prior confidence (0–1)
-- Ranked probe list
-- Evidence for / against
-- Auto-confirms at ≥ 0.85 confidence
-- Auto-dismisses at ≤ 0.10 confidence
+Each hypothesis has prior confidence (0–1), a probe list, and updates via Bayes. Auto-confirms at ≥ 0.85, auto-dismisses at ≤ 0.10. The `priority` score = `confidence × severity_weight` for ranking.
 
 #### RAG Knowledge Base — `nova_rag_builder.py`
 
-```bash
-# Build / rebuild from all past hunts
-python3 nova_rag_builder.py .
+Ingests all past hunt data into a queryable knowledge base. Before each attack phase, Nova retrieves the top-5 most relevant past findings — so she reasons from experience, not just training data.
 
-# Demo query
-python3 -c "
-from nova_rag_builder import get_rag
-rag = get_rag()
-results = rag.query('sql_injection', endpoint='/rest/products/search', top_k=3)
-print(rag.format_context(results))
-"
-```
-
-Ingests:
-- All `nova_h1_hunt_*.json` files (HackerOne recon data)
-- All submission evidence folders (`nova_0din_submission/`, `nova_nextgen_submission/`)
-- All `nova_*_report.json` and `nova_*_findings.json` files
-- `nova_verified_findings.json`, `nova_real_findings.json`
-- 10 built-in OWASP Top 10 patterns as baseline
-
-Every attack prompt is augmented with "what worked on similar targets before."
+Sources ingested: all `nova_h1_hunt_*.json`, submission folders, mission reports, `nova_verified_findings.json`, plus 10 built-in OWASP patterns.
 
 #### Adaptive Brain — `nova_adaptive_brain.py`
 
-Before attacking, profiles each endpoint:
-1. Sends probe requests to understand normal behavior
-2. Maps valid params, error conditions, response patterns
-3. Extracts dynamic tokens (CSRF, nonces)
-4. Builds context-aware attack strategy for that specific endpoint
+Before attacking, profiles each endpoint — maps normal vs. error responses, extracts dynamic tokens, builds a context-specific attack strategy rather than blindly spraying payloads.
 
 ---
 
-### 5.5 Reconnaissance
+### 5.6 Reconnaissance
 
-#### Wild Hunt — `nova_wild_hunt.py`
+| Module | Capability |
+|---|---|
+| `nova_wild_hunt.py` | DNS subdomain brute-force, tech fingerprinting, port scanning, CVE mapping |
+| `nova_scope_manager.py` | Live HackerOne scope sync with 1-hour cache, scope diff detection |
+| `nova_github_scanner.py` | Scans commit history for accidentally committed secrets |
+| `nova_active_ibb.py` | HackerOne Invite-Based Bug Bounty automated recon |
+| `nova_0din_hunter.py` | 0din bug bounty platform targeting |
 
-Full real-world recon for bug bounty targets:
-
-```bash
-python3 nova_wild_hunt.py
-```
-
-- DNS subdomain brute-force (50+ common prefixes)
-- Technology stack fingerprinting (headers, cookies, response patterns)
-- Open port scanning
-- URL endpoint discovery
-- SSL certificate analysis
-- CVE → exploit mapping based on detected versions
-
-#### HackerOne Recon — `nova_active_ibb.py` / `nova_0din_hunter.py`
-
-Automated recon specifically for HackerOne and 0din bug bounty programs. Nova has already run hunts against: `konghq.com`, `verily.com`, `notion.so`, `api.target.com` — all results stored as `nova_h1_hunt_*.json`.
-
-#### GitHub Secret Scanner — `nova_github_scanner.py`
-
-Scans public GitHub repos for accidentally committed secrets: API keys, passwords, tokens, connection strings. Checks commit history, not just current files.
-
-#### Scope Manager — `nova_scope_manager.py`
-
-```bash
-python3 nova_scope_manager.py
-```
-
-Live HackerOne scope sync:
-- Fetches all programs you participate in via H1 API
-- Pulls in-scope / out-of-scope assets per program
-- Local cache with 1-hour TTL
-- Scope diff — detects changes since last sync
-- Export as Markdown, JSON, or plain list
-
-Requires H1 API credentials in `~/.nova/scope_config.json`.
+**Already mapped targets stored as `nova_h1_hunt_*.json`:**
+`konghq.com` (50+ subdomains), `verily.com` (60+ subdomains), `notion.so`, `api.target.com`
 
 ---
 
-### 5.6 Code Analysis
+### 5.7 Code Analysis
 
-#### Code Reasoner — `nova_code_reasoner_v2.py`
-
-```bash
-python3 nova_code_reasoner_v2.py
-```
-
-Fetches Juice Shop source from GitHub, then:
-- Maps runtime error stack traces to source file + line number
-- Identifies dangerous sinks: `.query()`, `eval()`, `innerHTML`, `exec()`
-- Traces data flow from `req.body`/`req.query` to sinks
-- Identifies missing authentication checks
-- Generates vulnerability hypotheses from code patterns
-
-Sink categories tracked: SQL injection, command injection, path traversal, XSS, JWT misuse, auth bypass.
-
-#### Source Auditor — `nova_source_auditor.py`
-
-Static analysis across the entire repository:
-- Finds hardcoded credentials and secrets
-- Identifies dangerous function usage
-- Maps dependency vulnerabilities (CVE lookup)
-- Generates a prioritized audit report
-
-#### Data Flow Engine — `nova_dataflow_engine.py`
-
-Traces how user-supplied input flows through the application:
-- Entry points: `req.body`, `req.query`, `req.params`, `req.headers`
-- Through transformations: sanitizers, validators, parsers
-- To sinks: DB queries, file operations, HTTP calls, template rendering
-- Flags paths missing sanitization
+| Module | Capability |
+|---|---|
+| `nova_code_reasoner_v2.py` | Maps runtime stack traces to source lines, identifies dangerous sinks, taint-traces `req.body` → `.query()` |
+| `nova_source_auditor.py` | Static analysis — hardcoded secrets, dangerous functions, dependency CVEs |
+| `nova_dataflow_engine.py` | Full data-flow taint analysis from user input to sinks |
+| `nova_repo_intelligence.py` | Symbol index, test file mapping, stack detection — for LLM navigation |
 
 ---
 
-### 5.7 Memory & Learning
+### 5.8 Memory & Learning
 
 #### NovaBrain — `nova_memory_system.py`
 
-Nova's persistent intelligence survives across all hunts:
+Persists across every hunt, restart, and self-evolution:
 
-```python
-from nova_memory_system import NovaBrain
-brain = NovaBrain()
-brain.record_technique_result("jwt_none_bypass", success=True)
-brain.record_payload("' OR 1=1--", hit=True)
-brain.get_best_techniques(top_k=5)
-brain.get_best_payloads(vuln_type="sql_injection", top_k=10)
-```
-
-Tracks:
 - Technique success rates (scored, ranked over time)
 - Payload hit counts per vulnerability type
-- Tool effectiveness scores
-- WAF bypass patterns that worked
+- WAF bypass patterns that worked per WAF
 - Technology fingerprints and their known weaknesses
-- Hunt statistics (total hunts, findings, critical/high counts)
+- Hunt totals (critical/high counts, duration, targets)
 
 #### Feedback Cortex — `nova_feedback_cortex.py`
 
-After every exploit attempt:
-1. Validates whether a partial success is real (checks for `/etc/passwd` patterns, SQL errors, etc.)
-2. Extracts credentials and tokens from successful responses
-3. Updates the graph brain confidence scores
-4. Adds successful payloads to the signature database
+After every exploit attempt: validates partial successes with pattern matching (e.g. `root:.*:0:0:` for path traversal confirmation), extracts credentials/tokens from successful responses, and updates graph brain confidence scores.
 
-```
-Signature database: nova_signatures.json
-Credential store:   nova_credentials.json
-Graph brain:        nova_memory.json
-```
+#### Self-Improvement Memory — `nova_self_improvement.py`
+
+Separate from NovaBrain — tracks Nova's own code improvements:
+- What patches were proposed
+- Which were applied and verified
+- What failed and why
+- Lessons to carry forward
 
 #### 24/7 Continuous Mode — `nova_continuous_v3.py`
 
@@ -673,142 +601,116 @@ Graph brain:        nova_memory.json
 python3 nova_continuous_v3.py
 ```
 
-Runs indefinitely — hunts, learns, sleeps, hunts again. After each cycle:
-- Updates NovaBrain with what worked
-- Adjusts technique weights
-- Generates incremental reports
-- Optionally alerts on new critical findings
+Runs indefinitely — hunts, learns, sleeps, hunts again. After each cycle updates NovaBrain, adjusts technique weights, generates incremental reports.
 
 ---
 
-### 5.8 Reporting & Deployment
+### 5.9 Reporting & Deployment
 
-#### Daybreak Assessment — `nova_daybreak.py`
-
-Three-stage assessment pipeline modelled on OpenAI Daybreak:
+#### Daybreak 3-Stage Assessment — `nova_daybreak.py`
 
 ```
 Stage 1 — AI Threat Prioritization
-    LLM reasons about the attack surface and ranks targets by risk score (0–10)
-    Each target gets: risk_score, attack_type, reason, confidence
+  LLM scores each target endpoint 0–10, assigns attack type and confidence.
 
 Stage 2 — Scoped Sandbox Validation
-    Tests only what Stage 1 ranked as high-priority
-    Human checkpoint before escalating to critical
-    HackerOne scope enforced at every step
+  Tests only Stage 1 high-priority targets. Human checkpoint before critical escalation.
+  HackerOne scope enforced at every step.
 
 Stage 3 — Audit-Ready Evidence Package
-    Full PoC with reproduction steps
-    CVSS 3.1 score and CWE classification
-    HackerOne submission-ready JSON
-```
-
-```bash
-python3 nova_daybreak.py
+  Full PoC, CVSS 3.1 score, CWE, reproduction steps, HackerOne submission JSON.
 ```
 
 #### Report Generator — `nova_report.py`
 
-```bash
-python3 nova_report.py
-```
+Outputs three formats: **HTML** (color-coded severity), **Markdown** (H1-ready), **JSON** (machine-readable).
 
-Generates three formats:
-- **HTML** — Full color-coded report with severity badges, PoC evidence, reproduction steps
-- **Markdown** — GitHub-compatible, suitable for HackerOne submissions
-- **JSON** — Machine-readable, structured for automation
+#### Agentic Deploy Evaluator — `nova_agentic_deploy.py`
 
-#### Agentic Deploy — `nova_agentic_deploy.py`
-
-Evaluates whether AI agent payloads are safe before deployment using a sandboxed local Ollama evaluation. Tests for: excessive privilege requests, scope violations, data exfiltration attempts.
+Local Ollama-powered sandbox evaluation of agent payloads before deployment. Checks for excessive privilege requests, out-of-scope testing, data exfiltration attempts — no cloud calls.
 
 ---
 
 ## 6. Module Reference
 
-| Module | Version | Purpose |
-|---|---|---|
-| `nova_agent_core.py` | 1.0 | True ReAct agentic loop |
-| `nova_tool_kit.py` | 1.0 | Tool execution engine (bash/browser/http/file) |
-| `nova_model_router.py` | 1.0 | Task-based Ollama model routing |
-| `nova_reasoning_core.py` | 2.0 | Unified LLM backbone |
-| `nova_llm_bridge.py` | 2.0 | LLM mission planner + NL interface |
-| `nova_rag_builder.py` | 1.0 | RAG knowledge base from past hunts |
-| `nova_chain_of_thought.py` | 1.0 | Observe→Hypothesize→Probe→Conclude |
-| `nova_hypothesis_engine.py` | 1.0 | Bayesian hypothesis testing |
-| `nova_adaptive_brain.py` | 1.0 | Context-aware strategy adaptation |
-| `nova_core.py` | 3.0 | 10-phase pipeline orchestrator |
-| `nova_swarm_v3.py` | 3.0 | 6-agent parallel swarm |
-| `nova_swarm_parallel.py` | 1.0 | 10-agent parallel swarm |
-| `nova_exploit_synthesizer.py` | 1.0 | SQLi, XSS, SSRF, path traversal |
-| `nova_jwt_forge.py` | 1.0 | JWT forgery engine |
-| `nova_race_engine.py` | 1.0 | Race condition exploitation |
-| `nova_proto_polluter.py` | 1.0 | Prototype pollution engine |
-| `nova_deserialize_dropper.py` | 1.0 | Deserialization attacks |
-| `nova_session_hijacker.py` | 1.0 | Session hijacking |
-| `nova_url_smuggling.py` | 1.0 | HTTP request smuggling |
-| `nova_fuzzer_fix.py` | 1.0 | Parameter fuzzer |
-| `nova_browser_agent.py` | 1.1 | Browser-based attack agent |
-| `nova_code_reasoner_v2.py` | 2.0 | Source code vulnerability analysis |
-| `nova_source_auditor.py` | 1.0 | Static code auditing |
-| `nova_dataflow_engine.py` | 1.0 | Data flow taint tracing |
-| `nova_memory_system.py` | 1.0 | NovaBrain persistent intelligence |
-| `nova_feedback_cortex.py` | 1.0 | Self-learning validation |
-| `nova_daybreak.py` | 1.0 | 3-stage Daybreak assessment |
-| `nova_report.py` | 1.0 | HTML/MD/JSON report generator |
-| `nova_scope_manager.py` | 1.0 | HackerOne live scope sync |
-| `nova_wild_hunt.py` | 1.0 | Real-world target assessment |
-| `nova_github_scanner.py` | 1.0 | GitHub secret scanner |
-| `nova_continuous_v3.py` | 3.0 | 24/7 continuous hunting |
-| `nova_agentic_deploy.py` | 1.0 | Sandboxed payload evaluation |
+| Module | Version | Category | Description |
+|---|---|---|---|
+| `nova_agent_core.py` | 1.0 | Agentic | ReAct loop — LLM drives the hunt |
+| `nova_tool_kit.py` | 1.0 | Agentic | Tool execution engine (bash/browser/http/file/self) |
+| `nova_repo_intelligence.py` | 1.0 | **Self-Improvement** | **Symbol+test index — LLM codebase navigation** |
+| `nova_self_improvement.py` | 1.0 | **Self-Improvement** | **Run-signal collection, patch proposals, memory** |
+| `nova_model_router.py` | 1.0 | Intelligence | Task-based Ollama model routing |
+| `nova_reasoning_core.py` | 2.0 | Intelligence | Unified LLM backbone |
+| `nova_llm_bridge.py` | 2.0 | Intelligence | NL mission planner + expert system prompts |
+| `nova_rag_builder.py` | 1.0 | Intelligence | RAG knowledge base from past hunts |
+| `nova_chain_of_thought.py` | 1.0 | Intelligence | Observe→Hypothesize→Probe→Conclude |
+| `nova_hypothesis_engine.py` | 1.0 | Intelligence | Bayesian hypothesis testing |
+| `nova_adaptive_brain.py` | 1.0 | Intelligence | Context-aware endpoint profiling |
+| `nova_core.py` | 3.0 | Orchestration | 10-phase pipeline orchestrator |
+| `nova_swarm_v3.py` | 3.0 | Orchestration | 6-agent swarm with shared knowledge graph |
+| `nova_swarm_parallel.py` | 1.0 | Orchestration | 10-agent parallel swarm |
+| `nova_exploit_synthesizer.py` | 1.0 | Attack | SQLi, XSS, SSRF, LFI, path traversal |
+| `nova_jwt_forge.py` | 1.0 | Attack | JWT forgery — none algo, weak secret, key confusion |
+| `nova_race_engine.py` | 1.0 | Attack | Race conditions, TOCTOU, double-spend |
+| `nova_proto_polluter.py` | 1.0 | Attack | Prototype pollution → auth bypass / RCE |
+| `nova_deserialize_dropper.py` | 1.0 | Attack | Node.js deserialization → RCE |
+| `nova_session_hijacker.py` | 1.0 | Attack | Session fixation, CSRF, cookie theft |
+| `nova_url_smuggling.py` | 1.0 | Attack | HTTP request smuggling |
+| `nova_fuzzer_fix.py` | 1.0 | Attack | Parameter fuzzer |
+| `nova_browser_agent.py` | 1.1 | Attack | Browser-based JS-aware attacks |
+| `nova_code_reasoner_v2.py` | 2.0 | Code Analysis | Source code vulnerability analysis |
+| `nova_source_auditor.py` | 1.0 | Code Analysis | Static analysis, hardcoded secrets |
+| `nova_dataflow_engine.py` | 1.0 | Code Analysis | Taint tracing user input → sinks |
+| `nova_memory_system.py` | 1.0 | Memory | NovaBrain — persistent cross-hunt learning |
+| `nova_feedback_cortex.py` | 1.0 | Memory | Self-learning finding validation |
+| `nova_wild_hunt.py` | 1.0 | Recon | Real-world subdomain + CVE recon |
+| `nova_scope_manager.py` | 1.0 | Recon | HackerOne live scope sync |
+| `nova_github_scanner.py` | 1.0 | Recon | GitHub secret + token scanner |
+| `nova_daybreak.py` | 1.0 | Reporting | 3-stage Daybreak assessment |
+| `nova_report.py` | 1.0 | Reporting | HTML/MD/JSON professional reports |
+| `nova_agentic_deploy.py` | 1.0 | Reporting | Sandboxed payload evaluation |
+| `nova_continuous_v3.py` | 3.0 | Reporting | 24/7 continuous hunting loop |
 
 ---
 
-## 7. Configuration
+## 7. Configuration & Environment Variables
 
-All settings live in `nova_config.json`. Copy to `~/nova_workspace/nova_config.json` to override defaults.
+`nova_config.json` holds all defaults. Copy to `~/nova_workspace/nova_config.json` to override.
 
 ```json
 {
   "llm": {
-    "model":          "auto",          // "auto" uses model router
+    "model":          "auto",
     "fallback_model": "llama3.2",
     "timeout":        120,
     "url":            "http://localhost:11434"
   },
-
-  "recon": {
-    "subdomain_tools": ["subfinder", "amass", "crt.sh"],
-    "max_subdomains":  500,
-    "max_urls":        10000,
-    "threads":         10
-  },
-
   "attack": {
-    "enabled_chains": [
-      "sqli", "xss", "ssrf", "cors", "jwt",
-      "prototype_pollution", "race_condition"
-    ],
+    "enabled_chains": ["sqli","xss","ssrf","cors","jwt","prototype_pollution","race_condition"],
     "severity_threshold": "low",
     "max_payloads_per_param": 50
   },
-
   "evolution": {
-    "enabled":     true,
+    "enabled": true,
     "require_tests": true,
     "backup_before": true
   }
 }
 ```
 
-**Environment variable overrides:**
+**Full environment variable reference:**
 
-```bash
-NOVA_LLM_URL=http://localhost:11434   # Ollama base URL
-NOVA_LLM_MODEL=deepseek-r1:14b       # Force specific model (skip routing)
-NOVA_LLM_TIMEOUT=120                  # LLM request timeout seconds
-NOVA_MAX_STEPS=40                     # Max agentic loop steps
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `NOVA_LLM_URL` | `http://localhost:11434` | Ollama base URL |
+| `NOVA_LLM_MODEL` | `""` (auto-route) | Force a specific model |
+| `NOVA_LLM_TIMEOUT` | `120` | LLM request timeout (seconds) |
+| `NOVA_MAX_STEPS` | `30` | Max agentic loop steps |
+| `NOVA_REFLECT_EVERY` | `5` | Reflection interval (steps) |
+| `NOVA_HISTORY_LIMIT` | `30` | Max conversation history entries |
+| `NOVA_PERMISSION_PROFILE` | `full` | Tool access level: `full` / `read_only` / `no_network` |
+| `NOVA_WORKSPACE` | `~/nova_workspace` | Working directory for outputs |
+| `NOVA_TOOL_TIMEOUT` | `60` | Max per-tool timeout (seconds) |
 
 ---
 
@@ -816,19 +718,23 @@ NOVA_MAX_STEPS=40                     # Max agentic loop steps
 
 | Capability | Claude Mythos | OpenAI Daybreak | Nova v3.0 |
 |---|---|---|---|
-| **Cost per run** | $25–$125 / MTok | ~$100–200/mo | **$0** |
+| **Cost per run** | $25–$125/MTok | ~$100–200/mo | **$0** |
 | **Tool use** | ✅ Free tool calls | ✅ Free tool calls | ✅ Free tool calls |
 | **Browser** | ✅ Real Chromium | ✅ Real browser | ✅ Playwright Chromium |
 | **Shell access** | ✅ Full Linux | ✅ Full Linux | ✅ Full Linux |
 | **LLM drives loop** | ✅ | ✅ | ✅ ReAct loop |
-| **Model quality** | Opus-class | GPT-4o class | Best Ollama available |
-| **Security-specialized model** | ❌ General LLM | ❌ General LLM | ✅ xploiter/the-xploiter |
+| **Reflection / self-correction** | ✅ | ✅ | ✅ Every N steps |
+| **Model quality** | Opus-class | GPT-4o-class | Best Ollama per task |
+| **Security-specialized model** | ❌ | ❌ | ✅ xploiter/the-xploiter |
 | **Chain-of-thought** | ✅ | ✅ | ✅ DeepSeek-R1 |
-| **Prior hunt knowledge** | ❌ | ❌ | ✅ RAG from 100+ hunts |
-| **Scope enforcement** | Manual | ✅ Built-in | ✅ H1 scope sync |
-| **Persistent memory** | ❌ (session only) | ❌ | ✅ NovaBrain |
-| **Self-improvement** | ❌ | ❌ | ✅ |
-| **Privacy** | ❌ Sends code to cloud | ❌ Sends code to cloud | ✅ 100% local |
+| **Prior hunt knowledge (RAG)** | ❌ | ❌ | ✅ 100+ past hunts |
+| **Reads own codebase** | ✅ | ✅ | ✅ nova_repo_intelligence |
+| **Self-improvement** | ❌ | ❌ | ✅ nova_self_improvement |
+| **Secret redaction in outputs** | ✅ | ✅ | ✅ Built into tool kit |
+| **Permission profiles** | ✅ | ✅ | ✅ read_only / full / no_network |
+| **Scope enforcement** | Manual | ✅ | ✅ H1 live scope sync |
+| **Persistent memory** | ❌ session only | ❌ | ✅ NovaBrain |
+| **Privacy** | ❌ sends to cloud | ❌ sends to cloud | ✅ 100% local |
 | **24/7 hunting** | ❌ | Limited | ✅ Continuous mode |
 
 ---
@@ -836,7 +742,8 @@ NOVA_MAX_STEPS=40                     # Max agentic loop steps
 ## 9. HackerOne Integration
 
 ```bash
-# Configure H1 credentials
+# Configure credentials
+mkdir -p ~/.nova
 cat > ~/.nova/scope_config.json << 'EOF'
 {
   "h1_username": "your_h1_handle",
@@ -844,25 +751,16 @@ cat > ~/.nova/scope_config.json << 'EOF'
 }
 EOF
 
-# Sync scope for all your programs
+# Sync scope for all enrolled programs
 python3 nova_scope_manager.py --sync
 
 # Hunt within scope
 python3 nova_agent_core.py \
-  --target https://target.h1.program.com \
-  --objective "Find high-severity vulnerabilities within HackerOne scope. Respect all out-of-scope rules."
+  --target https://target.h1program.com \
+  --objective "Find high-severity vulnerabilities within HackerOne scope"
 ```
 
-Nova's `nova_scope_manager.py` enforces HackerOne program scopes at every step — she will not test out-of-scope assets.
-
-Past H1 recon already completed and stored:
-
-```
-konghq.com — 50+ subdomains mapped
-verily.com — 60+ subdomains mapped
-notion.so  — 4 subdomains mapped
-api.target.com — 1 endpoint mapped
-```
+Nova's scope manager enforces in-scope / out-of-scope rules at every step and syncs live from the H1 API with a 1-hour local cache.
 
 ---
 
@@ -870,24 +768,36 @@ api.target.com — 1 endpoint mapped
 
 ### Add a New Attack Module
 
-1. Create `nova_myattack.py` with a class that takes `base_url` and returns a list of findings
+1. Create `nova_myattack.py` with a class taking `base_url`, returning a findings list
 2. Import it in `nova_core.py` and add a phase
 3. Add it to the swarm in `nova_swarm_parallel.py` as an Agent subclass
 
-### Add a New Tool (Agentic Mode)
+### Add a New Tool to Agentic Mode
 
 1. Add a schema entry to `TOOL_SCHEMAS` in `nova_tool_kit.py`
-2. Add the executor function
+2. Write the executor function with the `exec_` prefix
 3. Register it in the `execute_tool()` dispatcher
+4. Add to `permission_denied()` if it needs access control
 
-### Train on New Findings
+### Train Nova on New Findings
 
 ```bash
-# After a successful hunt, rebuild the RAG with new findings
+# After a successful hunt, rebuild RAG with new data
 python3 nova_rag_builder.py . --force-rebuild
 ```
 
-### Teach Nova a New Bypass
+### Trigger a Self-Improvement Cycle
+
+```bash
+# Review last N runs and generate an improvement plan
+python3 nova_self_improvement.py
+
+# Inside a running agent hunt (tools available):
+# {"action": "self_review",   "args": {}}
+# {"action": "self_remember", "args": {"lesson": "..."}}
+```
+
+### Teach Nova a New WAF Bypass
 
 ```python
 from nova_memory_system import NovaBrain
@@ -898,58 +808,66 @@ brain.record_technique_result("sqli_unicode_bypass", success=True)
 
 ---
 
-## File Tree (Key Files)
+## Repository Map
 
 ```
 Nova-arsenal/
-├── nova_agent_core.py           ← START HERE for agentic mode
-├── nova_core.py                 ← START HERE for pipeline mode
-├── launch_swarm.py              ← START HERE for swarm mode
-├── nova_setup.sh                ← One-command installation
-├── nova_config.json             ← Main configuration
 │
-├── Intelligence/
-│   ├── nova_model_router.py     ← Task → best Ollama model
-│   ├── nova_reasoning_core.py   ← Unified LLM backbone
-│   ├── nova_llm_bridge.py       ← NL mission planner
-│   ├── nova_rag_builder.py      ← Past-hunt knowledge base
-│   ├── nova_chain_of_thought.py ← Hypothesis→Probe→Conclude
-│   ├── nova_hypothesis_engine.py← Bayesian testing
-│   └── nova_adaptive_brain.py   ← Context-aware strategy
+├── ENTRY POINTS
+│   ├── nova_agent_core.py           ← Agentic mode (LLM drives hunt)
+│   ├── nova_core.py                 ← Pipeline mode (10 phases)
+│   ├── launch_swarm.py              ← 10-agent parallel swarm
+│   └── nova_setup.sh                ← One-command installation
 │
-├── Agentic/
-│   ├── nova_agent_core.py       ← ReAct loop (LLM drives hunt)
-│   └── nova_tool_kit.py         ← bash/browser/http/file tools
+├── SELF-IMPROVEMENT  ✦ new
+│   ├── nova_self_improvement.py     ← Run-signal → patch proposals → memory
+│   └── nova_repo_intelligence.py    ← Symbol/test index for LLM navigation
 │
-├── Attack Modules/
+├── AGENTIC LAYER
+│   └── nova_tool_kit.py             ← bash/browser/http/file/self tools + permission profiles
+│
+├── INTELLIGENCE
+│   ├── nova_model_router.py         ← Task → best Ollama model
+│   ├── nova_reasoning_core.py       ← Unified LLM backbone
+│   ├── nova_llm_bridge.py           ← NL mission planner
+│   ├── nova_rag_builder.py          ← Past-hunt knowledge base
+│   ├── nova_chain_of_thought.py     ← Hypothesis engine
+│   ├── nova_hypothesis_engine.py    ← Bayesian testing
+│   └── nova_adaptive_brain.py       ← Context-aware strategy
+│
+├── ATTACK MODULES
 │   ├── nova_exploit_synthesizer.py  ← SQLi, XSS, SSRF, LFI
 │   ├── nova_jwt_forge.py            ← JWT attacks
 │   ├── nova_race_engine.py          ← Race conditions
 │   ├── nova_proto_polluter.py       ← Prototype pollution
-│   ├── nova_deserialize_dropper.py  ← Deserialization
+│   ├── nova_deserialize_dropper.py  ← Deserialization RCE
 │   ├── nova_session_hijacker.py     ← Session attacks
-│   └── nova_url_smuggling.py        ← HTTP smuggling
+│   ├── nova_url_smuggling.py        ← HTTP smuggling
+│   └── nova_fuzzer_fix.py           ← Parameter fuzzer
 │
-├── Recon/
-│   ├── nova_wild_hunt.py        ← Real-world recon
-│   ├── nova_scope_manager.py    ← HackerOne scope sync
-│   └── nova_github_scanner.py   ← Secret scanning
+├── RECON
+│   ├── nova_wild_hunt.py            ← Real-world recon engine
+│   ├── nova_scope_manager.py        ← HackerOne scope sync
+│   └── nova_github_scanner.py       ← Secret scanning
 │
-├── Code Analysis/
-│   ├── nova_code_reasoner_v2.py ← Source vulnerability analysis
-│   ├── nova_source_auditor.py   ← Static analysis
-│   └── nova_dataflow_engine.py  ← Taint tracing
+├── CODE ANALYSIS
+│   ├── nova_code_reasoner_v2.py     ← Source vulnerability analysis
+│   ├── nova_source_auditor.py       ← Static analysis
+│   └── nova_dataflow_engine.py      ← Taint tracing
 │
-├── Memory/
-│   ├── nova_memory_system.py    ← NovaBrain persistence
-│   ├── nova_feedback_cortex.py  ← Self-learning validation
-│   ├── nova_brain_memory.json   ← Technique/payload scores
-│   └── nova_exploit_memory.json ← What worked where
+├── MEMORY
+│   ├── nova_memory_system.py        ← NovaBrain persistence
+│   └── nova_feedback_cortex.py      ← Self-learning validation
 │
-└── Output/
-    ├── nova_report.py           ← HTML/MD/JSON reports
-    ├── nova_daybreak.py         ← 3-stage assessment engine
-    └── nova_continuous_v3.py    ← 24/7 hunting loop
+├── REPORTING
+│   ├── nova_daybreak.py             ← 3-stage assessment pipeline
+│   ├── nova_report.py               ← HTML/MD/JSON generator
+│   ├── nova_agentic_deploy.py       ← Payload sandbox evaluator
+│   └── nova_continuous_v3.py        ← 24/7 hunting loop
+│
+└── CONFIG
+    ├── nova_config.json             ← Main configuration
+    └── requirements.txt             ← Python dependencies
 ```
 
 ---
@@ -958,8 +876,8 @@ Nova-arsenal/
 
 **Nova is a research and educational tool.**  
 Only hunt targets you have explicit written permission to test.  
-Always respect HackerOne / Bugcrowd program scope.
+Always respect program scope rules.
 
-*Built for the solo researcher who can't afford $125/MTok frontier agents.*
+*Built for the solo researcher who cannot afford $125/MTok frontier agents.*
 
 </div>
