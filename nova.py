@@ -5,16 +5,16 @@
  ██╔██╗ ██║██║   ██║██║   ██║ ███████║
  ██║╚██╗██║██║   ██║╚██╗ ██╔╝ ██╔══██║
  ██║ ╚████║╚██████╔╝ ╚████╔╝  ██║  ██║
- ╚═╝  ╚═══╝ ╚═════╝   ╚═══╝   ╚═╝  ╚═╝  ARSENAL v4.1
+ ╚═╝  ╚═══╝ ╚═════╝   ╚═══╝   ╚═╝  ╚═╝  ARSENAL v4.2
 
 Natural-language entry point — ties ALL Nova capabilities together.
 Every module shares the same LLM router, hook bus, typed context,
-persistent session, and execution tracer automatically.
+persistent session, execution tracer, and full codebase map automatically.
 
 Usage:
-  python3 nova.py "Hunt http://target.com for all bugs"
-  python3 nova.py "Orchestrate multi-agent recon+attack on https://target.com"
+  python3 nova.py "Hunt https://target.com for all bugs"
   python3 nova.py "Full stack pipeline on ./juice-shop"
+  python3 nova.py "Orchestrate multi-agent attack on https://target.com"
   python3 nova.py "Daybreak AI assessment on https://target.com"
   python3 nova.py "Triage findings and show top H1-ready bugs"
 """
@@ -35,7 +35,7 @@ WORKSPACE.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(NOVA_DIR))
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  PROVIDER LAYER — load all 7 v4.1 modules with graceful degradation        ║
+# ║  PROVIDER LAYER — all 7 modules + codebase mapper loaded at startup        ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 def _try_import(module: str, attr: str = None):
@@ -48,51 +48,64 @@ def _try_import(module: str, attr: str = None):
 
 # LLM Router (OpenAI → Anthropic → Gemini → Ollama)
 _router_mod      = _try_import("nova_llm_router")
-get_router       = getattr(_router_mod, "get_router",    None)
-_ROUTER          = get_router() if get_router else None
+get_router       = getattr(_router_mod, "get_router",             None)
+_ROUTER          = None  # initialised in _init_provider_layer()
 
 # Hook Bus (lifecycle events)
 _hooks_mod       = _try_import("nova_hooks")
-get_bus          = getattr(_hooks_mod, "get_bus",        None)
-attach_logging   = getattr(_hooks_mod, "attach_logging_hooks", None)
-attach_telegram  = getattr(_hooks_mod, "attach_telegram_hooks", None)
-_BUS             = None   # initialised in _init_provider_layer()
+get_bus          = getattr(_hooks_mod, "get_bus",                 None)
+attach_logging   = getattr(_hooks_mod, "attach_logging_hooks",    None)
+attach_telegram  = getattr(_hooks_mod, "attach_telegram_hooks",   None)
 
-# Typed Context (shared state + scope enforcement)
-RunContext       = _try_import("nova_context", "RunContext")
+# Typed Context
+RunContext       = _try_import("nova_context",      "RunContext")
 
-# Session Store (persistent cross-run memory)
-SessionStore     = _try_import("nova_sessions", "SessionStore")
+# Session Store
+SessionStore     = _try_import("nova_sessions",     "SessionStore")
 
-# Observability (span-based tracing)
-Tracer           = _try_import("nova_observability", "Tracer")
+# Observability
+Tracer           = _try_import("nova_observability","Tracer")
 
 # Retry + Circuit Breaker
-RetryPolicy      = _try_import("nova_retry", "RetryPolicy")
+RetryPolicy      = _try_import("nova_retry",        "RetryPolicy")
 
-# Skills Library (prompt templates)
-SkillLibrary     = _try_import("nova_skills", "SkillLibrary")
+# Skills Library
+SkillLibrary     = _try_import("nova_skills",       "SkillLibrary")
 
-# ── Global singletons (set once per process) ────────────────────────────────────
-_CTX:     Optional[Any] = None   # RunContext
-_SESSION: Optional[Any] = None   # Session
-_TRACER:  Optional[Any] = None   # Tracer
-_STORE:   Optional[Any] = None   # SessionStore
+# ═══════════════════════════════════════════════════════════════════════════════
+# CODEBASE MAPPER — Phase 0 of every run
+# ═══════════════════════════════════════════════════════════════════════════════
+_mapper_mod         = _try_import("nova_codebase_mapper")
+get_codebase_map    = getattr(_mapper_mod, "get_codebase_map",       None)
+map_to_agent_context= getattr(_mapper_mod, "map_to_agent_context",   None)
+NovaCodebaseMapper  = getattr(_mapper_mod, "NovaCodebaseMapper",     None)
+
+# ── Global singletons ──────────────────────────────────────────────────────────
+_BUS:      Optional[Any] = None
+_CTX:      Optional[Any] = None
+_SESSION:  Optional[Any] = None
+_TRACER:   Optional[Any] = None
+_STORE:    Optional[Any] = None
+_CMAP:     Optional[Any] = None   # CodebaseMap — the strategic master map
 _PROVIDER_READY = False
 
 
 def _init_provider_layer(target: str = "", scope: List[str] = None,
                          session_id: Optional[str] = None,
                          verbose: bool = True) -> bool:
-    """
-    Initialise all 7 provider-layer singletons once per process.
-    Called at the start of every nova.py run.
-    """
-    global _CTX, _SESSION, _TRACER, _STORE, _BUS, _PROVIDER_READY
+    """Initialise all 7 provider-layer singletons once per process."""
+    global _BUS, _CTX, _SESSION, _TRACER, _STORE, _ROUTER, _PROVIDER_READY
     if _PROVIDER_READY:
         return True
 
-    # ── Hook bus ────────────────────────────────────────────────────────────
+    # LLM Router
+    if get_router:
+        try:
+            _ROUTER = get_router()
+        except Exception:
+            pass
+
+    # Hook bus
     if get_bus:
         _BUS = get_bus(verbose=False)
         if attach_logging:
@@ -100,7 +113,6 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
                 attach_logging(_BUS)
             except Exception:
                 pass
-        # Telegram integration
         tg_token   = os.getenv("NOVA_TELEGRAM_TOKEN")
         tg_chat_id = os.getenv("NOVA_TELEGRAM_CHAT_ID")
         if tg_token and tg_chat_id and attach_telegram:
@@ -109,15 +121,16 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
             except Exception:
                 pass
 
-    # ── Typed context ────────────────────────────────────────────────────────
+    # Typed context
     if RunContext:
         _CTX = RunContext(
             target=target,
-            scope=scope or ([target.split("//")[-1].split("/")[0]] if target.startswith("http") else []),
+            scope=scope or ([target.split("//")[-1].split("/")[0]]
+                            if target.startswith("http") else []),
             max_steps=MAX_STEPS,
             verbose=False)
 
-    # ── Session store + session ──────────────────────────────────────────────
+    # Session store + session
     if SessionStore:
         _STORE = SessionStore()
         if session_id:
@@ -127,10 +140,10 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
                       f"({len(_SESSION.findings)} previous findings)")
         if not _SESSION:
             _SESSION = _STORE.create(target=target, mission="full")
-            if verbose and SessionStore:
+            if verbose:
                 print(f"  📂 Session {_SESSION.session_id[:8]} created")
 
-    # ── Tracer ───────────────────────────────────────────────────────────────
+    # Tracer
     if Tracer:
         _TRACER = Tracer(verbose=False)
 
@@ -145,15 +158,13 @@ def _load(module_name: str, class_name: str = None):
         import importlib
         mod = importlib.import_module(module_name)
         return getattr(mod, class_name) if class_name else mod
-    except Exception as e:
+    except Exception:
         return None
 
 
 # ── Unified LLM call (router → Ollama fallback) ────────────────────────────────
 
 def _ask_llm(prompt: str, system: str = "", temperature: float = 0.1) -> str:
-    """Ask the LLM via the router (any provider) with Ollama fallback."""
-    # Try the multi-provider router first
     if _ROUTER:
         try:
             resp = _ROUTER.chat(
@@ -163,15 +174,13 @@ def _ask_llm(prompt: str, system: str = "", temperature: float = 0.1) -> str:
             return resp.content
         except Exception:
             pass
-    # Fallback: raw Ollama
     try:
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         payload = json.dumps({
-            "model": OLLAMA_MODEL,
-            "messages": messages,
+            "model": OLLAMA_MODEL, "messages": messages,
             "stream": False,
             "options": {"temperature": temperature, "num_predict": 1000}
         }).encode()
@@ -179,7 +188,108 @@ def _ask_llm(prompt: str, system: str = "", temperature: float = 0.1) -> str:
             f"{OLLAMA_URL}/api/chat", data=payload,
             headers={"Content-Type": "application/json"}, method="POST")
         with urllib.request.urlopen(req, timeout=60) as r:
-            return json.loads(r.read()).get("message", {}).get("content", "").strip()
+            return json.loads(r.read()).get("message",{}).get("content","").strip()
+    except Exception:
+        return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASE 0: CODEBASE MAP — runs before everything else when target is a path
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _run_phase0_mapper(target: str, force: bool = False) -> Optional[Any]:
+    """
+    Map the target directory before any scan runs.
+    Returns a CodebaseMap (or None if target is not a directory / mapper unavailable).
+    The map is stored in the global _CMAP and injected into every subsequent phase.
+    """
+    global _CMAP
+
+    if _CMAP and not force:
+        return _CMAP
+
+    is_dir = os.path.isdir(target)
+    if not is_dir and not os.path.isdir(os.getcwd()):
+        return None
+
+    # For URL targets, try to map the current working directory as the companion codebase
+    map_target = target if is_dir else os.getcwd()
+
+    if not get_codebase_map and not NovaCodebaseMapper:
+        return None
+
+    try:
+        print(f"\n  🗺  Phase 0: Codebase Mapper → {map_target}")
+        if get_codebase_map:
+            cmap = get_codebase_map(map_target, force=force, verbose=True)
+        else:
+            cmap = NovaCodebaseMapper(map_target, verbose=True).scan()
+
+        _CMAP = cmap
+
+        # Sync map discoveries into the shared context
+        if _CTX and cmap:
+            try:
+                for ep in cmap.endpoints[:50]:
+                    _CTX.append("endpoints", ep.get("route",""), dedupe=True)
+                for lang in cmap.languages:
+                    _CTX.set(f"lang_{lang.lower()}", cmap.languages[lang]["files"])
+                _CTX.set("primary_language", cmap.primary_language)
+                _CTX.set("frameworks",       cmap.frameworks)
+                _CTX.set("auth_patterns",    cmap.auth_patterns)
+                _CTX.set("databases",        cmap.databases)
+                _CTX.set("codebase_mapped",  True)
+            except Exception:
+                pass
+
+        # Sync secret findings as high-priority recon findings
+        if _CTX and cmap and cmap.secret_findings:
+            for s in cmap.secret_findings[:10]:
+                try:
+                    _CTX.add_finding({
+                        "type":     "SecretExposure",
+                        "severity": "HIGH",
+                        "file":     s.get("file","?"),
+                        "line":     s.get("line", 0),
+                        "description": f"Potential {s.get('pattern','secret')} detected",
+                        "snippet":  s.get("snippet",""),
+                        "source":   "codebase_mapper",
+                    }, agent="mapper")
+                except Exception:
+                    pass
+
+        # Emit mapper findings to bus
+        if _BUS and cmap:
+            try:
+                _BUS.fire("MapComplete", {
+                    "file_count":      cmap.file_count,
+                    "primary_language":cmap.primary_language,
+                    "frameworks":      cmap.frameworks,
+                    "endpoints":       len(cmap.endpoints),
+                    "secrets":         len(cmap.secret_findings),
+                    "risky_deps":      len(cmap.risky_deps),
+                })
+            except Exception:
+                pass
+
+        return cmap
+
+    except Exception as e:
+        print(f"  ⚠️  Mapper: {e}")
+        return None
+
+
+def _get_map_brief() -> str:
+    """Return the attack brief from _CMAP for injection into module calls."""
+    if not _CMAP:
+        return ""
+    if map_to_agent_context:
+        try:
+            return map_to_agent_context(_CMAP)
+        except Exception:
+            pass
+    try:
+        return _CMAP.attack_brief()
     except Exception:
         return ""
 
@@ -197,6 +307,8 @@ KEYWORD_MODES = {
                         "what to report","best findings","top findings","h1 ready"],
     "hunt":            ["hunt","bug bounty","bounty","find bugs","exploit","pentest","hack"],
     "recon":           ["recon","reconn","subdomain","enumerate","discover","footprint","crt.sh"],
+    "map":             ["map codebase","codebase map","map the code","scan codebase",
+                        "analyse codebase","analyze codebase","understand the code"],
     "fuzz":            ["fuzz","fuzzing","brute force","directory","endpoint","wordlist"],
     "sqli":            ["sql","sqli","sql injection","database injection","blind sql"],
     "xss":             ["xss","cross site script","reflected xss","stored xss","dom xss"],
@@ -243,9 +355,9 @@ KEYWORD_MODES = {
     "swarm":           ["swarm","parallel","10 agents","mass scan"],
 }
 
+
 def _parse_intent(query: str) -> dict:
     q = query.lower()
-    # Try router LLM for intent classification
     llm_resp = _ask_llm(
         f"Task: {query}\n\nClassify into ONE mode. Output only the mode name.\n"
         f"Modes: {', '.join(KEYWORD_MODES.keys())}",
@@ -263,7 +375,7 @@ def _parse_intent(query: str) -> dict:
 
     url_match  = re.search(r'https?://[^\s]+', query)
     path_match = re.search(
-        r'(?:on|for|in|at|scan|audit)\s+([./~][\w./\-]+|[\w\-]+/[\w./\-]+)', query)
+        r'(?:on|for|in|at|scan|audit|map)\s+([./~][\w./\-]+|[\w\-]+/[\w./\-]+)', query)
     if url_match:
         target = url_match.group(0)
     elif path_match:
@@ -286,14 +398,10 @@ def _save_findings(findings: List[Dict], label: str) -> str:
 
 
 def _emit_findings(findings: List[Dict], source: str):
-    """
-    Publish findings to: hook bus, typed context, session, vuln tracker.
-    Called after every sub-module produces results.
-    """
+    """Fan out findings to: hook bus, typed context, session, vuln tracker."""
     if not findings:
         return
 
-    # ── Hook bus ────────────────────────────────────────────────────────────
     if _BUS:
         for f in findings:
             try:
@@ -301,7 +409,6 @@ def _emit_findings(findings: List[Dict], source: str):
             except Exception:
                 pass
 
-    # ── Typed context ────────────────────────────────────────────────────────
     if _CTX:
         for f in findings:
             try:
@@ -309,7 +416,6 @@ def _emit_findings(findings: List[Dict], source: str):
             except Exception:
                 pass
 
-    # ── Session ──────────────────────────────────────────────────────────────
     if _SESSION:
         for f in findings:
             try:
@@ -317,14 +423,11 @@ def _emit_findings(findings: List[Dict], source: str):
             except Exception:
                 pass
 
-    # ── Vuln tracker ─────────────────────────────────────────────────────────
     TrackerCls = _load("nova_vuln_tracker", "NovaVulnTracker")
     if TrackerCls:
         try:
             t = TrackerCls()
-            t.start_run(
-                _CTX.target if _CTX else source,
-                source)
+            t.start_run(_CTX.target if _CTX else source, source)
             t.ingest_findings(findings,
                               target=_CTX.target if _CTX else source,
                               source_module=source)
@@ -334,7 +437,6 @@ def _emit_findings(findings: List[Dict], source: str):
 
 
 def _span(name: str, kind: str = "agent"):
-    """Return a Tracer span context manager or a null context."""
     if _TRACER:
         try:
             return _TRACER.span(name, kind=kind)
@@ -344,8 +446,85 @@ def _span(name: str, kind: str = "agent"):
     return contextlib.nullcontext()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MAP-AWARE MODULE WRAPPERS
+# ─────────────────────────────────────────────────────────────────────────────
+# These helpers pass the codebase map into modules that can accept it,
+# providing strategic context to make every scan smarter.
+
+def _map_aware_sast(target: str, findings: List[Dict]):
+    """SAST — prioritise files flagged by the mapper as high-value."""
+    Cls = _load("nova_source_auditor", "NovaSourceAuditor")
+    if not Cls:
+        return
+    try:
+        d = target if os.path.isdir(target) else "."
+        a = Cls(d)
+        # Inject high-value files from map to scan first
+        if _CMAP and hasattr(a, "set_priority_files"):
+            prio = [h.get("file","") for h in
+                    _CMAP.attack_surface.get("high_value",[])
+                    if h.get("file","")]
+            if prio:
+                a.set_priority_files(prio)
+        a.audit_directory()
+        _emit_findings(a.findings, "sast")
+        findings.extend(a.findings)
+    except Exception as e:
+        print(f"  ⚠️  SAST: {e}")
+
+
+def _map_aware_threat_model(target: str):
+    """Threat model — seed with mapper's entry points, auth patterns, and data models."""
+    Cls = _load("nova_threat_model", "NovaThreatModel")
+    if not Cls:
+        return
+    try:
+        tm = Cls()
+        d  = target if os.path.isdir(target) else "."
+        src: Dict[str, str] = {}
+
+        # If we have a codebase map, read the specific entry-point files
+        # instead of random-walking the directory
+        if _CMAP and _CMAP.entry_points:
+            for ep in _CMAP.entry_points[:15]:
+                full = Path(d) / ep
+                if full.exists():
+                    try:
+                        src[ep] = full.read_text(encoding="utf-8", errors="ignore")[:3000]
+                    except Exception:
+                        pass
+        # Fallback: walk first 30 files
+        if not src:
+            for root, _, files in os.walk(d):
+                for f in files[:30]:
+                    try:
+                        p = os.path.join(root, f)
+                        src[os.path.relpath(p, d)] = open(
+                            p, encoding="utf-8", errors="ignore").read(3000)
+                    except Exception:
+                        pass
+
+        # Inject map metadata as synthetic context
+        if _CMAP:
+            src["__nova_map__"] = json.dumps({
+                "frameworks":    _CMAP.frameworks,
+                "auth_patterns": _CMAP.auth_patterns,
+                "databases":     _CMAP.databases,
+                "data_models":   _CMAP.data_models,
+                "entry_points":  _CMAP.entry_points,
+            }, default=str)
+
+        model = tm.build_from_files(src)
+        out   = WORKSPACE / "nova_threat_model.json"
+        out.write_text(json.dumps(model, indent=2, default=str))
+        print(f"  🗺  Threat model → {out}")
+    except Exception as e:
+        print(f"  ⚠️  Threat model: {e}")
+
+
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  DISPATCH TABLE — every module wired to the provider layer                 ║
+# ║  DISPATCH — 13 phases, all sharing the same provider layer + codebase map  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 def dispatch(intent: dict) -> List[Dict]:
@@ -354,8 +533,8 @@ def dispatch(intent: dict) -> List[Dict]:
     query  = intent.get("original_query", "")
     findings: List[Dict] = []
 
-    print(f"\n{'━'*62}")
-    print(f"  🦅 Nova Arsenal v4.1")
+    print(f"\n{'━'*64}")
+    print(f"  🦅 Nova Arsenal v4.2")
     print(f"  🎯 Mode    : {mode}")
     print(f"  📍 Target  : {target}")
     if _ROUTER:
@@ -363,16 +542,24 @@ def dispatch(intent: dict) -> List[Dict]:
             print(f"  🔀 Provider: {_ROUTER.available_providers()}")
         except Exception:
             pass
-    print(f"{'━'*62}\n")
+    if _CMAP:
+        print(f"  🗺  Map     : {_CMAP.file_count} files | "
+              f"{_CMAP.primary_language} | "
+              f"{len(_CMAP.endpoints)} endpoints | "
+              f"{len(_CMAP.secret_findings)} secrets")
+    print(f"{'━'*64}\n")
 
-    # ── Fire PreRun hook ─────────────────────────────────────────────────────
+    # Fire PreRun hook
     if _BUS:
         try:
-            _BUS.fire("PreRun", {"mode": mode, "target": target, "query": query})
+            _BUS.fire("PreRun", {
+                "mode": mode, "target": target, "query": query,
+                "codebase_mapped": _CMAP is not None,
+            })
         except Exception:
             pass
 
-    # ── Session: record task ──────────────────────────────────────────────────
+    # Session: record task
     if _SESSION:
         try:
             _SESSION.add_message("user", query, agent="nova")
@@ -382,21 +569,58 @@ def dispatch(intent: dict) -> List[Dict]:
     t_start = time.monotonic()
 
     # ════════════════════════════════════════════════════════════════════════════
-    # PHASE 1: STATIC ANALYSIS (code, config, secrets)
+    # PHASE 0 (already ran before dispatch) — inject secrets from map as findings
+    # ════════════════════════════════════════════════════════════════════════════
+    if _CMAP and mode in ("full_stack", "sast", "hunt", "map"):
+        sec_findings = []
+        for s in _CMAP.secret_findings:
+            sec_findings.append({
+                "type":        "SecretExposure",
+                "severity":    "HIGH",
+                "file":        s.get("file",""),
+                "line":        s.get("line", 0),
+                "description": f"Potential {s.get('pattern','secret')} in source",
+                "snippet":     s.get("snippet",""),
+                "source":      "codebase_mapper",
+            })
+        if sec_findings:
+            _emit_findings(sec_findings, "mapper")
+            findings.extend(sec_findings)
+            print(f"  🔑 Mapper: {len(sec_findings)} potential secrets injected as findings")
+
+        # Risky deps as findings
+        dep_findings = []
+        for d in _CMAP.risky_deps:
+            dep_findings.append({
+                "type":        "VulnerableDependency",
+                "severity":    "HIGH",
+                "description": f"{d['package']} {d['version']} — {d['risk']}",
+                "cve":         d.get("cve",""),
+                "file":        "package.json / requirements.txt",
+                "source":      "codebase_mapper",
+            })
+        if dep_findings:
+            _emit_findings(dep_findings, "mapper")
+            findings.extend(dep_findings)
+            print(f"  ⚠️  Mapper: {len(dep_findings)} CVE-affected dependencies")
+
+    # standalone map mode
+    if mode == "map":
+        if _CMAP:
+            out = WORKSPACE / f"nova_codebase_map_latest.json"
+            out.write_text(json.dumps(_CMAP.to_dict(), indent=2, default=str))
+            print(f"\n{_CMAP.summary()}")
+            print(f"\n{_CMAP.attack_brief()}")
+            print(f"\n  💾 Map saved → {out}")
+        return findings
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # PHASE 1: STATIC ANALYSIS
     # ════════════════════════════════════════════════════════════════════════════
 
     if mode in ("sast", "hunt", "full_stack"):
         with _span("SAST", "tool"):
-            Cls = _load("nova_source_auditor", "NovaSourceAuditor")
-            if Cls:
-                try:
-                    d = target if os.path.isdir(target) else "."
-                    a = Cls(d)
-                    a.audit_directory()
-                    _emit_findings(a.findings, "sast")
-                    findings.extend(a.findings)
-                except Exception as e:
-                    print(f"  ⚠️  SAST: {e}")
+            _map_aware_sast(target, findings)
 
     if mode in ("sast", "hunt", "full_stack"):
         with _span("FilePrioritizer", "tool"):
@@ -474,34 +698,15 @@ def dispatch(intent: dict) -> List[Dict]:
                     print(f"  ⚠️  Container: {e}")
 
     # ════════════════════════════════════════════════════════════════════════════
-    # PHASE 2: THREAT MODELING
+    # PHASE 2: THREAT MODELING (map-aware — uses entry points from mapper)
     # ════════════════════════════════════════════════════════════════════════════
 
     if mode in ("threat_model", "full_stack"):
         with _span("ThreatModel", "agent"):
-            Cls = _load("nova_threat_model", "NovaThreatModel")
-            if Cls:
-                try:
-                    tm = Cls()
-                    d  = target if os.path.isdir(target) else "."
-                    src: Dict[str, str] = {}
-                    for root, _, files in os.walk(d):
-                        for f in files[:30]:
-                            try:
-                                p = os.path.join(root, f)
-                                src[os.path.relpath(p, d)] = open(
-                                    p, encoding="utf-8", errors="ignore").read(3000)
-                            except Exception:
-                                pass
-                    model = tm.build_from_files(src)
-                    out   = WORKSPACE / "nova_threat_model.json"
-                    out.write_text(json.dumps(model, indent=2, default=str))
-                    print(f"  🗺  Threat model → {out}")
-                except Exception as e:
-                    print(f"  ⚠️  Threat model: {e}")
+            _map_aware_threat_model(target)
 
     # ════════════════════════════════════════════════════════════════════════════
-    # PHASE 3: LIVE RECON
+    # PHASE 3: PASSIVE RECON
     # ════════════════════════════════════════════════════════════════════════════
 
     if mode in ("recon",):
@@ -519,9 +724,29 @@ def dispatch(intent: dict) -> List[Dict]:
 
     # ════════════════════════════════════════════════════════════════════════════
     # PHASE 4: ACTIVE VULNERABILITY TESTING
+    # Endpoints from the codebase map are injected as seeds where modules accept them
     # ════════════════════════════════════════════════════════════════════════════
 
     _url = target if target.startswith("http") else DEFAULT_TARGET
+
+    # Seed URL list from codebase map (endpoints discovered in source code)
+    _map_endpoints: List[str] = []
+    if _CMAP:
+        base = _url.rstrip("/")
+        _map_endpoints = list(dict.fromkeys(
+            base + ep["route"]
+            for ep in _CMAP.endpoints if ep.get("route","").startswith("/")
+        ))[:100]
+        if _map_endpoints:
+            print(f"  🗺  Seeding {len(_map_endpoints)} endpoints from codebase map")
+
+    def _inject_endpoints(scanner_obj, attr: str = "seed_urls"):
+        """Try to inject pre-discovered endpoints into a scanner."""
+        if _map_endpoints and hasattr(scanner_obj, attr):
+            try:
+                setattr(scanner_obj, attr, _map_endpoints)
+            except Exception:
+                pass
 
     if mode in ("idor", "hunt", "full_stack"):
         with _span("IDORScanner", "tool"):
@@ -529,6 +754,7 @@ def dispatch(intent: dict) -> List[Dict]:
             if Cls:
                 try:
                     s = Cls(_url)
+                    _inject_endpoints(s)
                     r = s.run()
                     _emit_findings(r, "idor")
                     findings.extend(r)
@@ -555,6 +781,7 @@ def dispatch(intent: dict) -> List[Dict]:
             if Cls:
                 try:
                     s = Cls(_url)
+                    _inject_endpoints(s)
                     r = s.run()
                     _emit_findings(r, "csrf")
                     findings.extend(r)
@@ -568,6 +795,7 @@ def dispatch(intent: dict) -> List[Dict]:
             if Cls:
                 try:
                     s = Cls(_url)
+                    _inject_endpoints(s)
                     r = s.run()
                     _emit_findings(r, "business_logic")
                     findings.extend(r)
@@ -593,6 +821,7 @@ def dispatch(intent: dict) -> List[Dict]:
             if Cls:
                 try:
                     s = Cls(_url)
+                    _inject_endpoints(s)
                     r = s.run_sqli()
                     r = r if isinstance(r, list) else []
                     _emit_findings(r, "sqli")
@@ -605,7 +834,9 @@ def dispatch(intent: dict) -> List[Dict]:
             Cls = _load("nova_fuzzer", "NovaFuzzer")
             if Cls:
                 try:
-                    Cls(_url).run()
+                    s = Cls(_url)
+                    _inject_endpoints(s)
+                    s.run()
                 except Exception as e:
                     print(f"  ⚠️  Fuzz: {e}")
 
@@ -628,12 +859,27 @@ def dispatch(intent: dict) -> List[Dict]:
             if Cls:
                 try:
                     s = Cls(_url)
+                    _inject_endpoints(s)
                     r = s.run()
                     r = r if isinstance(r, list) else []
                     _emit_findings(r, "race")
                     findings.extend(r)
                 except Exception as e:
                     print(f"  ⚠️  Race: {e}")
+
+    if mode in ("ssrf",):
+        with _span("SSRF", "tool"):
+            Cls = _load("nova_fuzzer", "NovaFuzzer")
+            if Cls:
+                try:
+                    s = Cls(_url)
+                    _inject_endpoints(s)
+                    r = s.run_ssrf() if hasattr(s, "run_ssrf") else []
+                    r = r if isinstance(r, list) else []
+                    _emit_findings(r, "ssrf")
+                    findings.extend(r)
+                except Exception as e:
+                    print(f"  ⚠️  SSRF: {e}")
 
     if mode in ("llm_injection",):
         with _span("LLMInjection", "tool"):
@@ -683,7 +929,7 @@ def dispatch(intent: dict) -> List[Dict]:
                     print(f"  ⚠️  Sandbox: {e}")
 
     # ════════════════════════════════════════════════════════════════════════════
-    # PHASE 7: MULTI-AGENT ORCHESTRATION
+    # PHASE 7: MULTI-AGENT ORCHESTRATION (map injected into every agent)
     # ════════════════════════════════════════════════════════════════════════════
 
     if mode in ("orchestrate",):
@@ -695,6 +941,7 @@ def dispatch(intent: dict) -> List[Dict]:
                         _url,
                         scope=[_url.split("//")[-1].split("/")[0]],
                         session=_SESSION,
+                        codebase_map=_CMAP,   # ← strategic map injected
                         verbose=True)
                     result = runner.run(query, start="ReconAgent")
                     _emit_findings(result.findings, "orchestrate")
@@ -723,6 +970,9 @@ def dispatch(intent: dict) -> List[Dict]:
             if Cls:
                 try:
                     agent = Cls(_url, max_steps=MAX_STEPS)
+                    # Inject map brief into agent if it supports it
+                    if _CMAP and hasattr(agent, "set_codebase_context"):
+                        agent.set_codebase_context(_get_map_brief())
                     r = agent.run(query)
                     r = r if isinstance(r, list) else []
                     _emit_findings(r, "hunt")
@@ -731,7 +981,7 @@ def dispatch(intent: dict) -> List[Dict]:
                     print(f"  ⚠️  Agent core: {e}")
 
     # ════════════════════════════════════════════════════════════════════════════
-    # PHASE 8: DAYBREAK AI ASSESSMENT
+    # PHASE 8: DAYBREAK AI ASSESSMENT (scope-aware + map-guided)
     # ════════════════════════════════════════════════════════════════════════════
 
     if mode in ("daybreak", "full_stack"):
@@ -751,6 +1001,9 @@ def dispatch(intent: dict) -> List[Dict]:
                         except Exception:
                             pass
                     db = Cls(target, scope=scope)
+                    # Inject map context if Daybreak supports it
+                    if _CMAP and hasattr(db, "set_codebase_context"):
+                        db.set_codebase_context(_get_map_brief())
                     r  = db.run()
                     r  = r if isinstance(r, list) else []
                     _emit_findings(r, "daybreak")
@@ -760,11 +1013,11 @@ def dispatch(intent: dict) -> List[Dict]:
                     print(f"  ⚠️  Daybreak: {e}")
 
     # ════════════════════════════════════════════════════════════════════════════
-    # PHASE 9: FULL-STACK ACTIVE PROBE PHASE
+    # PHASE 9: FULL-STACK ACTIVE PROBES
     # ════════════════════════════════════════════════════════════════════════════
 
     if mode == "full_stack":
-        print("\n  🚀 Phase 9: Active API probes (parallel)...")
+        print("\n  🚀 Phase 9: Active API probes...")
         for sub_mode in ("idor", "graphql", "csrf", "business_logic",
                          "race", "jwt", "sqli", "ssrf"):
             sub_intent = {"mode": sub_mode, "target": _url, "original_query": query}
@@ -796,9 +1049,9 @@ def dispatch(intent: dict) -> List[Dict]:
             Cls = _load("nova_detection_engineer", "NovaDetectionEngineer")
             if Cls:
                 try:
-                    de   = Cls()
+                    de    = Cls()
                     rules = de.generate_rules(findings[:10])
-                    out  = WORKSPACE / "nova_detection_rules.json"
+                    out   = WORKSPACE / "nova_detection_rules.json"
                     out.write_text(json.dumps(rules, indent=2, default=str))
                     print(f"  🔔 Detection rules → {out}")
                 except Exception as e:
@@ -897,12 +1150,11 @@ def dispatch(intent: dict) -> List[Dict]:
                 print(f"  ⚠️  Continuous: {e}")
 
     # ════════════════════════════════════════════════════════════════════════════
-    # FINALISE — emit, save, close
+    # FINALISE
     # ════════════════════════════════════════════════════════════════════════════
 
     elapsed_ms = (time.monotonic() - t_start) * 1000
 
-    # Fire PostRun hook
     if _BUS:
         try:
             _BUS.fire("PostRun", {
@@ -913,12 +1165,11 @@ def dispatch(intent: dict) -> List[Dict]:
         except Exception:
             pass
 
-    # End session run record
     if _SESSION and _STORE:
         try:
             if _SESSION.runs:
                 run = _SESSION.runs[-1]
-                run.ended_at = datetime.now(timezone.utc).isoformat()
+                run.ended_at      = datetime.now(timezone.utc).isoformat()
                 run.findings_count = len(findings)
             _SESSION.add_message(
                 "assistant",
@@ -928,7 +1179,6 @@ def dispatch(intent: dict) -> List[Dict]:
         except Exception:
             pass
 
-    # Save tracer
     if _TRACER:
         try:
             if _TRACER._root:
@@ -939,12 +1189,13 @@ def dispatch(intent: dict) -> List[Dict]:
         except Exception:
             pass
 
-    # Save + print findings
     if findings:
         path     = _save_findings(findings, mode)
         critical = [f for f in findings
-                    if str(f.get("severity", "")).upper() in ("CRITICAL", "HIGH")]
-        print(f"\n{'━'*62}")
+                    if str(f.get("severity","")).upper() in ("CRITICAL","HIGH")]
+        sev_order = {"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3,"INFO":4}
+
+        print(f"\n{'━'*64}")
         print(f"  📊 Total findings : {len(findings)}")
         print(f"  🔴 Critical/High  : {len(critical)}")
         print(f"  ⏱  Elapsed        : {elapsed_ms/1000:.1f}s")
@@ -956,16 +1207,20 @@ def dispatch(intent: dict) -> List[Dict]:
         print(f"  💾 Saved          : {path}")
         if _SESSION:
             print(f"  📂 Session        : {_SESSION.session_id[:8]}")
+        if _CMAP:
+            print(f"  🗺  Map            : {_CMAP.file_count} files | "
+                  f"{_CMAP.primary_language} | "
+                  f"{len(_CMAP.endpoints)} endpoints")
         if critical:
             print(f"\n  Top findings:")
-            sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
-            for f in sorted(critical, key=lambda x: sev_order.get(
-                    x.get("severity", "INFO").upper(), 4))[:5]:
-                icon = {"CRITICAL": "🔴", "HIGH": "🟠"}.get(
-                    f.get("severity", "").upper(), "•")
+            for f in sorted(critical,
+                            key=lambda x: sev_order.get(
+                                str(x.get("severity","INFO")).upper(), 4))[:5]:
+                icon = {"CRITICAL":"🔴","HIGH":"🟠"}.get(
+                    f.get("severity","").upper(),"•")
                 print(f"  {icon} [{f.get('severity','?')}] {f.get('type','?')}"
                       f" — {f.get('file') or f.get('endpoint','?')}")
-        print(f"{'━'*62}\n")
+        print(f"{'━'*64}\n")
 
     return findings
 
@@ -976,19 +1231,16 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         print("Usage: python3 nova.py \"Your security task in plain English\"\n")
-        print("Examples:")
         examples = [
             "Hunt http://localhost:3000 for all vulnerabilities",
-            "Orchestrate multi-agent recon+attack on https://target.com",
-            "Full stack pipeline on ./my-app",
+            "Map the codebase at ./juice-shop",
+            "Full stack pipeline on ./juice-shop",
+            "Orchestrate multi-agent attack on https://target.com",
             "Daybreak AI assessment on https://target.com",
-            "Triage findings and rank by H1 priority",
-            "SAST scan of ./src",
-            "Check supply chain risk for ./package.json",
-            "Test GraphQL at http://localhost:4000",
-            "Scan CI/CD pipelines in .",
-            "Build STRIDE threat model for ./my-app",
+            "SAST code audit of ./src",
             "Scan git history for leaked secrets",
+            "Build STRIDE threat model for ./my-app",
+            "Triage findings and rank by H1 priority",
             "Show vulnerability tracker dashboard",
             "Health check of all Nova modules",
         ]
@@ -996,16 +1248,16 @@ def main():
             print(f"  python3 nova.py \"{ex}\"")
         sys.exit(0)
 
-    query  = " ".join(sys.argv[1:])
+    query  = " ".join(a for a in sys.argv[1:] if not a.startswith("--"))
     intent = _parse_intent(query)
 
-    # Resume session if --session flag passed
+    # Parse --session flag
     session_id = None
     for i, arg in enumerate(sys.argv):
         if arg == "--session" and i + 1 < len(sys.argv):
             session_id = sys.argv[i + 1]
 
-    print(f"\n  🦅 Nova Arsenal v4.1")
+    print(f"\n  🦅 Nova Arsenal v4.2")
     print(f"  📝 Task: \"{query[:80]}\"")
 
     _init_provider_layer(
@@ -1013,11 +1265,21 @@ def main():
         session_id=session_id,
         verbose=True)
 
+    # ═══════════════════════════════════════════════════════════════════════
+    # PHASE 0 — Map the codebase BEFORE running any scan
+    # This gives every subsequent phase full strategic intelligence:
+    #   • All languages, frameworks, dependencies
+    #   • Every route/endpoint discovered in source code
+    #   • Auth patterns, DB connections, data models
+    #   • Pre-detected secrets and CVE-affected deps
+    #   • AI-generated attack priority order
+    # ═══════════════════════════════════════════════════════════════════════
+    _run_phase0_mapper(intent["target"])
+
     findings = dispatch(intent)
 
-    # Exit code: 1 if critical/high findings, 0 otherwise
     has_critical = any(
-        str(f.get("severity", "")).upper() in ("CRITICAL", "HIGH")
+        str(f.get("severity","")).upper() in ("CRITICAL","HIGH")
         for f in findings)
     return 1 if has_critical else 0
 
