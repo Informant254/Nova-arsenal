@@ -261,6 +261,34 @@ def cmd_scan(args):
     return 1 if any(f.get("severity","").upper() in ("CRITICAL","HIGH") for f in findings) else 0
 
 
+def cmd_code(args):
+    """nova code <task> — autonomous coding-agent loop"""
+    _banner()
+    print(f"  🤖 {green('Autonomous coding')} → {cyan(args.repo)}")
+    print(f"  📝 {white(args.task)}\n")
+    Agent = _try("nova_code_agent", "NovaCodeAgent")
+    if not Agent:
+        print(red("  ✗ nova_code_agent.py is unavailable"))
+        return 1
+    report = Agent(
+        repo=args.repo,
+        task=args.task,
+        test_command=args.test_command or "",
+        max_retries=args.max_retries,
+        allow_edits=not args.no_edit,
+    ).run()
+    print(f"  Status:       {green(report.get('status', 'unknown'))}")
+    print(f"  Files mapped: {report.get('mapped_files', 0)}")
+    print(f"  Patch applied:{' yes' if report.get('patch_applied') else ' no'}")
+    if report.get("changed_files"):
+        print("  Changed files:")
+        for path in report["changed_files"]:
+            print(f"    - {path}")
+    print(f"  Report:       {cyan(report.get('report_path', ''))}")
+    failed = any(check.get("returncode", 0) != 0 for check in report.get("checks", []) if check.get("command") == report.get("test_command"))
+    return 1 if failed else 0
+
+
 def cmd_providers(args):
     """nova providers — show available LLM providers"""
     _banner()
@@ -316,8 +344,9 @@ def cmd_status(args):
         ("nova_orchestrator",  "nova_orchestrator",   "Runner"),
         ("nova_triage",        "nova_triage",         "NovaTriage"),
         ("nova_daybreak",      "nova_daybreak",       "NovaDaybreak"),
-        ("nova_agent_core",    "nova_agent_core",     "NovaAgentCore"),
-        ("nova_swarm_v3",      "nova_swarm_v3",       "NovaSwarm"),
+        ("nova_agent_core",    "nova_agent_core",     "NovaAgent"),
+        ("nova_code_agent",    "nova_code_agent",     "NovaCodeAgent"),
+        ("nova_swarm_v3",      "nova_swarm_v3",       "NovaSwarmV3"),
         ("nova_recon",         "nova_recon",          "NovaRecon"),
         ("nova_fuzzer",        "nova_fuzzer",         "NovaFuzzer"),
         ("nova_idor_scanner",  "nova_idor_scanner",   "NovaIDORScanner"),
@@ -337,9 +366,9 @@ def cmd_status(args):
         ("nova_audit_reporter","nova_audit_reporter", "NovaAuditReporter"),
         ("nova_vuln_tracker",  "nova_vuln_tracker",   "NovaVulnTracker"),
         ("nova_zero_day_correlator","nova_zero_day_correlator","NovaZeroDayCorrelator"),
-        ("nova_memory_system", "nova_memory_system",  "NovaMemorySystem"),
+        ("nova_memory_system", "nova_memory_system",  "NovaBrain"),
         ("nova_scope_manager", "nova_scope_manager",  "NovaScopeManager"),
-        ("nova_mcp_client",    "nova_mcp_client",     "NovaMCPClient"),
+        ("nova_mcp_client",    "nova_mcp_client",     "MCPClient"),
     ]
 
     ok = bad = 0
@@ -494,6 +523,7 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  nova code   "Fix the failing tests" --repo . --test-command "pytest"
   nova hunt   https://target.com
   nova full   https://target.com --provider openai
   nova recon  https://target.com
@@ -525,6 +555,15 @@ Examples:
     shared.set_defaults(verbose=True)
 
     subs = p.add_subparsers(dest="command", metavar="COMMAND")
+
+    # code
+    pc = subs.add_parser("code", parents=[shared],
+                         help="Autonomous coding agent: inspect, patch, test, retry")
+    pc.add_argument("task", help="Coding task, e.g. 'Fix failing tests'")
+    pc.add_argument("--repo", default=".", help="Repository path (default: .)")
+    pc.add_argument("--test-command", default="", help="Verification command to run")
+    pc.add_argument("--max-retries", type=int, default=1, help="Repair retries after test failure")
+    pc.add_argument("--no-edit", action="store_true", help="Plan and inspect without applying patches")
 
     # hunt
     ph = subs.add_parser("hunt", parents=[shared],
@@ -618,6 +657,7 @@ def main():
         return 0
 
     handlers = {
+        "code":      cmd_code,
         "hunt":      cmd_hunt,
         "full":      cmd_full,
         "recon":     cmd_recon,

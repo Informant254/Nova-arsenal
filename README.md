@@ -6,6 +6,199 @@
 
 **Status:** ✅ Production-Ready | 🦅 35+ Modules | 🤖 Multi-Agent LLM | 🚀 Cloud-Native
 
+
+## Nova Autonomous Agent Runtime
+
+Nova Arsenal now ships as an **autonomous coding and security agent runtime**. The
+security modules remain available, but the core agent loop has been upgraded to
+support repository mapping, governed tool execution, autonomous patch planning,
+validated diff application, test execution, retry-on-failure, and auditable run
+reports.
+
+### What changed in this release
+
+- `nova code` runs a conservative autonomous coding loop: map the repository,
+  generate a plan, request a minimal patch from the configured model, validate it
+  with `git apply --check`, apply only safe diffs, run tests, and retry once.
+- `nova_tool_kit.py` exposes a real tool registry (`execute_tool`,
+  `tools_summary_for_prompt`, and `TOOL_SCHEMAS`) so ReAct agents can call tools
+  through one governed interface.
+- Scope enforcement is strict by default. If a scope is declared, network tools
+  block out-of-scope hosts unless `NOVA_STRICT_SCOPE=false` is set deliberately.
+- `nova_features.py --check` now verifies core imports and exported attributes,
+  not only whether files exist.
+- `nova_evolution.py` provides a safe self-improvement entrypoint. It is blocked
+  unless `NOVA_ALLOW_EVOLUTION=true` is set, then routes improvements through the
+  same validated coding-agent loop.
+
+### Architecture diagram
+
+```mermaid
+flowchart TD
+    U[User intent / CLI / natural language] --> R[Intent parser + CLI router]
+    R --> M[Phase 0 codebase mapper]
+    M --> C[Context packer + repository brief]
+    C --> A{Agent mode}
+
+    A -->|nova code| CA[Autonomous coding agent]
+    A -->|hunt / full / scan| SA[Security orchestration pipeline]
+    A -->|evolution| EV[Safe self-improvement gate]
+
+    CA --> P[Plan]
+    P --> L[LLM router]
+    L --> D[Minimal unified diff]
+    D --> G[git apply --check]
+    G -->|valid| AP[Apply patch]
+    G -->|invalid| NP[Reject patch]
+    AP --> T[Test runner]
+    T -->|fail| RR[One repair retry]
+    T -->|pass or no tests| REP[Audit report]
+    RR --> L
+    NP --> REP
+
+    SA --> SAST[SAST / SCA / secrets / CI/CD / container]
+    SA --> ACT[Active scanners: IDOR / GraphQL / CSRF / JWT / SQLi / SSRF]
+    SA --> TRI[Triage + patch + detection + report]
+
+    EV -->|NOVA_ALLOW_EVOLUTION=true| CA
+    EV -->|default| BLOCK[Blocked]
+
+    subgraph Governance
+      TK[Governed tool registry]
+      SG[Strict scope guard]
+      AL[Redacted audit log]
+      RL[Rate limiter]
+    end
+
+    CA --> TK
+    SA --> TK
+    TK --> SG
+    TK --> AL
+    TK --> RL
+```
+
+### Installation manual
+
+#### 1. Clone
+
+```bash
+git clone https://github.com/Informant254/Nova-arsenal
+cd Nova-arsenal
+```
+
+#### 2. Create an isolated Python environment
+
+```bash
+python3 -m venv ~/nova_workspace/.venv
+source ~/nova_workspace/.venv/bin/activate
+python3 -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+The full requirements file installs security, browser, binary-analysis,
+cloud-security, and OSINT tooling. For a lean coding-agent environment, install
+at minimum:
+
+```bash
+pip install requests aiohttp beautifulsoup4 lxml colorama rich tabulate pyyaml python-dotenv ollama
+```
+
+#### 3. Install and start a local model provider
+
+Nova works with API providers, but the default open-source path is Ollama:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+ollama pull qwen3:8b
+```
+
+Optional provider keys can be configured when you want stronger remote models:
+
+```bash
+export OPENAI_API_KEY="..."
+export ANTHROPIC_API_KEY="..."
+export GEMINI_API_KEY="..."
+```
+
+#### 4. Configure Nova runtime policy
+
+```bash
+export NOVA_WORKSPACE=~/nova_workspace
+export NOVA_LLM_URL=http://localhost:11434
+export NOVA_LLM_MODEL=qwen3:8b
+export NOVA_PERMISSION_PROFILE=scoped
+export NOVA_STRICT_SCOPE=true
+```
+
+For autonomous coding verification, pass an explicit test command whenever
+possible:
+
+```bash
+export NOVA_CODE_TEST_COMMAND="python3 -m pytest"
+```
+
+#### 5. Verify installation
+
+```bash
+python3 nova_features.py --check
+python3 -m py_compile nova.py nova_cli.py nova_code_agent.py nova_tool_kit.py nova_agent_core.py
+```
+
+#### 6. Run Nova as an autonomous coding agent
+
+Inspection-only mode:
+
+```bash
+python3 nova_code_agent.py "Inspect the repository and create a plan" --repo . --no-edit
+```
+
+Autonomous coding mode with verification:
+
+```bash
+python3 nova_cli.py code "Fix the failing tests" --repo . --test-command "python3 -m pytest"
+```
+
+Natural-language mode:
+
+```bash
+python3 nova.py "Use the autonomous coding agent to fix failing tests in ."
+```
+
+#### 7. Run Nova as a security agent
+
+```bash
+python3 nova.py "Map the codebase at ."
+python3 nova.py "SAST code audit of ."
+python3 nova.py "Hunt http://localhost:3000 for vulnerabilities"
+```
+
+#### 8. Safe self-improvement
+
+Self-improvement is blocked by default. To allow Nova to improve itself, require
+an explicit local opt-in and a verification command:
+
+```bash
+export NOVA_ALLOW_EVOLUTION=true
+python3 nova_evolution.py --goal "Improve import smoke tests" --repo . --test-command "python3 nova_features.py --check"
+```
+
+### Industrial-grade operating principles
+
+1. **Never apply unvalidated patches.** Nova only applies generated diffs after
+   `git apply --check` succeeds.
+2. **Always run a verification command.** Use `--test-command` or
+   `NOVA_CODE_TEST_COMMAND` for every coding task.
+3. **Keep scope strict.** Leave `NOVA_STRICT_SCOPE=true` unless you are running a
+   controlled lab.
+4. **Review audit reports.** Nova writes reports to `NOVA_WORKSPACE` for every
+   coding-agent run.
+5. **Treat local models as runtime components.** Better open models improve Nova;
+   the runtime is model-agnostic and can also route to OpenAI, Anthropic,
+   Gemini, or OpenAI-compatible endpoints.
+
+---
+
 ---
 
 ## 📖 Table of Contents

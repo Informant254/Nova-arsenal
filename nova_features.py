@@ -16,6 +16,7 @@ Usage:
 
 import sys
 import os
+import subprocess
 from pathlib import Path
 from typing import Dict, List
 
@@ -256,6 +257,7 @@ class NovaFeatures:
         ],
         "Orchestration": [
             ("nova_orchestrator.py", "Multi-agent (Recon → Attack → Report)"),
+            ("nova_code_agent.py", "Autonomous coding loop: map → patch → test → retry"),
             ("nova_cli.py", "Structured CLI"),
             ("nova_eval.py", "20-mission benchmark"),
             ("nova_diff_watcher.py", "Real-time file watcher"),
@@ -334,31 +336,67 @@ class NovaFeatures:
                 print(f"    ✓ {module_name:35} — {description}")
             print()
 
+    MODULE_ATTRS = {
+        "nova.py": "dispatch",
+        "nova_cli.py": "main",
+        "nova_tool_kit.py": "execute_tool",
+        "nova_agent_core.py": "NovaAgent",
+        "nova_code_agent.py": "NovaCodeAgent",
+        "nova_codebase_mapper.py": "NovaCodebaseMapper",
+        "nova_source_auditor.py": "NovaSourceAuditor",
+        "nova_llm_router.py": "LLMRouter",
+    }
+
+    def _import_check(self, module_name: str) -> bool:
+        module = module_name[:-3]
+        attr = self.MODULE_ATTRS.get(module_name)
+        code = f"import {module}\n"
+        if attr:
+            code += f"assert hasattr({module}, '{attr}'), 'missing {attr}'\n"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=self.nova_dir,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip().splitlines()[-1:]
+            print(f"  import check failed: {detail[0] if detail else 'unknown error'}")
+            return False
+        return True
+
     def check_features(self) -> bool:
-        """Verify all expected modules exist."""
+        """Verify expected modules exist and core modules import."""
         self.print_header("✅ Feature Verification", 1)
-        
+
         missing = []
+        import_failures = []
         all_modules = []
-        
+
         for category, modules in self.MODULES.items():
             for module_name, _ in modules:
                 all_modules.append(module_name)
                 filepath = self.nova_dir / module_name
-                if filepath.exists():
-                    print(f"✓ {module_name}")
-                else:
+                if not filepath.exists():
                     print(f"✗ {module_name} (MISSING)")
                     missing.append(module_name)
-        
+                    continue
+                print(f"✓ {module_name}")
+                if module_name in self.MODULE_ATTRS and not self._import_check(module_name):
+                    import_failures.append(module_name)
+
         print()
-        print(f"Summary: {len(all_modules) - len(missing)}/{len(all_modules)} modules present")
-        
+        present = len(all_modules) - len(missing)
+        print(f"Summary: {present}/{len(all_modules)} modules present; {len(import_failures)} core import failure(s)")
+
         if missing:
             print(f"\n⚠️  Missing modules: {', '.join(missing)}")
-            print("   Run: git pull origin main")
+        if import_failures:
+            print(f"\n❌ Import failures: {', '.join(import_failures)}")
+        if missing or import_failures:
             return False
-        
+
         print("\n✅ All modules verified!")
         return True
 

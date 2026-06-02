@@ -40,6 +40,7 @@ class PermissionProfile(str, Enum):
 
 DEFAULT_PROFILE: PermissionProfile = PermissionProfile(
     os.getenv("NOVA_PERMISSION_PROFILE", "scoped"))
+STRICT_SCOPE = os.getenv("NOVA_STRICT_SCOPE", "true").lower() != "false"
 
 # ── Destructive patterns that are BLOCKED in all profiles except explicit ─────
 
@@ -229,7 +230,8 @@ class ScopeGuard:
         for b in blocked_hosts:
             if b in host:
                 return False, f"blocked: {b} is out of scope"
-        # If scope is set but host not found, warn but allow (non-strict mode)
+        if STRICT_SCOPE:
+            return False, f"blocked: {host} not in declared scope"
         return True, f"warning: {host} not in declared scope"
 
     def check_path(self, path: str) -> Tuple[bool, str]:
@@ -744,3 +746,82 @@ class Tool:
 
     def schema_str(self) -> str:
         return self._governed.schema_str()
+
+
+# ── Public tool registry used by autonomous agents ─────────────────────────────
+
+_DEFAULT_TOOLS: Dict[str, GovernedTool] = {}
+TOOL_SCHEMAS: Dict[str, Dict] = {}
+_ALIAS_MAP: Dict[str, str] = {
+    "http_request": "http_probe",
+    "bash": "shell",
+    "file_read": "read_file",
+    "file_write": "write_file",
+    "search_code": "grep_code",
+}
+
+
+def _ensure_registry(scope: List[str] = None) -> Dict[str, GovernedTool]:
+    global _DEFAULT_TOOLS, TOOL_SCHEMAS
+    if not _DEFAULT_TOOLS:
+        kit = get_default_kit(scope=scope)
+        _DEFAULT_TOOLS = {tool.name: tool for tool in kit.build(include_eval=True)}
+        TOOL_SCHEMAS = {name: tool.schema for name, tool in _DEFAULT_TOOLS.items()}
+    elif scope:
+        for tool in _DEFAULT_TOOLS.values():
+            if tool.requires_scope:
+                tool._scope = ScopeGuard(scope)
+    return _DEFAULT_TOOLS
+
+
+def register_tool(tool: GovernedTool) -> None:
+    """Register a governed tool for agent use."""
+    tools = _ensure_registry()
+    tools[tool.name] = tool
+    TOOL_SCHEMAS[tool.name] = tool.schema
+
+
+def list_tools() -> List[str]:
+    return sorted(_ensure_registry().keys())
+
+
+def tools_summary_for_prompt() -> str:
+    lines = []
+    for name, tool in sorted(_ensure_registry().items()):
+        lines.append(f"- {name}: {tool.description}")
+        schema = tool.schema_str()
+        if schema:
+            lines.append(schema)
+    lines.append("- mission_complete: finish the run with a summary and optional findings")
+    return "\n".join(lines)
+
+
+def _coerce_result(tool_name: str, raw: str) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    text = str(raw or "")
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            data.setdefault("success", "error" not in data)
+            return data
+    except Exception:
+        pass
+    success = not text.startswith("[BLOCKED]") and not text.startswith("ERROR:")
+    return {"success": success, "tool": tool_name, "result": text, "content": text}
+
+
+def execute_tool(tool_name: str, args: Dict = None, agent_name: str = "nova") -> Dict[str, Any]:
+    """Execute a governed tool and return a structured observation."""
+    args = args or {}
+    canonical = _ALIAS_MAP.get(tool_name, tool_name)
+    if canonical == "mission_complete":
+        return {"success": True, "summary": args.get("summary", "Mission complete"), "findings": args.get("findings", [])}
+    tools = _ensure_registry(scope=args.get("scope"))
+    tool = tools.get(canonical)
+    if not tool:
+        return {"success": False, "tool": tool_name, "error": f"Unknown tool: {tool_name}", "available_tools": list_tools()}
+    raw = tool.call(args, agent_name=agent_name)
+    result = _coerce_result(canonical, raw)
+    result.setdefault("tool", canonical)
+    return result

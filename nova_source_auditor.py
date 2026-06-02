@@ -11,8 +11,9 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 class NovaSourceAuditor:
-    def __init__(self):
+    def __init__(self, target_dir: str = None):
         self.findings = []
+        self.target_dir = target_dir
         self.audit_dir = tempfile.mkdtemp(prefix="nova_audit_")
 
         # ── TypeScript/JavaScript sinks ──────────────────────────────────────
@@ -261,7 +262,16 @@ class NovaSourceAuditor:
                 print(f"   🔥 [{priority_score}/5] {os.path.basename(filepath)}: {len(findings)} finding(s)")
 
         print(f"   📊 Scanned {scanned} files (priority ≥2), found {len(all_findings)} potential vulnerabilities")
+        self.findings = all_findings
         return all_findings
+
+    def audit_directory(self, target_dir: str = None) -> List[Dict]:
+        target = target_dir or self.target_dir or "."
+        self.findings = self.scan_directory(target)
+        return self.findings
+
+    def set_priority_files(self, priority_files: List[str]):
+        self.priority_files = priority_files
 
     def match_cves(self, findings: List[Dict]) -> List[Dict]:
         cve_map = {

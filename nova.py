@@ -305,6 +305,8 @@ KEYWORD_MODES = {
                         "autonomous agent","run agents","agent pipeline"],
     "triage":          ["triage","prioritise","prioritize","rank findings","sort findings",
                         "what to report","best findings","top findings","h1 ready"],
+    "code":            ["code","coding agent","fix tests","implement","refactor","repair",
+                        "write code","modify repo","change code","autonomous coding"],
     "hunt":            ["hunt","bug bounty","bounty","find bugs","exploit","pentest","hack"],
     "recon":           ["recon","reconn","subdomain","enumerate","discover","footprint","crt.sh"],
     "map":             ["map codebase","codebase map","map the code","scan codebase",
@@ -375,13 +377,13 @@ def _parse_intent(query: str) -> dict:
 
     url_match  = re.search(r'https?://[^\s]+', query)
     path_match = re.search(
-        r'(?:on|for|in|at|scan|audit|map)\s+([./~][\w./\-]+|[\w\-]+/[\w./\-]+)', query)
+        r'(?:on|for|in|at|scan|audit|map|repo|repository)\s+([./~][\w./\-]+|[\w\-]+/[\w./\-]+)', query)
     if url_match:
         target = url_match.group(0)
     elif path_match:
         target = path_match.group(1)
     else:
-        target = DEFAULT_TARGET
+        target = "." if detected_mode == "code" else DEFAULT_TARGET
 
     return {"mode": detected_mode, "target": target, "original_query": query}
 
@@ -567,6 +569,24 @@ def dispatch(intent: dict) -> List[Dict]:
             pass
 
     t_start = time.monotonic()
+
+    if mode == "code":
+        with _span("CodeAgent", "agent"):
+            Cls = _load("nova_code_agent", "NovaCodeAgent")
+            if not Cls:
+                return [{"type": "CodeAgent", "severity": "INFO", "description": "nova_code_agent.py is unavailable"}]
+            test_command = os.getenv("NOVA_CODE_TEST_COMMAND", "")
+            no_edit = os.getenv("NOVA_CODE_NO_EDIT", "false").lower() == "true"
+            report = Cls(repo=target, task=query or "Autonomous coding task", test_command=test_command, allow_edits=not no_edit).run()
+            finding = {
+                "type": "CodeAgentRun",
+                "severity": "INFO",
+                "description": f"Autonomous code run {report.get('status', 'completed')}",
+                "file": report.get("report_path", ""),
+                "report": report,
+            }
+            _emit_findings([finding], "code_agent")
+            return [finding]
 
     # ════════════════════════════════════════════════════════════════════════════
     # PHASE 0 (already ran before dispatch) — inject secrets from map as findings
@@ -1232,6 +1252,7 @@ def main():
         print(__doc__)
         print("Usage: python3 nova.py \"Your security task in plain English\"\n")
         examples = [
+            "Use the autonomous coding agent to fix failing tests in .",
             "Hunt http://localhost:3000 for all vulnerabilities",
             "Map the codebase at ./juice-shop",
             "Full stack pipeline on ./juice-shop",
@@ -1274,7 +1295,8 @@ def main():
     #   • Pre-detected secrets and CVE-affected deps
     #   • AI-generated attack priority order
     # ═══════════════════════════════════════════════════════════════════════
-    _run_phase0_mapper(intent["target"])
+    if intent["mode"] != "code":
+        _run_phase0_mapper(intent["target"])
 
     findings = dispatch(intent)
 
