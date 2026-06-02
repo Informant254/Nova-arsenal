@@ -1,70 +1,148 @@
-# App
-node_modules/
-juiceshop.sqlite
-order_*.pdf
-app/
-!frontend/src/app
-uploads/complaints/*.*
-!uploads/complaints/.gitkeep
-ftp/legal.md
-package-lock.json
-i18n/*.json
-i18n/*.invalid
-!frontend/src/assets/i18n/*.json
-!data/static/i18n/*.json
-/data/juiceshop.sqlite-journal
+# ════════════════════════════════════════════════════════════════
+#  Nova Arsenal — .gitignore
+#  Keep the repo lean: source + tests + configs only.
+#  All generated artifacts go to ~/nova_workspace (not committed).
+# ════════════════════════════════════════════════════════════════
 
-# Build
-.nyc_output/
-.sass-cache/
-build/
-cache/
-coverage/
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
 dist/
-logs/
-vagrant/.vagrant/
-*.orig
-*.out
-*.log
-JSON
-JSON.map
-frontend/src/**/*.js
-/bom.json
-/bom.xml
+build/
+.eggs/
+.Python
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pdm-python
+.venv/
+venv/
+env/
+ENV/
+.python-version
+*.pdb
 
-# IDEs
+# ── Node / JS ─────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.yarn/cache
+.npm/
+.node_repl_history
+package-lock.json
+
+# ── Nova generated outputs (ALL go to ~/nova_workspace) ──────────
+nova_workspace/
+~/nova_workspace/
+nova_*.json
+nova_*.html
+nova_*.har
+nova_*.png
+nova_*.jpg
+nova_*.md
+nova_trace_*.json
+nova_session_*.json
+nova_codebase_map_*.json
+nova_eval_*.json
+nova_diff_*.json
+nova_patches.json
+nova_detection_rules.json
+nova_audit_report.json
+nova_tracker_*.json
+nova_threat_model.json
+nova_daybreak_report.json
+nova_sast_report.json
+nova_sca_report.json
+nova_git_report.json
+nova_cicd_report.json
+nova_idor_report.json
+nova_graphql_report.json
+nova_csrf_report.json
+nova_business_logic_report.json
+nova_llm_injection_report.json
+nova_zero_day_report.json
+nova_supply_chain_report.json
+nova_container_report.json
+
+# ── Screenshots / HAR / Reports ────────────────────────────────────
+screenshots/
+hars/
+reports/
+*.har
+*.pcap
+*.pcapng
+
+# ── Eval fixtures (generated during test runs) ──────────────────
+eval_fixtures/
+
+# ── Secrets / Environment ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+*.asc
+
+# ── IDE / OS ──────────────────────────────────────────────────────
 .idea/
 .vscode/
-out/
-*.eml
-*.iml
-*.iws
 *.swp
-.ai/mcp/mcp.json
-.junie/memory/
-.junie/plans/
-
-# Branch ghpages
-assets/
-!frontend/src/assets/
-
-# Custom configuration files
-config/*.yml
-!config/addo.yml
-!config/bodgeit.yml
-!config/ctf.yml
-!config/fbctf.yml
-!config/default.yml
-!config/juicebox.yml
-!config/quiet.yml
-!config/test.yml
-!config/7ms.yml
-!config/mozilla.yml
-!config/unsafe.yml
-!config/tutorial.yml
-!config/oss.yml
-!config/defcon33.yml
-
-# System Files
+*.swo
+*~
 .DS_Store
-__pycache__/
+Thumbs.db
+desktop.ini
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+*.out
+
+# ── Coverage / test artefacts ─────────────────────────────────────
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+test-results/
+junit*.xml
+
+# ── Compiled / build outputs ─────────────────────────────────────
+*.o
+*.a
+*.lib
+*.dll
+*.exe
+*.dylib
+target/
+out/
+.next/
+.nuxt/
+
+# ── Docker / cloud state ─────────────────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# ── Virtualenv aliases ────────────────────────────────────────────
+.virtualenv
+pyenv
+pyvenv.cfg
