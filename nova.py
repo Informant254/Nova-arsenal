@@ -966,7 +966,7 @@ def dispatch(intent: dict) -> List[Dict]:
 
     if mode in ("hunt",):
         with _span("AgentCore", "agent"):
-            Cls = _load("nova_agent_core", "NovaAgentCore")
+            Cls = _load("nova_agent_core", "NovaAgentCore") or _load("nova_agent_core", "NovaAgent")
             if Cls:
                 try:
                     agent = Cls(_url, max_steps=MAX_STEPS)
