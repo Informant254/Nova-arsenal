@@ -8,8 +8,8 @@
 #               pip install -r requirements.txt
 
 # ── CORE ─────────────────────────────────────────────────────────
-requests>=2.31.0
-urllib3>=2.0.0
+ #requests>=2.31.0
+#urllib3>=2.0.0
 aiohttp>=3.9.0
 
 # ── WEB / BROWSER ────────────────────────────────────────────────
@@ -24,7 +24,7 @@ ollama>=0.1.0
 
 # ── SECURITY TOOLS ───────────────────────────────────────────────
 sqlmap>=1.7.0
-paramspider>=2.0
+ #paramspider>=2.0
 arjun>=2.2.0
 wafw00f>=2.2.0
 
