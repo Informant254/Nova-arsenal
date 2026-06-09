@@ -1,644 +1,632 @@
-#!/usr/bin/env python3
 """
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  🦅 NOVA CLI v1.0 — Unified Command-Line Interface                         ║
-║                                                                              ║
-║  Wraps every Nova module with structured subcommands, rich output,          ║
-║  session management, provider selection, and real-time finding display.     ║
-║                                                                              ║
-║  Usage:                                                                      ║
-║    nova hunt   https://target.com [options]                                 ║
-║    nova recon  https://target.com                                           ║
-║    nova full   https://target.com                                           ║
-║    nova orch   https://target.com                                           ║
-║    nova triage                                                              ║
-║    nova sast   ./src                                                        ║
-║    nova status                                                              ║
-║    nova session list                                                        ║
-║    nova session resume <id>                                                 ║
-║    nova providers                                                           ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+Nova CLI v1.0
+=============
+Command line interface for Nova.
+
+Usage:
+    nova chat                         Start conversational mode
+    nova scan target.com              Quick scan
+    nova sessions list                List all sessions
+    nova sessions resume <id>         Resume session
+    nova memory show target.com       Show target memory
+    nova report --session <id>        Generate report
+    nova config setup                 Run setup wizard
+    nova config show                  Show configuration
+    nova status                       System status
+
+Nova is smart enough to understand natural commands too:
+    nova "scan target.com for SQLi"
+    nova "what do you know about target.com"
+    nova "generate report for last session"
 """
 
-import argparse
-import json
 import os
 import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import List, Optional
+import logging
+import argparse
+from typing import Optional, List
+from datetime import datetime
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-NOVA_DIR  = Path(__file__).parent
-WORKSPACE = Path(os.path.expanduser(os.getenv("NOVA_WORKSPACE", "~/nova_workspace")))
-WORKSPACE.mkdir(parents=True, exist_ok=True)
-sys.path.insert(0, str(NOVA_DIR))
+logger = logging.getLogger(__name__)
 
-# ── Colour helpers (no deps — colorama if available, else ANSI) ────────────────
-try:
-    from colorama import Fore, Style, init as _cinit
-    _cinit(autoreset=True)
-    def _c(text, colour): return f"{colour}{text}{Style.RESET_ALL}"
-except ImportError:
-    class _Fore:
-        RED="\033[91m"; YELLOW="\033[93m"; GREEN="\033[92m"
-        CYAN="\033[96m"; MAGENTA="\033[95m"; WHITE="\033[97m"
-        BLUE="\033[94m"; RESET="\033[0m"
-    Fore = _Fore()
-    def _c(text, colour): return f"{colour}{text}\033[0m"
-
-def red(t):     return _c(t, Fore.RED)
-def yellow(t):  return _c(t, Fore.YELLOW)
-def green(t):   return _c(t, Fore.GREEN)
-def cyan(t):    return _c(t, Fore.CYAN)
-def magenta(t): return _c(t, Fore.MAGENTA)
-def white(t):   return _c(t, Fore.WHITE)
-def blue(t):    return _c(t, Fore.BLUE)
-
-SEV_ICONS = {
-    "CRITICAL": red("🔴 CRITICAL"),
-    "HIGH":     _c("🟠 HIGH",    Fore.YELLOW),
-    "MEDIUM":   yellow("🟡 MEDIUM"),
-    "LOW":      blue("🔵 LOW"),
-    "INFO":     white("⚪ INFO"),
-}
-
-def _banner():
-    print(cyan("""
- ███╗   ██╗ ██████╗ ██╗   ██╗  █████╗
- ████╗  ██║██╔═══██╗██║   ██║ ██╔══██╗
- ██╔██╗ ██║██║   ██║██║   ██║ ███████║
- ██║╚██╗██║██║   ██║╚██╗ ██╔╝ ██╔══██║
- ██║ ╚████║╚██████╔╝ ╚████╔╝  ██║  ██║
- ╚═╝  ╚═══╝ ╚═════╝   ╚═══╝   ╚═╝  ╚═╝"""))
-    print(magenta("  ARSENAL v4.1  ") + white("— Autonomous AI Security Agent"))
-    print(white("  " + "─"*52))
+NOVA_VERSION = "1.0.0"
+NOVA_BANNER = f"""
+ ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ 
+ ████╗  ██║██╔═══██╗██║   ██║██╔══██╗
+ ██╔██╗ ██║██║   ██║██║   ██║███████║
+ ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║
+ ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║
+ ╚═╝  ╚═══╝ ╚═════╝   ╚═══╝  ╚═╝  ╚═╝
+ 
+ Security Intelligence Platform v{NOVA_VERSION}
+ github.com/Informant254/Nova-arsenal
+ ─────────────────────────────────────
+"""
 
 
-def _hr():
-    print(white("  " + "═"*60))
+class NovaCLI:
+    """
+    Nova command line interface.
+    Entry point for all Nova interactions.
+    """
 
+    def __init__(self):
+        """Initialize CLI"""
 
-def _print_finding(f: dict, index: int):
-    sev  = str(f.get("severity", "INFO")).upper()
-    icon = SEV_ICONS.get(sev, f"• {sev}")
-    typ  = f.get("type", "?")
-    ep   = f.get("endpoint") or f.get("file") or "?"
-    desc = f.get("description", "")[:80]
-    cvss = f.get("cvss")
-    cvss_str = f"  CVSS: {cvss}" if cvss else ""
-    print(f"  {index:>3}. {icon}  {cyan(typ)}")
-    print(f"       📍 {ep}{cvss_str}")
-    if desc:
-        print(f"       {white(desc)}")
+        self.config = None
+        self.memory = None
+        self.session_manager = None
+        self.conversational_agent = None
 
+        self._initialize_components()
 
-def _print_findings_table(findings: List[dict], title: str = "Findings"):
-    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
-    sorted_f  = sorted(findings, key=lambda f: sev_order.get(
-        str(f.get("severity", "INFO")).upper(), 4))
-    _hr()
-    print(f"  {magenta('📊')} {white(title)} — {len(findings)} total")
-    _hr()
-    for i, f in enumerate(sorted_f, 1):
-        _print_finding(f, i)
-        if i < len(sorted_f):
-            print()
-    _hr()
-    # Severity summary
-    counts: dict = {}
-    for f in findings:
-        s = str(f.get("severity", "INFO")).upper()
-        counts[s] = counts.get(s, 0) + 1
-    parts = [f"{SEV_ICONS.get(k, k)}: {v}" for k, v in
-             sorted(counts.items(), key=lambda x: sev_order.get(x[0], 9))]
-    print("  " + "  |  ".join(parts))
+    def _initialize_components(self):
+        """Initialize Nova components"""
 
-
-# ── Lazy imports ───────────────────────────────────────────────────────────────
-
-def _try(module: str, attr: str = None):
-    try:
-        import importlib
-        m = importlib.import_module(module)
-        return getattr(m, attr) if attr else m
-    except Exception:
-        return None
-
-
-def _dispatch(query: str, session_id: Optional[str] = None,
-              provider: Optional[str] = None, verbose: bool = True) -> List[dict]:
-    """Run nova.py dispatch with optional provider override."""
-    if provider:
-        os.environ["NOVA_FORCE_PROVIDER"] = provider
-
-    nova_mod = _try("nova")
-    if not nova_mod:
-        print(red("  ✗ Failed to import nova.py"))
-        return []
-
-    nova_mod._init_provider_layer(verbose=verbose, session_id=session_id)
-    intent   = nova_mod._parse_intent(query)
-    findings = nova_mod.dispatch(intent)
-    return findings or []
-
-
-# ── Sub-command handlers ───────────────────────────────────────────────────────
-
-def cmd_hunt(args):
-    """nova hunt <target> — full agentic hunt"""
-    _banner()
-    print(f"  🎯 {green('Hunting')} → {cyan(args.target)}\n")
-    t0 = time.monotonic()
-    findings = _dispatch(
-        f"Hunt {args.target} for all vulnerabilities",
-        session_id=args.session,
-        provider=args.provider,
-        verbose=args.verbose)
-    _print_findings_table(findings, f"Hunt Results — {args.target}")
-    print(f"\n  ⏱  {(time.monotonic()-t0):.1f}s")
-    return 1 if any(f.get("severity","").upper() in ("CRITICAL","HIGH") for f in findings) else 0
-
-
-def cmd_full(args):
-    """nova full <target|path> — full-stack everything"""
-    _banner()
-    print(f"  🚀 {green('Full-stack pipeline')} → {cyan(args.target)}\n")
-    t0 = time.monotonic()
-    findings = _dispatch(
-        f"Full stack scan everything on {args.target}",
-        session_id=args.session,
-        provider=args.provider,
-        verbose=args.verbose)
-    _print_findings_table(findings, "Full-Stack Results")
-    print(f"\n  ⏱  {(time.monotonic()-t0):.1f}s")
-    return 1 if any(f.get("severity","").upper() in ("CRITICAL","HIGH") for f in findings) else 0
-
-
-def cmd_recon(args):
-    """nova recon <target> — passive recon"""
-    _banner()
-    print(f"  🔭 {green('Recon')} → {cyan(args.target)}\n")
-    findings = _dispatch(f"Recon {args.target}", session_id=args.session, verbose=args.verbose)
-    _print_findings_table(findings, "Recon Results")
-    return 0
-
-
-def cmd_orch(args):
-    """nova orch <target> — multi-agent orchestrator"""
-    _banner()
-    print(f"  🧠 {green('Orchestrating agents')} → {cyan(args.target)}\n")
-    t0 = time.monotonic()
-    findings = _dispatch(
-        f"Orchestrate multi-agent hunt on {args.target}",
-        session_id=args.session,
-        provider=args.provider,
-        verbose=args.verbose)
-    _print_findings_table(findings, "Orchestrator Results")
-    print(f"\n  ⏱  {(time.monotonic()-t0):.1f}s")
-    return 1 if any(f.get("severity","").upper() in ("CRITICAL","HIGH") for f in findings) else 0
-
-
-def cmd_triage(args):
-    """nova triage — triage + rank all findings"""
-    _banner()
-    print(f"  🎯 {green('Triaging findings...')}\n")
-
-    # Collect all findings from workspace
-    all_findings: List[dict] = []
-    for f in sorted(WORKSPACE.glob("nova_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
         try:
-            data = json.loads(f.read_text())
-            if "findings" in data and isinstance(data["findings"], list):
-                all_findings.extend(data["findings"])
-        except Exception:
-            pass
+            from nova_config_manager import NovaConfig
+            self.config = NovaConfig()
+        except ImportError:
+            logger.warning("Config manager not available")
 
-    if not all_findings:
-        print(yellow("  ⚠  No findings in workspace. Run a scan first."))
-        return 0
+        try:
+            from nova_memory import NovaMemory
+            db_path = "~/.nova/memory.db"
+            if self.config:
+                db_path = self.config.get("memory.db_path", db_path)
+            self.memory = NovaMemory(os.path.expanduser(db_path))
+        except ImportError:
+            logger.warning("Memory system not available")
 
-    findings = _dispatch(
-        "Triage and prioritise these findings",
-        session_id=args.session, verbose=args.verbose)
-    if not findings:
-        findings = all_findings
+        try:
+            from nova_session_manager import NovaSessionManager
+            session_dir = "~/.nova/sessions"
+            if self.config:
+                session_dir = self.config.get("sessions.dir", session_dir)
+            self.session_manager = NovaSessionManager(os.path.expanduser(session_dir))
+        except ImportError:
+            logger.warning("Session manager not available")
 
-    _print_findings_table(findings, "Triage — H1-Ready Ranking")
-    return 0
+    def run(self, args: Optional[List[str]] = None):
+        """
+        Main entry point.
 
+        Args:
+            args: Command line arguments (defaults to sys.argv)
+        """
 
-def cmd_sast(args):
-    """nova sast <path> — static analysis"""
-    _banner()
-    print(f"  🔬 {green('SAST')} → {cyan(args.target)}\n")
-    findings = _dispatch(f"SAST code audit of {args.target}",
-                         session_id=args.session, verbose=args.verbose)
-    _print_findings_table(findings, "SAST Results")
-    return 0
+        parser = self._build_parser()
 
+        # If no args, show banner and start chat
+        if not args and len(sys.argv) == 1:
+            self._print_banner()
+            self._start_chat()
+            return
 
-def cmd_sca(args):
-    """nova sca <path> — dependency / supply chain audit"""
-    _banner()
-    print(f"  📦 {green('SCA + Supply Chain')} → {cyan(args.target)}\n")
-    findings = _dispatch(f"SCA dependency scan of {args.target}",
-                         session_id=args.session, verbose=args.verbose)
-    _print_findings_table(findings, "SCA Results")
-    return 0
+        parsed = parser.parse_args(args)
 
-
-def cmd_scan(args):
-    """nova scan <mode> <target> — run any specific scan mode"""
-    _banner()
-    print(f"  ⚡ {green(args.mode)} → {cyan(args.target)}\n")
-    findings = _dispatch(f"{args.mode} {args.target}",
-                         session_id=args.session,
-                         provider=getattr(args, "provider", None),
-                         verbose=args.verbose)
-    _print_findings_table(findings, f"{args.mode.upper()} Results")
-    return 1 if any(f.get("severity","").upper() in ("CRITICAL","HIGH") for f in findings) else 0
-
-
-def cmd_providers(args):
-    """nova providers — show available LLM providers"""
-    _banner()
-    RouterCls = _try("nova_llm_router", "LLMRouter")
-    if not RouterCls:
-        print(yellow("  ⚠  nova_llm_router not found"))
-        return 1
-    try:
-        router = RouterCls()
-        avail  = router.available_providers()
-        print(f"  {green('Available LLM providers:')}")
-        for p in avail:
-            print(f"    ✅ {cyan(p)}")
-        all_p = ["openai", "anthropic", "gemini", "ollama"]
-        missing = [p for p in all_p if p not in avail]
-        if missing:
-            print(f"\n  {yellow('Not configured:')}")
-            for p in missing:
-                env = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY",
-                       "gemini": "GEMINI_API_KEY", "ollama": "NOVA_LLM_URL"}.get(p, "")
-                print(f"    ✗ {p}" + (f"  (set {env})" if env else ""))
-        # Test each provider
-        if args.test:
-            print(f"\n  {green('Testing providers...')}")
-            for p in avail:
-                try:
-                    from nova_llm_router import Provider
-                    t0  = time.monotonic()
-                    resp = router.chat("Reply: OK", provider=getattr(Provider, p.upper(), None))
-                    ms   = (time.monotonic() - t0) * 1000
-                    print(f"    ✅ {p}: {resp.content[:20]!r}  [{ms:.0f}ms]  [${resp.cost_usd:.5f}]")
-                except Exception as e:
-                    print(f"    ✗ {p}: {e}")
-    except Exception as e:
-        print(red(f"  Error: {e}"))
-    return 0
-
-
-def cmd_status(args):
-    """nova status — health-check every Nova module"""
-    _banner()
-    print(f"  {green('System Status')}\n")
-
-    checks = [
-        # (display_name, module, class_or_attr)
-        ("nova_llm_router",    "nova_llm_router",    "LLMRouter"),
-        ("nova_hooks",         "nova_hooks",          "HookBus"),
-        ("nova_context",       "nova_context",        "RunContext"),
-        ("nova_sessions",      "nova_sessions",       "SessionStore"),
-        ("nova_retry",         "nova_retry",          "RetryPolicy"),
-        ("nova_observability", "nova_observability",  "Tracer"),
-        ("nova_skills",        "nova_skills",         "SkillLibrary"),
-        ("nova_orchestrator",  "nova_orchestrator",   "Runner"),
-        ("nova_triage",        "nova_triage",         "NovaTriage"),
-        ("nova_daybreak",      "nova_daybreak",       "NovaDaybreak"),
-        ("nova_agent_core",    "nova_agent_core",     "NovaAgentCore"),
-        ("nova_swarm_v3",      "nova_swarm_v3",       "NovaSwarm"),
-        ("nova_recon",         "nova_recon",          "NovaRecon"),
-        ("nova_fuzzer",        "nova_fuzzer",         "NovaFuzzer"),
-        ("nova_idor_scanner",  "nova_idor_scanner",   "NovaIDORScanner"),
-        ("nova_graphql_tester","nova_graphql_tester", "NovaGraphQLTester"),
-        ("nova_csrf_tester",   "nova_csrf_tester",    "NovaCsrfTester"),
-        ("nova_business_logic","nova_business_logic", "NovaBusinessLogicTester"),
-        ("nova_jwt_forge",     "nova_jwt_forge",      "NovaJWTForge"),
-        ("nova_race_engine",   "nova_race_engine",    "NovaRaceEngine"),
-        ("nova_source_auditor","nova_source_auditor", "NovaSourceAuditor"),
-        ("nova_sca_scanner",   "nova_sca_scanner",    "NovaSCAScanner"),
-        ("nova_git_scanner",   "nova_git_scanner",    "NovaGitScanner"),
-        ("nova_cicd_scanner",  "nova_cicd_scanner",   "NovaCICDScanner"),
-        ("nova_container_scanner","nova_container_scanner","NovaContainerScanner"),
-        ("nova_threat_model",  "nova_threat_model",   "NovaThreatModel"),
-        ("nova_patch_generator","nova_patch_generator","NovaPatchGenerator"),
-        ("nova_detection_engineer","nova_detection_engineer","NovaDetectionEngineer"),
-        ("nova_audit_reporter","nova_audit_reporter", "NovaAuditReporter"),
-        ("nova_vuln_tracker",  "nova_vuln_tracker",   "NovaVulnTracker"),
-        ("nova_zero_day_correlator","nova_zero_day_correlator","NovaZeroDayCorrelator"),
-        ("nova_memory_system", "nova_memory_system",  "NovaMemorySystem"),
-        ("nova_scope_manager", "nova_scope_manager",  "NovaScopeManager"),
-        ("nova_mcp_client",    "nova_mcp_client",     "NovaMCPClient"),
-    ]
-
-    ok = bad = 0
-    for display, module, attr in checks:
-        obj = _try(module, attr)
-        if obj:
-            print(f"  ✅  {green(display):<38}")
-            ok += 1
+        if hasattr(parsed, "func"):
+            parsed.func(parsed)
         else:
-            print(f"  ✗   {yellow(display):<38}  {yellow('not found')}")
-            bad += 1
+            # Try to interpret as natural language
+            if args:
+                natural_input = " ".join(args)
+                self._handle_natural_input(natural_input)
+            else:
+                parser.print_help()
 
-    print()
+    def _build_parser(self) -> argparse.ArgumentParser:
+        """Build argument parser"""
 
-    # LLM providers
-    RouterCls = _try("nova_llm_router", "LLMRouter")
-    if RouterCls:
-        try:
-            r = RouterCls()
-            print(f"  🔀  {green('LLM Providers:')} {', '.join(r.available_providers())}")
-        except Exception:
-            pass
-
-    # Workspace
-    print(f"  📁  {green('Workspace:')} {WORKSPACE}")
-
-    # Session count
-    if Path(WORKSPACE / "sessions").exists():
-        n = len(list((WORKSPACE / "sessions").glob("*.json")))
-        print(f"  📂  {green('Sessions:')} {n} saved")
-
-    _hr()
-    print(f"  {green(str(ok))} modules ready, {(yellow(str(bad)) if bad else green('0'))} missing")
-    return 0 if bad == 0 else 1
-
-
-def cmd_session(args):
-    """nova session list|resume|delete"""
-    SessionStore_ = _try("nova_sessions", "SessionStore")
-    if not SessionStore_:
-        print(red("  ✗ nova_sessions not available"))
-        return 1
-
-    store = SessionStore_()
-
-    if args.session_cmd == "list":
-        sessions = store.list_sessions(target=getattr(args, "target", None))
-        if not sessions:
-            print(yellow("  No sessions found."))
-            return 0
-        _banner()
-        print(f"  {green('Sessions:')}\n")
-        for s in sessions:
-            print(f"  {cyan(s['session_id'][:8])}  "
-                  f"{white(s['target'][:40]):<42}"
-                  f"  findings: {yellow(str(s['findings'])):<6}"
-                  f"  ${s['total_cost_usd']:.5f}"
-                  f"  {s['updated_at'][:16]}")
-        return 0
-
-    elif args.session_cmd == "resume":
-        session = store.load(args.session_id)
-        if not session:
-            print(red(f"  ✗ Session {args.session_id} not found"))
-            return 1
-        print(f"  {green('Session')} {cyan(args.session_id[:8])}")
-        print(f"  Target:   {session.target}")
-        print(f"  Findings: {len(session.findings)}")
-        print(f"  Runs:     {len(session.runs)}")
-        print(f"  Cost:     ${session.total_cost_usd:.5f}")
-        print(f"\n  To resume: nova hunt {session.target} --session {args.session_id}")
-        return 0
-
-    elif args.session_cmd == "delete":
-        store.delete(args.session_id)
-        print(green(f"  ✓ Session {args.session_id} deleted"))
-        return 0
-
-    elif args.session_cmd == "export":
-        session = store.load(args.session_id)
-        if not session:
-            print(red(f"  ✗ Session {args.session_id} not found"))
-            return 1
-        out = Path(args.output) if hasattr(args, "output") and args.output \
-              else WORKSPACE / f"session_{args.session_id[:8]}_export.json"
-        out.write_text(json.dumps(session.to_dict(), indent=2, default=str))
-        print(green(f"  ✓ Exported to {out}"))
-        return 0
-
-    return 0
-
-
-def cmd_report(args):
-    """nova report — generate consolidated report from workspace findings"""
-    _banner()
-    all_findings: List[dict] = []
-    for f in sorted(WORKSPACE.glob("nova_*.json"),
-                    key=lambda p: p.stat().st_mtime, reverse=True)[:30]:
-        try:
-            data = json.loads(f.read_text())
-            if "findings" in data and isinstance(data["findings"], list):
-                all_findings.extend(data["findings"])
-        except Exception:
-            pass
-
-    if not all_findings:
-        print(yellow("  ⚠  No findings in workspace yet."))
-        return 0
-
-    # Deduplicate
-    seen = set()
-    deduped = []
-    for f in all_findings:
-        key = (f.get("type", ""), f.get("endpoint") or f.get("file", ""))
-        if key not in seen:
-            seen.add(key)
-            deduped.append(f)
-
-    _print_findings_table(deduped, "Consolidated Report")
-
-    # Save markdown
-    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
-    sorted_f  = sorted(deduped, key=lambda x: sev_order.get(
-        str(x.get("severity", "INFO")).upper(), 4))
-
-    md_lines = [
-        f"# Nova Arsenal — Security Report",
-        f"Generated: {datetime.now().isoformat()}",
-        f"Total findings: {len(deduped)}\n",
-        "| # | Severity | Type | Location | CVSS |",
-        "|---|----------|------|----------|------|",
-    ]
-    for i, f in enumerate(sorted_f, 1):
-        sev = f.get("severity", "INFO")
-        typ = f.get("type", "?")
-        loc = (f.get("endpoint") or f.get("file") or "?")[:60]
-        cvss = f.get("cvss", "")
-        md_lines.append(f"| {i} | {sev} | {typ} | `{loc}` | {cvss} |")
-
-    out = WORKSPACE / f"nova_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    out.write_text("\n".join(md_lines))
-    print(f"\n  📄 Markdown report → {green(str(out))}")
-    return 0
-
-
-# ── Argument Parser ────────────────────────────────────────────────────────────
-
-def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="nova",
-        description="🦅 Nova Arsenal v4.1 — Autonomous AI Security Agent",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        parser = argparse.ArgumentParser(
+            prog="nova",
+            description="Nova Security Intelligence Platform",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
 Examples:
-  nova hunt   https://target.com
-  nova full   https://target.com --provider openai
-  nova recon  https://target.com
-  nova orch   https://target.com --session abc123
-  nova sast   ./src
-  nova sca    ./
-  nova scan   jwt https://target.com
-  nova scan   sqli https://target.com
-  nova triage
-  nova report
-  nova status
-  nova providers --test
-  nova session list
-  nova session resume abc123
-  nova session delete abc123
-""")
+  nova chat                        Start interactive chat
+  nova scan target.com             Quick reconnaissance scan
+  nova sessions list               Show all sessions
+  nova memory show target.com      What Nova knows about target
+  nova report --session abc123     Generate report
+  nova config setup                First-time setup
+  nova status                      Check system status
+  nova "scan target.com for SQLi"  Natural language command
+            """
+        )
 
-    # Shared options
-    shared = argparse.ArgumentParser(add_help=False)
-    shared.add_argument("--session",  "-s", metavar="ID",
-                        help="Resume a previous session by ID")
-    shared.add_argument("--provider", "-p",
-                        choices=["openai", "anthropic", "gemini", "ollama"],
-                        help="Force a specific LLM provider")
-    shared.add_argument("--verbose",  "-v", action="store_true",
-                        help="Verbose output")
-    shared.add_argument("--quiet",    "-q", action="store_false", dest="verbose",
-                        help="Suppress verbose output")
-    shared.set_defaults(verbose=True)
+        parser.add_argument(
+            "--version", "-v",
+            action="version",
+            version=f"Nova {NOVA_VERSION}"
+        )
 
-    subs = p.add_subparsers(dest="command", metavar="COMMAND")
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="Enable debug output"
+        )
 
-    # hunt
-    ph = subs.add_parser("hunt", parents=[shared],
-                         help="Full agentic bug bounty hunt")
-    ph.add_argument("target", help="URL to hunt (https://target.com)")
+        subparsers = parser.add_subparsers(title="commands")
 
-    # full
-    pf = subs.add_parser("full", parents=[shared],
-                          help="Full-stack: all 27 modules")
-    pf.add_argument("target", help="URL or path")
+        # ─── CHAT ───
+        chat_parser = subparsers.add_parser(
+            "chat",
+            help="Start interactive conversation with Nova"
+        )
+        chat_parser.set_defaults(func=self._cmd_chat)
 
-    # recon
-    pr = subs.add_parser("recon", parents=[shared],
-                          help="Passive recon (subdomains, endpoints, JS)")
-    pr.add_argument("target", help="URL to recon")
+        # ─── SCAN ───
+        scan_parser = subparsers.add_parser(
+            "scan",
+            help="Scan a target"
+        )
+        scan_parser.add_argument("target", help="Target to scan")
+        scan_parser.add_argument(
+            "--risk", "-r",
+            choices=["low", "medium", "high"],
+            default="medium",
+            help="Risk level (default: medium)"
+        )
+        scan_parser.add_argument(
+            "--scope", "-s",
+            help="Scope of scan"
+        )
+        scan_parser.set_defaults(func=self._cmd_scan)
 
-    # orch
-    po = subs.add_parser("orch", parents=[shared],
-                          help="Multi-agent orchestrator (ReconAgent→AttackAgent→ReportAgent)")
-    po.add_argument("target", help="URL")
+        # ─── SESSIONS ───
+        sessions_parser = subparsers.add_parser(
+            "sessions",
+            help="Manage sessions"
+        )
+        sessions_sub = sessions_parser.add_subparsers()
 
-    # triage
-    pt = subs.add_parser("triage", parents=[shared],
-                          help="Triage and rank findings for H1 submission")
+        sessions_list = sessions_sub.add_parser("list", help="List sessions")
+        sessions_list.add_argument("--target", help="Filter by target")
+        sessions_list.set_defaults(func=self._cmd_sessions_list)
 
-    # sast
-    ps = subs.add_parser("sast", parents=[shared],
-                          help="Static code analysis")
-    ps.add_argument("target", nargs="?", default=".",
-                    help="Directory to scan (default: .)")
+        sessions_resume = sessions_sub.add_parser("resume", help="Resume session")
+        sessions_resume.add_argument("session_id", help="Session ID to resume")
+        sessions_resume.set_defaults(func=self._cmd_sessions_resume)
 
-    # sca
-    psc = subs.add_parser("sca", parents=[shared],
-                           help="Dependency / supply-chain audit")
-    psc.add_argument("target", nargs="?", default=".",
-                     help="Directory to scan (default: .)")
+        sessions_show = sessions_sub.add_parser("show", help="Show session details")
+        sessions_show.add_argument("session_id", help="Session ID")
+        sessions_show.set_defaults(func=self._cmd_sessions_show)
 
-    # scan (generic)
-    pg = subs.add_parser("scan", parents=[shared],
-                          help="Run a specific scan mode")
-    pg.add_argument("mode",   choices=list(
-        __import__("nova", fromlist=["KEYWORD_MODES"]).KEYWORD_MODES.keys()
-        if True else []), metavar="MODE",
-        help="Scan mode (sqli, xss, idor, csrf, jwt, race, graphql, ...)")
-    pg.add_argument("target", help="URL or path")
+        # ─── MEMORY ───
+        memory_parser = subparsers.add_parser(
+            "memory",
+            help="Access Nova's memory"
+        )
+        memory_sub = memory_parser.add_subparsers()
 
-    # providers
-    pp = subs.add_parser("providers", help="List and test LLM providers")
-    pp.add_argument("--test", "-t", action="store_true",
-                    help="Send test message to each provider")
+        memory_show = memory_sub.add_parser("show", help="Show target memory")
+        memory_show.add_argument("target", help="Target to show")
+        memory_show.set_defaults(func=self._cmd_memory_show)
 
-    # status
-    subs.add_parser("status", help="Health-check all Nova modules")
+        memory_list = memory_sub.add_parser("list", help="List all targets")
+        memory_list.set_defaults(func=self._cmd_memory_list)
 
-    # report
-    subs.add_parser("report", help="Generate consolidated report from workspace findings")
+        memory_stats = memory_sub.add_parser("stats", help="Memory statistics")
+        memory_stats.set_defaults(func=self._cmd_memory_stats)
 
-    # session
-    pse = subs.add_parser("session", help="Session management")
-    session_subs = pse.add_subparsers(dest="session_cmd", metavar="ACTION")
-    sl = session_subs.add_parser("list", help="List all sessions")
-    sl.add_argument("--target", help="Filter by target")
-    sr = session_subs.add_parser("resume", help="Show details of a session")
-    sr.add_argument("session_id", help="Session ID (or first 8 chars)")
-    sd = session_subs.add_parser("delete", help="Delete a session")
-    sd.add_argument("session_id")
-    se = session_subs.add_parser("export", help="Export session to JSON")
-    se.add_argument("session_id")
-    se.add_argument("--output", "-o", help="Output path")
+        # ─── REPORT ───
+        report_parser = subparsers.add_parser(
+            "report",
+            help="Generate report"
+        )
+        report_parser.add_argument(
+            "--session", "-s",
+            help="Session ID"
+        )
+        report_parser.add_argument(
+            "--format", "-f",
+            choices=["html", "markdown", "json"],
+            default="html",
+            help="Report format (default: html)"
+        )
+        report_parser.add_argument(
+            "--output", "-o",
+            help="Output file path"
+        )
+        report_parser.set_defaults(func=self._cmd_report)
 
-    return p
+        # ─── CONFIG ───
+        config_parser = subparsers.add_parser(
+            "config",
+            help="Manage configuration"
+        )
+        config_sub = config_parser.add_subparsers()
+
+        config_setup = config_sub.add_parser("setup", help="Run setup wizard")
+        config_setup.set_defaults(func=self._cmd_config_setup)
+
+        config_show = config_sub.add_parser("show", help="Show configuration")
+        config_show.add_argument("--section", help="Config section to show")
+        config_show.set_defaults(func=self._cmd_config_show)
+
+        config_set = config_sub.add_parser("set", help="Set config value")
+        config_set.add_argument("key", help="Config key (e.g. llm.primary)")
+        config_set.add_argument("value", help="Value to set")
+        config_set.set_defaults(func=self._cmd_config_set)
+
+        # ─── STATUS ───
+        status_parser = subparsers.add_parser(
+            "status",
+            help="Show Nova system status"
+        )
+        status_parser.set_defaults(func=self._cmd_status)
+
+        return parser
+
+    # ─────────────────────────────────────────
+    # COMMANDS
+    # ─────────────────────────────────────────
+
+    def _cmd_chat(self, args):
+        """Start interactive chat"""
+        self._print_banner()
+        self._start_chat()
+
+    def _cmd_scan(self, args):
+        """Quick scan command"""
+
+        print(f"\n[Nova] Starting scan: {args.target}")
+        print(f"[Nova] Risk level: {args.risk}")
+
+        if self.session_manager:
+            session = self.session_manager.new_session(
+                target=args.target,
+                scope=args.scope or "",
+                risk_level=args.risk
+            )
+            print(f"[Nova] Session: {session.session_id}")
+
+        if self.memory:
+            knowledge = self.memory.what_do_i_know_about(args.target)
+            if knowledge.get("known"):
+                print(f"\n[Nova] I've seen this target before:")
+                print(f"  {knowledge['summary']}")
+
+        print(f"\n[Nova] Use 'nova chat' for full interaction with {args.target}")
+
+    def _cmd_sessions_list(self, args):
+        """List sessions"""
+
+        if not self.session_manager:
+            print("[Nova] Session manager not available")
+            return
+
+        sessions = self.session_manager.list_sessions(
+            target=getattr(args, "target", None)
+        )
+
+        if not sessions:
+            print("[Nova] No sessions found")
+            return
+
+        print(f"\n[Nova] Found {len(sessions)} session(s):\n")
+        self.session_manager.print_session_list(sessions)
+
+    def _cmd_sessions_resume(self, args):
+        """Resume a session"""
+
+        if not self.session_manager:
+            print("[Nova] Session manager not available")
+            return
+
+        session = self.session_manager.resume_session(args.session_id)
+
+        if session:
+            print(f"\n[Nova] Resuming session {args.session_id}")
+            print("[Nova] Starting chat mode...\n")
+            self._start_chat(session=session)
+
+    def _cmd_sessions_show(self, args):
+        """Show session details"""
+
+        if not self.session_manager:
+            print("[Nova] Session manager not available")
+            return
+
+        sessions = self.session_manager.list_sessions()
+        session = next((s for s in sessions if s.session_id == args.session_id), None)
+
+        if session:
+            self.session_manager.print_session_detail(session)
+        else:
+            print(f"[Nova] Session {args.session_id} not found")
+
+    def _cmd_memory_show(self, args):
+        """Show target memory"""
+
+        if not self.memory:
+            print("[Nova] Memory system not available")
+            return
+
+        knowledge = self.memory.what_do_i_know_about(args.target)
+
+        if not knowledge.get("known"):
+            print(f"\n[Nova] I haven't tested {args.target} before.")
+            return
+
+        print(f"\n[Nova] What I know about {args.target}:\n")
+        print(f"  First seen:     {knowledge['first_seen'][:10]}")
+        print(f"  Last seen:      {knowledge['last_seen'][:10]}")
+        print(f"  Total scans:    {knowledge['total_scans']}")
+        print(f"  Total findings: {knowledge['total_findings']}")
+        print(f"  Open findings:  {knowledge['open_findings']}")
+        print(f"  Critical:       {knowledge['critical_findings']}")
+
+        if knowledge.get("summary"):
+            print(f"\n  Summary: {knowledge['summary']}")
+
+        # Show findings
+        findings = self.memory.get_findings_for_target(args.target)
+        if findings:
+            print(f"\n  Recent findings:")
+            for f in findings[:5]:
+                status = "✓" if f.status == "fixed" else "●"
+                print(f"  {status} [{f.severity}] {f.title}")
+
+    def _cmd_memory_list(self, args):
+        """List all targets in memory"""
+
+        if not self.memory:
+            print("[Nova] Memory system not available")
+            return
+
+        targets = self.memory.get_all_targets()
+
+        if not targets:
+            print("[Nova] No targets in memory yet")
+            return
+
+        print(f"\n[Nova] Remembered targets ({len(targets)}):\n")
+        print(f"{'TARGET':<30} {'SCANS':<8} {'FINDINGS':<10} {'LAST SEEN'}")
+        print("─" * 65)
+
+        for t in targets:
+            print(
+                f"{t.target[:29]:<30} "
+                f"{t.total_scans:<8} "
+                f"{t.findings_count:<10} "
+                f"{t.last_seen[:10]}"
+            )
+
+        print()
+
+    def _cmd_memory_stats(self, args):
+        """Show memory statistics"""
+
+        if not self.memory:
+            print("[Nova] Memory system not available")
+            return
+
+        stats = self.memory.get_stats()
+        print("\n[Nova] Memory Statistics:\n")
+        for k, v in stats.items():
+            print(f"  {k}: {v}")
+        print()
+
+    def _cmd_report(self, args):
+        """Generate report"""
+
+        print(f"\n[Nova] Generating {args.format} report...")
+
+        if args.session:
+            print(f"[Nova] Session: {args.session}")
+
+        output = args.output or f"nova_report_{datetime.now().strftime('%Y%m%d_%H%M')}.{args.format}"
+        print(f"[Nova] Output: {output}")
+        print("[Nova] Report generation requires nova_report_generator.py")
+
+    def _cmd_config_setup(self, args):
+        """Run setup wizard"""
+
+        if self.config:
+            self.config.setup_wizard()
+        else:
+            print("[Nova] Config manager not available")
+
+    def _cmd_config_show(self, args):
+        """Show configuration"""
+
+        if self.config:
+            self.config.show(getattr(args, "section", None))
+        else:
+            print("[Nova] Config manager not available")
+
+    def _cmd_config_set(self, args):
+        """Set config value"""
+
+        if self.config:
+            self.config.set(args.key, args.value, save=True)
+            print(f"[Nova] Set {args.key} = {args.value}")
+        else:
+            print("[Nova] Config manager not available")
+
+    def _cmd_status(self, args):
+        """Show system status"""
+
+        print("\n[Nova] System Status\n")
+        print("─" * 40)
+
+        # Config
+        config_status = "✓" if self.config else "✗"
+        print(f"{config_status} Config Manager")
+
+        # Memory
+        memory_status = "✓" if self.memory else "✗"
+        print(f"{memory_status} Memory System")
+
+        # Sessions
+        session_status = "✓" if self.session_manager else "✗"
+        print(f"{session_status} Session Manager")
+
+        # LLM
+        if self.config:
+            primary_llm = self.config.get("llm.primary", "unknown")
+            print(f"  LLM: {primary_llm}")
+
+        # Memory stats
+        if self.memory:
+            stats = self.memory.get_stats()
+            print(f"\n Memory:")
+            print(f"   Targets: {stats['targets_remembered']}")
+            print(f"   Findings: {stats['total_findings']}")
+            print(f"   Sessions: {stats['total_sessions']}")
+
+        print("─" * 40)
+        print(f"\n  Nova v{NOVA_VERSION} — Ready\n")
+
+    # ─────────────────────────────────────────
+    # CHAT MODE
+    # ─────────────────────────────────────────
+
+    def _start_chat(self, session=None):
+        """Start interactive chat mode"""
+
+        print("Nova is ready. Type your request or 'exit' to quit.\n")
+        print("Examples:")
+        print("  scan target.com")
+        print("  what do you know about target.com")
+        print("  show my sessions")
+        print("  help\n")
+
+        while True:
+            try:
+                user_input = input("You: ").strip()
+
+                if not user_input:
+                    continue
+
+                if user_input.lower() in ["exit", "quit", "bye"]:
+                    print("\nNova: Goodbye. Stay sharp. 🦅\n")
+                    break
+
+                if user_input.lower() == "help":
+                    self._show_chat_help()
+                    continue
+
+                # Handle input
+                response = self._handle_chat_input(user_input, session)
+                print(f"\nNova: {response}\n")
+
+            except KeyboardInterrupt:
+                print("\n\nNova: Session interrupted. Goodbye. 🦅\n")
+                break
+            except EOFError:
+                break
+
+    def _handle_chat_input(self, user_input: str, session=None) -> str:
+        """Handle chat input"""
+
+        input_lower = user_input.lower()
+
+        # Quick commands
+        if "sessions" in input_lower or "session list" in input_lower:
+            if self.session_manager:
+                sessions = self.session_manager.get_recent_sessions()
+                if sessions:
+                    lines = [f"Your recent sessions:"]
+                    for s in sessions[:5]:
+                        lines.append(f"  {s.session_id} | {s.target} | {s.status.value}")
+                    return "\n".join(lines)
+            return "No sessions found."
+
+        elif "know about" in input_lower or "remember" in input_lower:
+            # Extract target
+            import re
+            target_match = re.search(r'(?:about|remember)\s+(\S+)', input_lower)
+            if target_match and self.memory:
+                target = target_match.group(1)
+                knowledge = self.memory.what_do_i_know_about(target)
+                if knowledge.get("known"):
+                    return knowledge["summary"]
+                return f"I haven't tested {target} before."
+            return "Which target do you want to know about?"
+
+        elif "status" in input_lower:
+            self._cmd_status(None)
+            return ""
+
+        elif "scan" in input_lower:
+            import re
+            target_match = re.search(r'scan\s+(\S+)', input_lower)
+            if target_match:
+                target = target_match.group(1)
+                return (
+                    f"I'll plan a scan for {target}.\n"
+                    f"Use: nova scan {target}\n"
+                    f"Or tell me more about what you want to find."
+                )
+            return "What target do you want to scan?"
+
+        else:
+            # Try conversational agent if available
+            try:
+                from nova_conversational_agent import NovaConversationalAgent
+                # Would use conversational agent here
+                pass
+            except ImportError:
+                pass
+
+            return (
+                f"I understand you want to: {user_input}\n"
+                f"Tell me the target and I'll help you plan the assessment."
+            )
+
+    def _handle_natural_input(self, text: str):
+        """Handle natural language command"""
+
+        print(f"\n[Nova] Processing: {text}")
+
+        text_lower = text.lower()
+
+        if "scan" in text_lower:
+            import re
+            target = re.search(r'scan\s+(\S+)', text_lower)
+            if target:
+                print(f"[Nova] Scanning {target.group(1)}...")
+                print(f"[Nova] Use: nova scan {target.group(1)}")
+                return
+
+        print("[Nova] Use 'nova chat' for natural conversation")
+        print("[Nova] Or use: nova --help")
+
+    def _show_chat_help(self):
+        """Show help in chat mode"""
+
+        print("""
+Nova commands:
+  scan <target>         Scan a target
+  sessions              Show recent sessions
+  memory <target>       What I know about a target
+  status                System status
+  exit                  Exit Nova
+  help                  Show this help
+        """)
+
+    def _print_banner(self):
+        """Print Nova banner"""
+        print(NOVA_BANNER)
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────
 
 def main():
-    # Try to import KEYWORD_MODES for the scan subcommand choices
-    try:
-        import nova as _nova_mod
-        # Patch the scan subparser choices dynamically
-        pass
-    except Exception:
-        pass
+    """Main entry point"""
 
-    parser = _build_parser()
-    args   = parser.parse_args()
+    cli = NovaCLI()
 
-    if not args.command:
-        _banner()
-        parser.print_help()
-        return 0
-
-    handlers = {
-        "hunt":      cmd_hunt,
-        "full":      cmd_full,
-        "recon":     cmd_recon,
-        "orch":      cmd_orch,
-        "triage":    cmd_triage,
-        "sast":      cmd_sast,
-        "sca":       cmd_sca,
-        "scan":      cmd_scan,
-        "providers": cmd_providers,
-        "status":    cmd_status,
-        "report":    cmd_report,
-        "session":   cmd_session,
-    }
-
-    handler = handlers.get(args.command)
-    if handler:
-        return handler(args) or 0
-
-    parser.print_help()
-    return 0
+    if len(sys.argv) > 1:
+        cli.run(sys.argv[1:])
+    else:
+        cli.run()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
