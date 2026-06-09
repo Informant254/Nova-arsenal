@@ -72,6 +72,34 @@ RetryPolicy      = _try_import("nova_retry",        "RetryPolicy")
 # Skills Library
 SkillLibrary     = _try_import("nova_skills",       "SkillLibrary")
 
+# ── Extended providers (previously orphaned modules) ─────────────────────────
+# Brain / Memory System
+_brain_mod        = _try_import("nova_memory_system")
+get_brain         = getattr(_brain_mod,        "get_brain",        None)
+# Notifications
+_notif_mod        = _try_import("nova_notifications")
+NovaNotifications = getattr(_notif_mod,        "NovaNotifications",None)
+# Error Handler
+_err_mod          = _try_import("nova_error_handler")
+NovaErrorHandler  = getattr(_err_mod,          "NovaErrorHandler", None)
+# Findings DB
+_fdb_mod          = _try_import("nova_findings_db")
+NovaFindingsDB    = getattr(_fdb_mod,          "NovaFindingsDB",   None)
+# Context Engine + Enricher
+NovaContextEngine  = _try_import("nova_context_engine",  "NovaContextEngine")
+ContextEnricher    = _try_import("nova_context_enricher","ContextEnricher")
+# RAG Builder
+_rag_mod  = _try_import("nova_rag_builder")
+get_rag   = getattr(_rag_mod, "get_rag", None)
+# Output / Result Parsers
+NovaOutputParser = _try_import("nova_output_parser",  "NovaOutputParser")
+ResultFindingsDB = _try_import("nova_result_parser",  "FindingsDatabase")
+# LLM Bridge (alternate LLM client over HTTP)
+_bridge_mod  = _try_import("nova_llm_bridge")
+get_bridge   = getattr(_bridge_mod, "get_bridge", None)
+# Memory
+TargetMemory = _try_import("nova_memory", "TargetMemory")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CODEBASE MAPPER — Phase 0 of every run
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -88,6 +116,13 @@ _TRACER:   Optional[Any] = None
 _STORE:    Optional[Any] = None
 _CMAP:     Optional[Any] = None   # CodebaseMap — the strategic master map
 _PROVIDER_READY = False
+# Extended singletons
+_BRAIN:    "Optional[Any]" = None   # NovaBrain — cross-session memory
+_NOTIF:    "Optional[Any]" = None   # NovaNotifications
+_ERR:      "Optional[Any]" = None   # NovaErrorHandler
+_FDB:      "Optional[Any]" = None   # NovaFindingsDB
+_CTX_ENG:  "Optional[Any]" = None   # NovaContextEngine
+_RAG:      "Optional[Any]" = None   # NovaRAGBuilder
 
 
 def _init_provider_layer(target: str = "", scope: List[str] = None,
@@ -146,6 +181,39 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
     # Tracer
     if Tracer:
         _TRACER = Tracer(verbose=False)
+
+    # ── Extended providers (previously orphaned modules) ────────────────────
+    global _BRAIN, _NOTIF, _ERR, _FDB, _CTX_ENG, _RAG
+    if get_brain:
+        try:
+            _BRAIN = get_brain()
+        except Exception:
+            pass
+    if NovaNotifications:
+        try:
+            _NOTIF = NovaNotifications()
+        except Exception:
+            pass
+    if NovaErrorHandler:
+        try:
+            _ERR = NovaErrorHandler()
+        except Exception:
+            pass
+    if NovaFindingsDB:
+        try:
+            _FDB = NovaFindingsDB(str(WORKSPACE / "nova_findings.db"))
+        except Exception:
+            pass
+    if NovaContextEngine:
+        try:
+            _CTX_ENG = NovaContextEngine()
+        except Exception:
+            pass
+    if get_rag:
+        try:
+            _RAG = get_rag(str(NOVA_DIR))
+        except Exception:
+            pass
 
     _PROVIDER_READY = True
     return True
@@ -353,6 +421,23 @@ KEYWORD_MODES = {
     "bootstrap":       ["bootstrap","health check","verify install","check modules","status"],
     "continuous":      ["continuous","monitor","watch","loop","scheduled","ongoing"],
     "swarm":           ["swarm","parallel","10 agents","mass scan"],
+    # ── Newly wired modes ────────────────────────────────────────────────────
+    "multi_target":    ["multi target","multiple targets","bulk scan","target list","batch scan"],
+    "attack":          ["attack chain","full attack","unified attack","exploit chain","chained exploit"],
+    "wild_hunt":       ["wild hunt","open bounty","bug bounty full","h1 hunt","hackerone hunt"],
+    "ibb":             ["ibb","intigriti","internet bug bounty","ibb hunt","ibb program"],
+    "0din":            ["0din","0day hunt","zero-day hunt","0din hunter","lfm"],
+    "github_scan":     ["github scan","github code search","github secrets","code search","gh recon"],
+    "ecosystem":       ["ecosystem audit","npm graph","dep graph","package ecosystem","dep map"],
+    "pypi":            ["pypi","malicious pypi","python package hunt","pip hunt","typosquatting"],
+    "browser":         ["browser agent","headless browser","playwright scan","selenium","visual scan"],
+    "pipeline":        ["nova pipeline","staged scan","scan pipeline","full pipeline mode"],
+    "nextgen":         ["nextgen","next gen agent","autonomous agent mode","next generation"],
+    "kali":            ["kali","kali linux","pentest","penetration test","kali agent","metasploit"],
+    "portswigger":     ["portswigger","web security academy","burp lab","burp suite","web academy"],
+    "report":          ["generate report","html report","export findings","write report","markdown report"],
+    "auth":            ["auth scan","authenticated scan","login bypass","auth bypass","broken auth"],
+    "dataflow":        ["dataflow","data flow","taint","source sink","taint analysis"],
 }
 
 
@@ -1148,6 +1233,315 @@ def dispatch(intent: dict) -> List[Dict]:
                 c.run()
             except Exception as e:
                 print(f"  ⚠️  Continuous: {e}")
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # INTELLIGENCE PHASES — wire orphaned intelligence modules into hunt/full_stack
+    # ════════════════════════════════════════════════════════════════════════════
+
+    if mode in ("hunt", "full_stack", "daybreak", "dataflow"):
+        with _span("DataFlowEngine", "tool"):
+            Cls = _load("nova_dataflow_engine", "NovaDataFlowEngine")
+            if Cls:
+                try:
+                    df = Cls(target if os.path.isdir(target) else ".")
+                    r  = df.analyze() if hasattr(df, "analyze") else []
+                    if isinstance(r, list) and r:
+                        _emit_findings(r, "dataflow")
+                        findings.extend(r)
+                except Exception as e:
+                    print(f"  ⚠️  DataFlow: {e}")
+
+    if mode in ("auth", "hunt", "full_stack"):
+        with _span("AuthScanner", "tool"):
+            Cls = _load("nova_auth_scanner", "NovaAuthenticatedScanner")
+            if Cls:
+                try:
+                    s = Cls(target)
+                    r = s.scan() if hasattr(s, "scan") else []
+                    if isinstance(r, list) and r:
+                        _emit_findings(r, "auth_scan")
+                        findings.extend(r)
+                except Exception as e:
+                    print(f"  ⚠️  Auth scanner: {e}")
+
+    if mode in ("hunt", "full_stack", "daybreak"):
+        with _span("HypothesisEngine", "agent"):
+            Cls = _load("nova_hypothesis_engine", "HypothesisEngine")
+            if Cls:
+                try:
+                    he = Cls(target)
+                    if hasattr(he, "generate"):
+                        he.generate(context=_CTX)
+                    if hasattr(he, "findings") and he.findings:
+                        _emit_findings(he.findings, "hypothesis")
+                        findings.extend(he.findings)
+                except Exception as e:
+                    print(f"  ⚠️  Hypothesis engine: {e}")
+
+    if mode in ("hunt", "full_stack", "daybreak"):
+        with _span("ChainOfThought", "agent"):
+            Cls = _load("nova_chain_of_thought", "NovaChainOfThought")
+            if Cls:
+                try:
+                    cot = Cls()
+                    if hasattr(cot, "reason") and query:
+                        cot.reason(task=query, target=target)
+                except Exception as e:
+                    print(f"  ⚠️  Chain-of-thought: {e}")
+
+    if mode in ("hunt", "full_stack") and findings:
+        with _span("VulnSynthesis", "agent"):
+            Cls = _load("nova_vuln_synthesis", "NovaVulnSynthesis")
+            if Cls:
+                try:
+                    vs    = Cls()
+                    synth = vs.synthesize(findings, target=target) if hasattr(vs, "synthesize") else []
+                    if isinstance(synth, list) and synth:
+                        _emit_findings(synth, "synthesis")
+                        findings.extend(synth)
+                except Exception as e:
+                    print(f"  ⚠️  Vuln synthesis: {e}")
+
+    if mode in ("hunt", "full_stack") and findings:
+        with _span("LiveVerify", "tool"):
+            Cls = _load("nova_live_verify", "LiveVerificationEngine")
+            if Cls:
+                try:
+                    lv = Cls(target)
+                    if hasattr(lv, "verify_bulk"):
+                        lv.verify_bulk(findings)
+                except Exception as e:
+                    print(f"  ⚠️  Live verify: {e}")
+
+    if mode in ("hunt", "full_stack"):
+        with _span("URLSmuggling", "tool"):
+            mod = _load("nova_url_smuggling")
+            if mod:
+                try:
+                    fn = getattr(mod, "run", None) or getattr(mod, "scan", None) or getattr(mod, "test", None)
+                    if fn:
+                        r = fn(target)
+                        if isinstance(r, list) and r:
+                            _emit_findings(r, "url_smuggling")
+                            findings.extend(r)
+                except Exception as e:
+                    print(f"  ⚠️  URL smuggling: {e}")
+
+    # Report generation — always run on hunt/full_stack if findings exist
+    if mode in ("report", "hunt", "full_stack") and findings:
+        mod = _load("nova_report")
+        if mod:
+            try:
+                bh = getattr(mod, "_build_html",     None)
+                bm = getattr(mod, "_build_markdown", None)
+                meta = {"mode": mode, "generated": datetime.now().isoformat()}
+                if bh:
+                    html = bh(target, findings, meta)
+                    hp = WORKSPACE / f"nova_report_{mode}.html"
+                    hp.write_text(html, encoding="utf-8")
+                    print(f"  📄 HTML report → {hp}")
+                if bm:
+                    md = bm(target, findings, meta)
+                    mp = WORKSPACE / f"nova_report_{mode}.md"
+                    mp.write_text(md, encoding="utf-8")
+                    print(f"  📄 MD report   → {mp}")
+            except Exception as e:
+                print(f"  ⚠️  Report: {e}")
+
+    # Store session in brain memory
+    if _BRAIN and mode in ("hunt", "full_stack", "daybreak"):
+        try:
+            store_fn = getattr(_BRAIN, "store_session", getattr(_BRAIN, "add", None))
+            if store_fn:
+                store_fn(target=target, mode=mode, findings=findings)
+        except Exception:
+            pass
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # NEW SPECIALIST MODES — previously orphaned, now fully wired
+    # ════════════════════════════════════════════════════════════════════════════
+
+    if mode in ("wild_hunt",):
+        Cls = _load("nova_wild_hunt", "NovaWildHunt")
+        if Cls:
+            try:
+                w = Cls(target)
+                r = w.hunt() if hasattr(w, "hunt") else (w.run() if hasattr(w, "run") else [])
+                _emit_findings(r, "wild_hunt")
+                findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  Wild hunt: {e}")
+
+    if mode in ("ibb",):
+        Cls = _load("nova_ibb_hunter", "NovaIBBHunter")
+        if Cls:
+            try:
+                h = Cls(target)
+                r = h.hunt() if hasattr(h, "hunt") else (h.run() if hasattr(h, "run") else [])
+                _emit_findings(r, "ibb")
+                findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  IBB hunter: {e}")
+
+    if mode in ("0din",):
+        Cls = _load("nova_0din_hunter", "Nova0DINHunter")
+        if Cls:
+            try:
+                h = Cls(target)
+                r = h.hunt() if hasattr(h, "hunt") else (h.run() if hasattr(h, "run") else [])
+                _emit_findings(r, "0din")
+                findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  0DIN hunter: {e}")
+
+    if mode in ("github_scan",):
+        with _span("GitHubScanner", "tool"):
+            Cls = _load("nova_github_scanner", "NovaGitHubScanner")
+            if Cls:
+                try:
+                    s = Cls(target)
+                    r = s.scan() if hasattr(s, "scan") else []
+                    _emit_findings(r, "github_scan")
+                    findings.extend(r)
+                    if hasattr(s, "save"):
+                        s.save(str(WORKSPACE / "nova_github_scan_report.json"))
+                except Exception as e:
+                    print(f"  ⚠️  GitHub scanner: {e}")
+
+    if mode in ("ecosystem", "sca", "full_stack"):
+        with _span("EcosystemAuditor", "tool"):
+            Cls = _load("nova_ecosystem_auditor", "NovaEcosystemAuditor")
+            if Cls:
+                try:
+                    ea = Cls(target if os.path.isdir(target) else ".")
+                    r  = ea.audit() if hasattr(ea, "audit") else (ea.scan() if hasattr(ea, "scan") else [])
+                    if isinstance(r, list) and r:
+                        _emit_findings(r, "ecosystem")
+                        findings.extend(r)
+                except Exception as e:
+                    print(f"  ⚠️  Ecosystem auditor: {e}")
+
+    if mode in ("pypi",):
+        Cls = _load("nova_pypi_hunter", "NovaPyPIHunter")
+        if Cls:
+            try:
+                h = Cls(target)
+                r = h.hunt() if hasattr(h, "hunt") else (h.run() if hasattr(h, "run") else [])
+                _emit_findings(r, "pypi")
+                findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  PyPI hunter: {e}")
+
+    if mode in ("browser",):
+        Cls = _load("nova_browser_agent", "NovaBrowserAgent")
+        if Cls:
+            try:
+                b = Cls(target)
+                r = b.scan() if hasattr(b, "scan") else (b.run() if hasattr(b, "run") else [])
+                _emit_findings(r, "browser")
+                findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  Browser agent: {e}")
+
+    if mode in ("multi_target",):
+        mod = _load("nova_multi_target_orchestrator")
+        if mod:
+            try:
+                targets = [t.strip() for t in re.split(r"[,\s]+", target) if t.strip()]
+                OrcCls  = (getattr(mod, "MultiTargetOrchestrator", None)
+                           or getattr(mod, "TargetQueue", None))
+                if OrcCls:
+                    o = OrcCls(targets)
+                    r = o.run() if hasattr(o, "run") else []
+                    if isinstance(r, list) and r:
+                        _emit_findings(r, "multi_target")
+                        findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  Multi-target: {e}")
+
+    if mode in ("attack",):
+        Cls = _load("nova_unified_attack", "NovaUnifiedAttack")
+        if Cls:
+            try:
+                a = Cls(target)
+                r = a.run() if hasattr(a, "run") else (a.attack() if hasattr(a, "attack") else [])
+                _emit_findings(r, "attack")
+                findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  Unified attack: {e}")
+
+    if mode in ("swarm",):
+        # Wire v2 and parallel alongside the existing v3
+        Cls2 = _load("nova_swarm_v2",      "NovaSwarmV2")
+        if Cls2:
+            try:
+                s2 = Cls2(target)
+                r2 = s2.run() if hasattr(s2, "run") else []
+                if isinstance(r2, list) and r2:
+                    _emit_findings(r2, "swarm_v2")
+                    findings.extend(r2)
+            except Exception as e:
+                print(f"  ⚠️  Swarm v2: {e}")
+        ClsP = _load("nova_swarm_parallel")
+        if ClsP:
+            try:
+                run_fn = getattr(ClsP, "run", None)
+                if run_fn:
+                    rp = run_fn(target)
+                    if isinstance(rp, list) and rp:
+                        _emit_findings(rp, "swarm_parallel")
+                        findings.extend(rp)
+            except Exception as e:
+                print(f"  ⚠️  Swarm parallel: {e}")
+
+    if mode in ("pipeline",):
+        Cls = _load("nova_pipeline", "NovaPipeline")
+        if Cls:
+            try:
+                p = Cls(target)
+                r = p.run() if hasattr(p, "run") else []
+                if isinstance(r, list) and r:
+                    _emit_findings(r, "pipeline")
+                    findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  Pipeline: {e}")
+
+    if mode in ("nextgen",):
+        Cls = _load("nova_nextgen_agentic", "NovaNextGenAgentic")
+        if Cls:
+            try:
+                a = Cls(target)
+                r = a.run() if hasattr(a, "run") else []
+                if isinstance(r, list) and r:
+                    _emit_findings(r, "nextgen")
+                    findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  NextGen agentic: {e}")
+
+    if mode in ("kali",):
+        Cls = _load("nova_kali_agent", "NovaKaliAgent")
+        if Cls:
+            try:
+                kb_cls = _load("nova_kali_knowledge_base", "KaliKnowledgeBase")
+                kb     = kb_cls() if kb_cls else None
+                a = Cls(target, knowledge_base=kb) if kb else Cls(target)
+                r = a.run() if hasattr(a, "run") else []
+                if isinstance(r, list) and r:
+                    _emit_findings(r, "kali")
+                    findings.extend(r)
+            except Exception as e:
+                print(f"  ⚠️  Kali agent: {e}")
+
+    if mode in ("portswigger", "training"):
+        Cls = _load("nova_portswigger_academy", "NovaPortSwigger")
+        if Cls:
+            try:
+                p = Cls()
+                fn = getattr(p, "run", getattr(p, "learn", getattr(p, "start", None)))
+                if fn:
+                    fn(query=query)
+            except Exception as e:
+                print(f"  ⚠️  PortSwigger academy: {e}")
 
     # ════════════════════════════════════════════════════════════════════════════
     # FINALISE

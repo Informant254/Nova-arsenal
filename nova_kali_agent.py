@@ -24,11 +24,45 @@ Responsibility:
 
 import logging
 import json
+import importlib
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from datetime import datetime
 import uuid
+
+# ── Wire in all Kali knowledge-base sub-modules ──────────────────────────────
+def _load_kb(module: str):
+    try:
+        return importlib.import_module(module)
+    except Exception:
+        return None
+
+_KB_CRYPTO_STEGO     = _load_kb("nova_kali_kb_crypto_stego")
+_KB_EXPLOITATION     = _load_kb("nova_kali_kb_exploitation")
+_KB_FORENSICS        = _load_kb("nova_kali_kb_forensics")
+_KB_PASSWORD_ATTACKS = _load_kb("nova_kali_kb_password_attacks")
+_KB_POST_EXPLOITATION= _load_kb("nova_kali_kb_post_exploitation")
+_KB_REPORTING        = _load_kb("nova_kali_kb_reporting")
+_KB_SCANNING         = _load_kb("nova_kali_kb_scanning")
+_KB_SNIFFING         = _load_kb("nova_kali_kb_sniffing")
+_KB_SOCIAL_ENGINEERING=_load_kb("nova_kali_kb_social_engineering")
+_KB_WEB_APPLICATION  = _load_kb("nova_kali_kb_web_application")
+
+KALI_KB_MODULES: Dict[str, Any] = {
+    name: mod for name, mod in {
+        "crypto_stego":      _KB_CRYPTO_STEGO,
+        "exploitation":      _KB_EXPLOITATION,
+        "forensics":         _KB_FORENSICS,
+        "password_attacks":  _KB_PASSWORD_ATTACKS,
+        "post_exploitation": _KB_POST_EXPLOITATION,
+        "reporting":         _KB_REPORTING,
+        "scanning":          _KB_SCANNING,
+        "sniffing":          _KB_SNIFFING,
+        "social_engineering":_KB_SOCIAL_ENGINEERING,
+        "web_application":   _KB_WEB_APPLICATION,
+    }.items() if mod is not None
+}
 
 logger = logging.getLogger(__name__)
 

@@ -41,6 +41,59 @@ MODULES = {
     "nova_context_manager":    ("NovaContextManager",     "v3.5", "Context compression"),
     "nova_agent_core":         ("NovaAgentCore",          "v2.0", "ReAct hunt loop"),
     "nova_self_improvement":   (None,                     "v3.5", "Self-improvement engine"),
+    # ── Newly wired modules (previously orphaned) ────────────────────────────
+    "nova_memory_system":       ("NovaBrain",                "v1.0", "Cross-session memory brain"),
+    "nova_notifications":       ("NovaNotifications",        "v1.0", "Notification bus (Telegram/email)"),
+    "nova_error_handler":       ("NovaErrorHandler",         "v1.0", "Structured error handling"),
+    "nova_findings_db":         ("NovaFindingsDB",           "v1.0", "Persistent findings database"),
+    "nova_output_parser":       ("NovaOutputParser",         "v1.0", "Tool-output parser (nmap/nikto)"),
+    "nova_result_parser":       ("FindingsDatabase",         "v1.0", "Findings result parser"),
+    "nova_context_engine":      ("NovaContextEngine",        "v1.0", "Dynamic context engine"),
+    "nova_context_enricher":    ("ContextEnricher",          "v1.0", "Application context enricher"),
+    "nova_rag_builder":         ("NovaRAGBuilder",           "v1.0", "RAG knowledge builder"),
+    "nova_llm_bridge":          ("NovaLLMBridge",            "v1.0", "LLM HTTP bridge"),
+    "nova_model_router":        ("NovaModelRouter",          "v1.0", "Multi-model router"),
+    "nova_language_model":      (None,                       "v1.0", "Language model abstraction layer"),
+    "nova_memory":              (None,                       "v1.0", "Target/finding/session memory"),
+    "nova_hypothesis_engine":   ("HypothesisEngine",         "v1.0", "Hypothesis-driven testing"),
+    "nova_chain_of_thought":    ("NovaChainOfThought",       "v1.0", "Chain-of-thought reasoning"),
+    "nova_vuln_synthesis":      ("NovaVulnSynthesis",        "v1.0", "Cross-finding synthesis"),
+    "nova_dataflow_engine":     ("NovaDataFlowEngine",       "v1.0", "Taint / data-flow SAST"),
+    "nova_auth_scanner":        ("NovaAuthenticatedScanner", "v1.0", "Authenticated scanner"),
+    "nova_live_verify":         ("LiveVerificationEngine",   "v1.0", "Live finding verification"),
+    "nova_live_exploit":        ("NovaLiveExploit",          "v1.0", "Live exploit engine"),
+    "nova_report":              (None,                       "v1.0", "HTML/Markdown report generator"),
+    "nova_wild_hunt":           ("NovaWildHunt",             "v1.0", "Wild bug-bounty hunt mode"),
+    "nova_ibb_hunter":          ("NovaIBBHunter",            "v1.0", "Internet Bug Bounty hunter"),
+    "nova_0din_hunter":         ("Nova0DINHunter",           "v1.0", "0DIN zero-day hunter"),
+    "nova_github_scanner":      ("NovaGitHubScanner",        "v1.0", "GitHub code/secret scanner"),
+    "nova_ecosystem_auditor":   ("NovaEcosystemAuditor",     "v1.0", "Full ecosystem auditor"),
+    "nova_pypi_hunter":         ("NovaPyPIHunter",           "v1.0", "Malicious PyPI package hunter"),
+    "nova_browser_agent":       ("NovaBrowserAgent",         "v1.0", "Headless browser agent"),
+    "nova_multi_target_orchestrator": (None,                 "v1.0", "Multi-target orchestrator"),
+    "nova_unified_attack":      ("NovaUnifiedAttack",        "v1.0", "Unified attack chain"),
+    "nova_swarm_v2":            ("NovaSwarmV2",              "v1.0", "Swarm v2 parallel agents"),
+    "nova_swarm_parallel":      (None,                       "v1.0", "Concurrent swarm (recon/exploit/auth/code)"),
+    "nova_pipeline":            ("NovaPipeline",             "v1.0", "Staged scan pipeline"),
+    "nova_nextgen_agentic":     ("NovaNextGenAgentic",       "v1.0", "Next-gen autonomous agent"),
+    "nova_kali_agent":          ("NovaKaliAgent",            "v1.0", "Kali pentest agent"),
+    "nova_kali_knowledge_base": ("KaliKnowledgeBase",        "v1.0", "Kali tool knowledge base"),
+    "nova_kali_knowledge":      ("KaliKnowledgeBase",        "v1.0", "Kali knowledge (alt)"),
+    "nova_kali_kb_crypto_stego":    (None,                   "v1.0", "Kali KB: crypto & steganography"),
+    "nova_kali_kb_exploitation":    (None,                   "v1.0", "Kali KB: exploitation techniques"),
+    "nova_kali_kb_forensics":       (None,                   "v1.0", "Kali KB: digital forensics"),
+    "nova_kali_kb_password_attacks":(None,                   "v1.0", "Kali KB: password attacks"),
+    "nova_kali_kb_post_exploitation":(None,                  "v1.0", "Kali KB: post-exploitation"),
+    "nova_kali_kb_reporting":       (None,                   "v1.0", "Kali KB: reporting"),
+    "nova_kali_kb_scanning":        (None,                   "v1.0", "Kali KB: scanning & enumeration"),
+    "nova_kali_kb_sniffing":        (None,                   "v1.0", "Kali KB: sniffing & spoofing"),
+    "nova_kali_kb_social_engineering":(None,                 "v1.0", "Kali KB: social engineering"),
+    "nova_kali_kb_web_application": (None,                   "v1.0", "Kali KB: web application attacks"),
+    "nova_portswigger_academy":     ("NovaPortSwigger",      "v1.0", "PortSwigger Web Academy"),
+    "nova_url_smuggling":           (None,                   "v1.0", "HTTP request smuggling"),
+    "nova_knowledge_rag":           (None,                   "v1.0", "RAG knowledge base (findings/CVEs)"),
+    "nova_payload_engine":          (None,                   "v1.0", "Polymorphic payload generator"),
+    "nova_evolver":                 (None,                   "v1.0", "Self-improvement engine"),
 }
 
 REQUIRED_MODULES = [
@@ -196,7 +249,7 @@ def quick_smoke_test():
 
 
 def print_capability_summary(module_results: dict, external_tools: list):
-    print(f"\n{BOLD}{CYAN}━━━ Nova Arsenal v4.0 Capability Summary ━━━{RESET}")
+    print(f"\n{BOLD}{CYAN}━━━ Nova Arsenal v4.2 Capability Summary ━━━{RESET}")
     total = len(MODULES)
     working = sum(1 for v in module_results.values() if v)
     pct = int(working/total*100)
@@ -236,7 +289,7 @@ def print_capability_summary(module_results: dict, external_tools: list):
 
     print()
     if working == total:
-        print(f"  {BOLD}{GREEN}🚀 Nova Arsenal v4.0 — FULL POWER — All {total} modules ready{RESET}")
+        print(f"  {BOLD}{GREEN}🚀 Nova Arsenal v4.2 — FULL POWER — All {total} modules ready{RESET}")
     else:
         missing = total - working
         print(f"  {YELLOW}⚠️  {missing} module(s) not available — run: git pull origin main{RESET}")
@@ -245,7 +298,7 @@ def print_capability_summary(module_results: dict, external_tools: list):
 
 def main():
     quick = "--quick" in sys.argv
-    print(f"\n{BOLD}{CYAN}Nova Arsenal v4.0 — Bootstrap & Health Check{RESET}")
+    print(f"\n{BOLD}{CYAN}Nova Arsenal v4.2 — Bootstrap & Health Check{RESET}")
     print(f"{CYAN}{'━'*50}{RESET}\n")
 
     print(f"{BOLD}[1/6] Python{RESET}")
