@@ -744,3 +744,46 @@ class Tool:
 
     def schema_str(self) -> str:
         return self._governed.schema_str()
+
+
+# ── Module-level compatibility exports ────────────────────────────────────────
+# These match the API expected by nova_agent_core and other consumers.
+
+import json as _json
+from typing import Any as _Any
+
+TOOL_SCHEMAS: dict = {}
+
+def _ensure_kit():
+    """Lazily initialise the default kit so imports don't trigger side-effects."""
+    try:
+        return get_default_kit()
+    except Exception:
+        return None
+
+def execute_tool(tool_name: str, args: dict) -> _Any:
+    """Call a tool from the default kit by name. Returns the tool's output string."""
+    kit = _ensure_kit()
+    if kit is None:
+        return f"ERROR: tool kit unavailable"
+    tools = {t.name: t for t in kit.build()}
+    if tool_name not in tools:
+        return f"ERROR: unknown tool '{tool_name}'"
+    try:
+        return tools[tool_name].call(args)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+def tools_summary_for_prompt() -> str:
+    """Return a compact string describing all available tools for LLM prompts."""
+    kit = _ensure_kit()
+    if kit is None:
+        return "(tool kit unavailable)"
+    lines = []
+    for t in kit.build():
+        lines.append(f"- {t.name}: {t.description}")
+        schema = getattr(t, "schema", {}) or {}
+        for param, meta in schema.get("properties", {}).items():
+            req = "required" if param in schema.get("required", []) else "optional"
+            lines.append(f"    {param} ({req}): {meta.get('description', '')}")
+    return "\n".join(lines) or "(no tools)"
