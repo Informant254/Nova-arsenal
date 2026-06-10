@@ -99,6 +99,14 @@ _bridge_mod  = _try_import("nova_llm_bridge")
 get_bridge   = getattr(_bridge_mod, "get_bridge", None)
 # Memory
 TargetMemory = _try_import("nova_memory", "TargetMemory")
+# Weapon Forge — dedicated exploit writer
+_forge_mod      = _try_import("nova_weapon_forge")
+NovaWeaponForge = getattr(_forge_mod, "NovaWeaponForge", None)
+get_weapon_forge= getattr(_forge_mod, "get_weapon_forge", None)
+# Auto-Exploit Loop — autonomous Critical/High exploit pipeline
+_auto_ex_mod       = _try_import("nova_auto_exploit_loop")
+AutoExploitLoop    = getattr(_auto_ex_mod, "AutoExploitLoop",       None)
+get_auto_exploit   = getattr(_auto_ex_mod, "get_auto_exploit_loop", None)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CODEBASE MAPPER — Phase 0 of every run
@@ -123,6 +131,8 @@ _ERR:      "Optional[Any]" = None   # NovaErrorHandler
 _FDB:      "Optional[Any]" = None   # NovaFindingsDB
 _CTX_ENG:  "Optional[Any]" = None   # NovaContextEngine
 _RAG:      "Optional[Any]" = None   # NovaRAGBuilder
+_FORGE:    "Optional[Any]" = None   # NovaWeaponForge singleton
+_AUTO_EX:  "Optional[Any]" = None   # AutoExploitLoop singleton
 
 
 def _init_provider_layer(target: str = "", scope: List[str] = None,
@@ -212,6 +222,18 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
     if get_rag:
         try:
             _RAG = get_rag(str(NOVA_DIR))
+        except Exception:
+            pass
+    global _FORGE, _AUTO_EX
+    if get_weapon_forge:
+        try:
+            _FORGE = get_weapon_forge(target=target, dry_run=True)
+        except Exception:
+            pass
+    if get_auto_exploit:
+        try:
+            _AUTO_EX = get_auto_exploit(target=target,
+                                         session_id=session_id or "")
         except Exception:
             pass
 
@@ -435,6 +457,10 @@ KEYWORD_MODES = {
     "nextgen":         ["nextgen","next gen agent","autonomous agent mode","next generation"],
     "kali":            ["kali","kali linux","pentest","penetration test","kali agent","metasploit"],
     "portswigger":     ["portswigger","web security academy","burp lab","burp suite","web academy"],
+    "weapon_forge":    ["weapon forge","forge exploit","write exploit","generate exploit",
+                        "exploit code","exploit writer","create exploit","build exploit"],
+    "auto_exploit":    ["auto exploit","auto-exploit","autonomous exploit",
+                        "exploit automatically","confirm exploit"],
     "report":          ["generate report","html report","export findings","write report","markdown report"],
     "auth":            ["auth scan","authenticated scan","login bypass","auth bypass","broken auth"],
     "dataflow":        ["dataflow","data flow","taint","source sink","taint analysis"],
@@ -1357,9 +1383,73 @@ def dispatch(intent: dict) -> List[Dict]:
         except Exception:
             pass
 
+    # ── AUTO-EXPLOIT LOOP ─────────────────────────────────────────────────────
+    # Fires on Critical/High findings when NOVA_AUTO_EXPLOIT=1.
+    # Pipeline: forge PoC → validate → live-verify → confirm → alert → memorise
+    if findings and mode in ("hunt","full_stack","daybreak","swarm","pipeline",
+                              "nextgen","wild_hunt","ibb","0din","attack"):
+        if AutoExploitLoop:
+            try:
+                import os as _os
+                loop = AutoExploitLoop(target=target, session_id="")
+                if _os.getenv("NOVA_AUTO_EXPLOIT","0") == "1":
+                    loop.enable()
+                confirmed = loop.run(findings)
+                if confirmed:
+                    print(f"\n  🔴 AUTO-EXPLOIT: {len(confirmed)} finding(s) CONFIRMED EXPLOITABLE")
+                    for c in confirmed:
+                        ex = c.get("auto_exploit",{})
+                        print(f"     ⚔️  [{c.get('severity','?')}] {c.get('type','?')} "
+                              f"→ {ex.get('exploit_file','(dry-run)')}")
+                    _emit_findings(confirmed, "auto_exploit_loop")
+            except Exception:
+                pass  # auto-exploit is non-blocking
+
+    # ── WEAPON FORGE — auto-forge on Critical findings (dry-run by default) ────
+    if findings and mode in ("hunt","full_stack","attack","kali"):
+        trigger_findings = [f for f in findings
+                            if str(f.get("severity","")).upper() == "CRITICAL"]
+        if trigger_findings and NovaWeaponForge:
+            try:
+                forge = NovaWeaponForge(target=target, dry_run=True)
+                forged = forge.batch_forge(trigger_findings[:3])
+                if forged:
+                    print(f"\n  ⚔️  WEAPON FORGE: {len(forged)} exploit(s) generated (dry-run)")
+                    for fw in forged:
+                        if fw.get("ok"):
+                            print(f"     → {fw['vuln_type']} ({fw['code_lines']} lines) "
+                                  f"[{fw['severity']}]")
+            except Exception:
+                pass  # non-blocking
+
     # ════════════════════════════════════════════════════════════════════════════
     # NEW SPECIALIST MODES — previously orphaned, now fully wired
     # ════════════════════════════════════════════════════════════════════════════
+
+    # ── Weapon Forge mode (direct exploit generation) ─────────────────────────
+    if mode in ("weapon_forge", "forge", "exploit_write"):
+        ForgeClass = _load("nova_weapon_forge", "NovaWeaponForge")
+        if ForgeClass:
+            try:
+                forge = ForgeClass(target=target, dry_run=False)
+                cve_match = re.search(r"CVE-\d{4}-\d+", query, re.I)
+                if cve_match:
+                    r = forge.forge_from_cve(cve_match.group())
+                else:
+                    r = forge.forge_from_description(query)
+                if r.get("ok"):
+                    findings.append({
+                        "type": "ExploitGenerated",
+                        "severity": r.get("severity","INFO"),
+                        "description": f"Exploit forged: {r['filename']}",
+                        "vuln_type": r.get("vuln_type",""),
+                        "code_lines": r.get("code_lines",0),
+                        "filepath": r.get("filepath",""),
+                        "source": "nova_weapon_forge",
+                    })
+                    print(f"  ⚔️  Weapon forged: {r['filename']} ({r['code_lines']} lines)")
+            except Exception as e:
+                print(f"  ⚠️  Weapon Forge: {e}")
 
     if mode in ("wild_hunt",):
         Cls = _load("nova_wild_hunt", "NovaWildHunt")

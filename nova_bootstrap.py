@@ -94,6 +94,8 @@ MODULES = {
     "nova_knowledge_rag":           (None,                   "v1.0", "RAG knowledge base (findings/CVEs)"),
     "nova_payload_engine":          (None,                   "v1.0", "Polymorphic payload generator"),
     "nova_evolver":                 (None,                   "v1.0", "Self-improvement engine"),
+    "nova_weapon_forge":            ("NovaWeaponForge",       "v1.0", "Dedicated exploit writer (CVE → runnable code)"),
+    "nova_auto_exploit_loop":       ("AutoExploitLoop",       "v1.0", "Auto-exploit Critical/High findings end-to-end"),
 }
 
 REQUIRED_MODULES = [
@@ -281,6 +283,8 @@ def print_capability_summary(module_results: dict, external_tools: list):
         ("Triple-Verify Engine",               "nova_verify_engine"        in module_results and module_results.get("nova_verify_engine",False)),
         ("10-Agent Parallel Swarm",            True),
         ("Self-Improvement Engine",            True),
+        ("Weapon Forge (exploit writer)",      "nova_weapon_forge"      in module_results and module_results.get("nova_weapon_forge",False)),
+        ("Auto-Exploit Loop (Critical/High)",  "nova_auto_exploit_loop" in module_results and module_results.get("nova_auto_exploit_loop",False)),
         ("24/7 Continuous Hunting",            True),
     ]
     for cap, ok in capabilities:
