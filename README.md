@@ -404,7 +404,7 @@ docker run --rm \
 ## Quick Start
 
 ```bash
-# Verify all 75 modules load
+# Verify all 77 modules load
 python3 nova_bootstrap.py
 
 # Natural language — any phrasing works:
@@ -421,6 +421,20 @@ python3 nova.py "Multi-target scan t1.com,t2.com,t3.com"
 
 # Resume a previous session
 python3 nova.py "Hunt http://target.com" --session abc12345
+
+# ⚔️  Weapon Forge — write exploit code directly
+python3 nova.py "Forge exploit for CVE-2024-1234 on http://target.com"
+python3 nova.py "Generate exploit code for SQL injection on http://target.com"
+python3 nova.py "Write exploit for XSS vulnerability on http://target.com"
+
+# Or invoke the Weapon Forge module directly:
+python3 nova_weapon_forge.py cve CVE-2024-1234 http://target.com
+python3 nova_weapon_forge.py desc "SQL injection in login form" http://target.com
+python3 nova_weapon_forge.py type xss http://target.com
+
+# 🔴 Auto-Exploit Loop — autonomous PoC on Critical/High findings:
+NOVA_AUTO_EXPLOIT=1 python3 nova.py "Hunt http://target.com"
+NOVA_AUTO_EXPLOIT=1 NOVA_EXPLOIT_DRY=0 python3 nova.py "Full stack on http://target.com"
 
 # Interactive shell (recommended)
 python3 nova_cli.py
@@ -761,6 +775,23 @@ export NOVA_SCOPE="*.example.com,api.example.com"
 export NOVA_EXCLUDED="admin.example.com"
 ```
 
+### ⚔️ Weapon Forge & Auto-Exploit Loop
+
+```bash
+# Enable autonomous exploit loop (off by default — safety first)
+export NOVA_AUTO_EXPLOIT=1           # 1 = enable, 0 = disable (default)
+export NOVA_EXPLOIT_DRY=1            # 1 = dry-run only — forge code, do NOT fire (default)
+                                     # 0 = LIVE — exploits will fire against the target
+                                     #     Only use on targets you own or have written permission for
+
+# Weapon Forge output directory (auto-created)
+# Exploits are saved to: $NOVA_WORKSPACE/exploits/exploit_<id>_<timestamp>.py
+```
+
+> **Safety note:** `NOVA_AUTO_EXPLOIT=1` only generates & validates PoC code.
+> Set `NOVA_EXPLOIT_DRY=0` only when running on targets you own or have explicit written
+> authorization to test. Nova will never execute live exploits without both flags set.
+
 ---
 
 ## Output Files
@@ -785,6 +816,9 @@ All outputs in `~/nova_workspace/` (or `$NOVA_WORKSPACE`):
 | `nova_findings.db` | Persistent findings database |
 | `nova_tracker_dashboard.md` | Vuln tracker Markdown dashboard |
 | `nova_bootstrap_status.json` | Last health-check result |
+| `nova_auto_exploit_<ts>.json` | Auto-exploit confirmed findings report |
+| `exploits/exploit_<id>_<ts>.py` | Weapon Forge — runnable exploit code |
+| `exploits/forge_manifest.json` | Manifest of all forged exploits (rolling, last 100) |
 
 ---
 
