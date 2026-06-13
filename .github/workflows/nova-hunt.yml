@@ -339,39 +339,71 @@ jobs:
           [ -n "$LATEST" ] && cp "$LATEST" nova_findings.json
           echo "Log lines: $LINES | Critical/High: $CRIT"
 
+      - name: Generate H1 Report
+        id: h1report
+        env:
+          NOVA_WORKSPACE:     /root/nova_workspace
+          NOVA_TARGET:        ${{ steps.target.outputs.target }}
+          NOVA_PROGRAM:       ${{ steps.target.outputs.program }}
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY:  ${{ github.repository }}
+          GITHUB_RUN_ID:      ${{ github.run_id }}
+        run: |
+          echo "=== Generating HackerOne-Ready Report ==="
+          TARGET="${{ steps.target.outputs.target }}"
+          export NOVA_TARGET="$TARGET"
+          timeout 180 python3 nova_report_generator.py 5 2>&1 | tee -a nova_run.log || true
+
+          # Copy final report to workspace root for artifact upload
+          H1_MD="/root/nova_workspace/nova_h1_report.md"
+          [ -f "$H1_MD" ] && cp "$H1_MD" nova_h1_report.md && echo "H1 report ready: $(wc -l < nova_h1_report.md) lines" || echo "H1 report not generated"
+          POC_JSON="/root/nova_workspace/nova_poc_report.json"
+          [ -f "$POC_JSON" ] && cp "$POC_JSON" nova_poc_report.json || true
+
       - name: Post findings issue
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const log     = fs.existsSync('nova_trimmed.log')     ? fs.readFileSync('nova_trimmed.log','utf8')     : '(no log)';
-            const summary = fs.existsSync('findings_summary.txt') ? fs.readFileSync('findings_summary.txt','utf8') : '';
             const date    = new Date().toISOString().split('T')[0];
-            const target   = '${{ steps.target.outputs.target }}';
-            const program  = '${{ steps.target.outputs.program }}' || 'unknown';
-            const model    = '${{ inputs.model }}' || 'llama3.1:8b';
-            const critical = '${{ steps.findings.outputs.critical }}';
-            const lines    = '${{ steps.findings.outputs.lines }}';
-            const runUrl   = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = [
-              '## Nova Arsenal Hunt Results',
-              `| Field | Value |`,
-              `|-------|-------|`,
-              `| **Program** | ${program} |`,
-              `| **Target** | \`${target}\` |`,
-              `| **Model** | ${model} |`,
-              `| **Date** | ${date} |`,
-              `| **Critical/High** | ${critical} |`,
-              `| **Log lines** | ${lines} |`,
-              `| **Run** | [View](${runUrl}) |`,
-              '',
-              summary ? `### Key Findings\n\n\`\`\`\n${summary.slice(0,4000)}\n\`\`\`` : '### No critical/high findings.',
-              '<details><summary>Full Output</summary>\n\n```\n' + log + '\n```\n</details>',
-            ].join('\n');
+            const target  = '${{ steps.target.outputs.target }}';
+            const program = '${{ steps.target.outputs.program }}' || 'unknown';
+            const model   = '${{ inputs.model }}' || 'llama3.1:8b';
+            const critical= '${{ steps.findings.outputs.critical }}';
+            const lines   = '${{ steps.findings.outputs.lines }}';
+            const runUrl  = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Prefer the full H1 report if available
+            let body = '';
+            if (fs.existsSync('nova_h1_report.md')) {
+              body = fs.readFileSync('nova_h1_report.md','utf8').slice(0, 65000);
+            } else {
+              const log     = fs.existsSync('nova_trimmed.log')     ? fs.readFileSync('nova_trimmed.log','utf8')     : '(no log)';
+              const summary = fs.existsSync('findings_summary.txt') ? fs.readFileSync('findings_summary.txt','utf8') : '';
+              body = [
+                '## Nova Arsenal Hunt Results',
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| **Program** | ${program} |`,
+                `| **Target** | \`${target}\` |`,
+                `| **Model** | ${model} |`,
+                `| **Date** | ${date} |`,
+                `| **Critical/High** | ${critical} |`,
+                `| **Log lines** | ${lines} |`,
+                `| **Run** | [View](${runUrl}) |`,
+                '',
+                summary ? `### Key Findings\n\n\`\`\`\n${summary.slice(0,4000)}\n\`\`\`` : '### No critical/high findings.',
+                '<details><summary>Full Output</summary>\n\n```\n' + log.slice(0,30000) + '\n```\n</details>',
+              ].join('\n');
+            }
+
+            // Post H1 report issue
+            const h1Title = `[Nova H1 Report] ${program}: ${target} | ${date} | ${critical} Critical/High findings`;
             await github.rest.issues.create({
               owner: context.repo.owner, repo: context.repo.repo,
-              title: `Nova [${program}]: ${target} [${date}] — ${critical} critical/high`,
-              body, labels: ['nova-findings'],
+              title: h1Title,
+              body,
+              labels: ['nova-findings', 'nova-h1-ready'],
             });
 
       - name: Notify complete
