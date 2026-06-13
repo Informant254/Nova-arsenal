@@ -62,26 +62,56 @@ TECH_DETECT_PATTERNS = {
 
 
 def _fetch_nvd_recent(days: int = 30) -> List[Dict]:
-    since = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00.000")
-    try:
-        url = f"{NVD_API}?pubStartDate={since}&resultsPerPage=50&cvssV3Severity=CRITICAL"
-        req = urllib.request.Request(url, headers={"Accept":"application/json"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = json.loads(r.read())
-        vulns = []
-        for item in data.get("vulnerabilities",[]):
-            cve = item.get("cve",{})
-            cid  = cve.get("id","")
-            desc = " ".join(d["value"] for d in cve.get("descriptions",[]) if d.get("lang")=="en")[:200]
-            score = 0.0
-            try:
-                score = cve["metrics"]["cvssMetricV31"][0]["cvssData"]["baseScore"]
-            except: pass
-            vulns.append({"cve_id": cid, "description": desc, "cvss": score, "source": "NVD"})
-        return vulns
-    except Exception as e:
-        print(f"  ⚠️  NVD API error: {e}")
-        return []
+    """Fetch recent CRITICAL CVEs from NVD v2 API with proper date format, headers, and retry."""
+    import urllib.parse, time as _time
+    now   = datetime.utcnow()
+    since = (now - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00.000") + "+00:00"
+    until = now.strftime("%Y-%m-%dT23:59:59.999") + "+00:00"
+    params = {
+        "pubStartDate":    since,
+        "pubEndDate":      until,
+        "resultsPerPage":  "100",
+        "cvssV3Severity":  "CRITICAL",
+    }
+    api_key = os.environ.get("NVD_API_KEY", "")
+    headers = {
+        "Accept":     "application/json",
+        "User-Agent": "Nova-Arsenal/2.0 (Bug Bounty Research; github.com/Informant254/Nova-arsenal)",
+    }
+    if api_key:
+        headers["apiKey"] = api_key
+    url = f"{NVD_API}?{urllib.parse.urlencode(params)}"
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=20) as r:
+                data = json.loads(r.read())
+            vulns = []
+            for item in data.get("vulnerabilities", []):
+                cve   = item.get("cve", {})
+                cid   = cve.get("id", "")
+                desc  = " ".join(d["value"] for d in cve.get("descriptions", []) if d.get("lang") == "en")[:200]
+                score = 0.0
+                for metric_key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
+                    try:
+                        score = cve["metrics"][metric_key][0]["cvssData"]["baseScore"]
+                        break
+                    except Exception:
+                        pass
+                vulns.append({"cve_id": cid, "description": desc, "cvss": score, "source": "NVD"})
+            print(f"  ✅ NVD API: {len(vulns)} recent CRITICAL CVEs fetched (last {days}d)")
+            return vulns
+        except urllib.error.HTTPError as e:
+            print(f"  ⚠️  NVD API HTTP {e.code} (attempt {attempt+1}/3): {e.reason}")
+            if e.code in (403, 429):
+                _time.sleep(6 * (attempt + 1))
+            elif e.code == 404:
+                print("  ⚠️  NVD 404 — falling back to OSV-only mode")
+                return []
+        except Exception as e:
+            print(f"  ⚠️  NVD API error (attempt {attempt+1}/3): {e}")
+            _time.sleep(3)
+    return []
 
 
 def _fetch_osv_for_package(pkg: str, ecosystem: str = "npm") -> List[Dict]:
