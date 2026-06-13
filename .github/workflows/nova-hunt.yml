@@ -60,8 +60,15 @@ jobs:
           go install github.com/lc/gau/v2/cmd/gau@latest 2>/dev/null || true
           go install github.com/tomnomnom/waybackurls@latest 2>/dev/null || true
           go install github.com/hahwul/dalfox/v2@latest 2>/dev/null || true
+          # Persist Go toolchain path to ALL subsequent steps
+          echo "/root/go/bin" >> $GITHUB_PATH
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+          echo "GOPATH=/root/go" >> $GITHUB_ENV
           pip3 install --quiet --break-system-packages arjun 2>/dev/null || true
           echo "Bootstrap done"
+          echo "Go tools installed:"
+          ls /root/go/bin/ 2>/dev/null || echo "  (none yet — cache miss)"
+          which nmap sqlmap nikto 2>/dev/null || true
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,16 +82,45 @@ jobs:
 
       - name: Install Python deps
         run: |
-          pip3 install --quiet --break-system-packages -r requirements-ci.txt 2>/dev/null || true
-          python3 -m playwright install chromium --with-deps 2>/dev/null || true
+          echo "Installing Python dependencies..."
+          pip3 install --break-system-packages -r requirements-ci.txt
+          echo "Python deps installed successfully."
+          # Install playwright without --with-deps (system chromium already in Bootstrap)
+          python3 -m playwright install chromium 2>/dev/null || true
+
+      - name: Verify dependencies
+        run: |
+          echo "Verifying critical Python imports..."
+          python3 -c "import requests; print('  requests OK')"
+          python3 -c "import aiohttp; print('  aiohttp OK')"
+          python3 -c "import bs4; print('  beautifulsoup4 OK')"
+          python3 -c "import httpx; print('  httpx OK')"
+          python3 -c "import ollama; print('  ollama OK')"
+          python3 -c "import yaml; print('  pyyaml OK')"
+          python3 -c "import rich; print('  rich OK')"
+          python3 -c "import jwt; print('  PyJWT OK')"
+          python3 -c "import cryptography; print('  cryptography OK')"
+          echo "All critical imports verified."
+          echo "System tool check:"
+          for tool in nmap sqlmap nikto gobuster curl wget git; do
+            which $tool > /dev/null 2>&1 && echo "  $tool OK" || echo "  $tool MISSING"
+          done
+          echo "Go tool check:"
+          for tool in ffuf subfinder httpx nuclei katana gau waybackurls dalfox; do
+            which $tool > /dev/null 2>&1 && echo "  $tool OK" || echo "  $tool not in PATH"
+          done
 
       - name: Download wordlists
         run: |
           mkdir -p ~/nova_workspace/wordlists
-          curl -sL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt \
-            -o ~/nova_workspace/wordlists/common.txt 2>/dev/null || true
-          curl -sL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-20000.txt \
-            -o ~/nova_workspace/wordlists/subdomains.txt 2>/dev/null || true
+          echo "Downloading wordlists from SecLists..."
+          curl -fsSL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt \
+            -o ~/nova_workspace/wordlists/common.txt && echo "  common.txt OK ($(wc -l < ~/nova_workspace/wordlists/common.txt) lines)" || echo "  common.txt FAILED (continuing without)"
+          curl -fsSL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-20000.txt \
+            -o ~/nova_workspace/wordlists/subdomains.txt && echo "  subdomains.txt OK ($(wc -l < ~/nova_workspace/wordlists/subdomains.txt) lines)" || echo "  subdomains.txt FAILED (continuing without)"
+          curl -fsSL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt \
+            -o ~/nova_workspace/wordlists/directories.txt && echo "  directories.txt OK" || echo "  directories.txt FAILED (continuing without)"
+          ls -lh ~/nova_workspace/wordlists/
 
       - name: Install Ollama
         run: |
@@ -151,6 +187,7 @@ jobs:
           NOVA_TELEGRAM_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
           NOVA_TELEGRAM_CHAT_ID: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
           NOVA_WORKSPACE: /root/nova_workspace
+          NOVA_TARGET: ${{ steps.target.outputs.target }}
           NOVA_CI_MODE: '1'
           NOVA_TOOL_CLONE_DIR: /opt/nova-tools
           GOPATH: /root/go
@@ -161,8 +198,10 @@ jobs:
           if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
           export NOVA_LLM_MODEL="$MODEL"
           mkdir -p /root/nova_workspace
+          export NOVA_TARGET="$TARGET"
           echo "Target: $TARGET | Model: $MODEL | Steps: $NOVA_MAX_STEPS"
-          timeout 280 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee nova_run.log || true
+          echo "Nova env: LLM=$NOVA_LLM_URL model=$NOVA_LLM_MODEL workspace=$NOVA_WORKSPACE"
+          timeout 18000 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee nova_run.log || true
 
       - name: Collect findings
         id: findings
