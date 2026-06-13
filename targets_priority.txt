@@ -1,7 +1,89 @@
-admin-cloud.konghq.com
-api-konnect-portal.konghq.com
-au.api.konghq.com
-admin.konghq.com
-developer.konghq.com
-docs.konghq.com
-konghq.com
+# ============================================================
+# Nova Arsenal - Priority Bug Bounty Targets
+# Last updated: 2026-06-13
+# Source: HackerOne GraphQL API + official program pages
+# IMPORTANT: Only scan assets explicitly listed in each
+#            program's current scope. Verify at program page
+#            before each hunt. Out-of-scope = ban/legal risk.
+# ============================================================
+
+# ── SHOPIFY (HackerOne: hackerone.com/shopify) ─────────────
+# Bounty-eligible wildcards
+*.shopify.com
+*.shopifycloud.com
+*.shopifycs.com
+*.shopify.io
+*.shopifykloud.com
+*.pci.shopifyinc.com
+# Bounty-eligible specific targets
+admin.shopify.com
+accounts.shopify.com
+partners.shopify.com
+shop.app
+shopify.plus
+shopifyinbox.com
+linkpop.com
+arrive-server.shopifycloud.com
+# Note: your-store.myshopify.com = use YOUR OWN test store only
+
+# ── GITLAB (HackerOne: hackerone.com/gitlab) ───────────────
+# Bounty-eligible wildcards
+*.gitlab.net
+*.gitlab.org
+*.gitlap.com
+# Bounty-eligible specific targets
+gitlab.com
+about.gitlab.com
+customers.gitlab.com
+docs.gitlab.com
+design.gitlab.com
+registry.gitlab.com
+advisories.gitlab.com
+
+# ── GOOGLE VRP (bughunters.google.com) ─────────────────────
+# Core properties (HIGH bounty)
+accounts.google.com
+myaccount.google.com
+google.com
+mail.google.com
+drive.google.com
+cloud.google.com
+console.cloud.google.com
+# Developer / API surfaces
+developers.google.com
+apis.google.com
+# Auth / Identity surfaces
+oauth2.googleapis.com
+# YouTube
+youtube.com
+studio.youtube.com
+# Note: *.google.com wildcard = in scope per VRP rules
+
+# ── MICROSOFT MSRC (microsoft.com/msrc/bounty) ─────────────
+# Azure (HIGH priority - dedicated bounty up to $60k)
+portal.azure.com
+management.azure.com
+login.microsoftonline.com
+graph.microsoft.com
+# Microsoft Online Services
+outlook.com
+office.com
+office365.com
+onedrive.com
+sharepoint.com
+teams.microsoft.com
+# Microsoft Identity
+login.live.com
+account.microsoft.com
+# Bing
+bing.com
+
+# ── ECITIZEN KENYA (ecitizen.go.ke) ────────────────────────
+# NOTE: No formal BB program found on H1/Bugcrowd/Intigriti.
+# Kenya government runs a responsible disclosure policy.
+# Contact: ict@ecitizen.go.ke before testing.
+# Only test with explicit written authorization.
+# Leaving commented out until authorization is confirmed:
+# ecitizen.go.ke
+# accounts.ecitizen.go.ke
+# api.ecitizen.go.ke
