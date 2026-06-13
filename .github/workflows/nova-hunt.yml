@@ -39,21 +39,15 @@ jobs:
 
     steps:
 
-      - name: Bootstrap Kali and install tools
+      - name: Bootstrap Kali tools
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update -qq 2>/dev/null
-          apt-get install -y -qq \
-            python3 python3-pip python3-dev \
-            curl wget git ca-certificates \
-            build-essential libssl-dev libffi-dev \
-            nmap masscan dnsutils whois dnsrecon \
-            theharvester amass sublist3r \
-            nikto whatweb wafw00f sqlmap \
-            gobuster dirb netcat-openbsd \
-            tcpdump hydra medusa \
-            chromium chromium-driver \
-            golang-go 2>/dev/null || true
+          apt-get install -y -qq python3 python3-pip python3-dev curl wget git \
+            build-essential libssl-dev nmap masscan dnsutils whois dnsrecon \
+            theharvester amass sublist3r nikto whatweb wafw00f sqlmap \
+            gobuster dirb netcat-openbsd tcpdump hydra medusa \
+            chromium chromium-driver golang-go 2>/dev/null || true
           export GOPATH=/root/go
           export PATH=$PATH:/root/go/bin
           go install github.com/ffuf/ffuf/v2@latest 2>/dev/null || true
@@ -65,7 +59,7 @@ jobs:
           go install github.com/tomnomnom/waybackurls@latest 2>/dev/null || true
           go install github.com/hahwul/dalfox/v2@latest 2>/dev/null || true
           pip3 install --quiet --break-system-packages arjun 2>/dev/null || true
-          echo "Kali tools ready"
+          echo "Kali bootstrap done"
 
       - name: Checkout Nova Arsenal
         uses: actions/checkout@v4
@@ -89,7 +83,6 @@ jobs:
             -o ~/nova_workspace/wordlists/common.txt 2>/dev/null || true
           curl -sL "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-20000.txt" \
             -o ~/nova_workspace/wordlists/subdomains.txt 2>/dev/null || true
-          echo "Wordlists downloaded"
 
       - name: Install Ollama
         run: |
@@ -120,41 +113,33 @@ jobs:
           if [ -z "$TARGET" ]; then
             TARGET=$(grep -v '^#' targets_priority.txt | grep -v '^$' | head -1)
           fi
-          if echo "$TARGET" | grep -qv '^http'; then
+          if ! echo "$TARGET" | grep -q '^http'; then
             TARGET="https://$TARGET"
           fi
           echo "target=$TARGET" >> $GITHUB_OUTPUT
           echo "Hunting: $TARGET"
 
-      - name: Notify hunt start via Telegram
+      - name: Notify hunt start
         env:
-          NOVA_TELEGRAM_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
-          NOVA_TELEGRAM_CHAT_ID: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+          TG_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+          TG_CHAT: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
         run: |
           TARGET="${{ steps.target.outputs.target }}"
           MODEL="${{ inputs.model }}"
           if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
-          python3 - <<PYEOF
+          python3 -c "
 import os, urllib.request, urllib.parse
-token = os.environ.get("NOVA_TELEGRAM_TOKEN","")
-chat  = os.environ.get("NOVA_TELEGRAM_CHAT_ID","")
+token = os.environ.get('TG_TOKEN','')
+chat  = os.environ.get('TG_CHAT','')
 if token and chat:
-    msg = (
-        "Nova Arsenal Hunt Started\n\n"
-        "Target: $TARGET\n"
-        "Model: $MODEL\n"
-        "Modules: ALL 25 modes\n"
-        "Alerts: live on Critical and High findings"
-    )
-    data = urllib.parse.urlencode({"chat_id": chat, "text": msg}).encode()
+    msg = 'Nova Arsenal Hunt Started\n\nTarget: $TARGET\nModel: $MODEL\nModules: ALL 25 modes running\nAlerts: live Critical and High findings'
+    data = urllib.parse.urlencode({'chat_id': chat, 'text': msg}).encode()
     try:
-        urllib.request.urlopen(
-            urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data),
-            timeout=10)
-        print("Telegram: notified")
+        urllib.request.urlopen(urllib.request.Request('https://api.telegram.org/bot' + token + '/sendMessage', data=data), timeout=10)
+        print('Telegram: notified')
     except Exception as e:
-        print(f"Telegram: {e}")
-PYEOF
+        print('Telegram error:', e)
+"
 
       - name: Run Nova CI Runner
         id: nova
@@ -175,10 +160,7 @@ PYEOF
           if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
           export NOVA_LLM_MODEL="$MODEL"
           mkdir -p /root/nova_workspace
-          echo "Nova CI Runner starting"
-          echo "Target: $TARGET"
-          echo "Model: $MODEL"
-          echo "Max steps per mode: $NOVA_MAX_STEPS"
+          echo "Target: $TARGET | Model: $MODEL | Steps: $NOVA_MAX_STEPS"
           timeout 280 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee nova_run.log || true
 
       - name: Collect findings
@@ -199,10 +181,8 @@ PYEOF
         with:
           script: |
             const fs = require('fs');
-            const log = fs.existsSync('nova_trimmed.log')
-              ? fs.readFileSync('nova_trimmed.log', 'utf8') : '(no log)';
-            const summary = fs.existsSync('findings_summary.txt')
-              ? fs.readFileSync('findings_summary.txt', 'utf8') : '';
+            const log = fs.existsSync('nova_trimmed.log') ? fs.readFileSync('nova_trimmed.log', 'utf8') : '(no log)';
+            const summary = fs.existsSync('findings_summary.txt') ? fs.readFileSync('findings_summary.txt', 'utf8') : '';
             const date = new Date().toISOString().split('T')[0];
             const target = '${{ steps.target.outputs.target }}';
             const model = '${{ inputs.model }}' || 'llama3.1:8b';
@@ -217,12 +197,9 @@ PYEOF
               `**Critical/High hits:** ${critical}`,
               `**Run:** [View full logs](${runUrl})`,
               '',
-              '---',
-              '',
               summary ? `### Key Findings\n\`\`\`\n${summary.slice(0,4000)}\n\`\`\`` : '',
               '',
-              '<details>',
-              '<summary>Full Nova Output</summary>',
+              '<details><summary>Full Nova Output</summary>',
               '',
               '```',
               log,
@@ -238,39 +215,28 @@ PYEOF
               labels: ['nova-findings', 'automated']
             });
 
-      - name: Notify completion via Telegram
+      - name: Notify completion
         if: always()
         env:
-          NOVA_TELEGRAM_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
-          NOVA_TELEGRAM_CHAT_ID: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+          TG_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+          TG_CHAT: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
         run: |
           TARGET="${{ steps.target.outputs.target }}"
           CRIT="${{ steps.findings.outputs.critical }}"
           LINES="${{ steps.findings.outputs.lines }}"
           STATUS="${{ job.status }}"
-          python3 - <<PYEOF
+          python3 -c "
 import os, urllib.request, urllib.parse
-token = os.environ.get("NOVA_TELEGRAM_TOKEN","")
-chat  = os.environ.get("NOVA_TELEGRAM_CHAT_ID","")
+token = os.environ.get('TG_TOKEN','')
+chat  = os.environ.get('TG_CHAT','')
 if token and chat:
-    status = "$STATUS"
-    icon = "Done" if status == "success" else "Warning"
-    msg = (
-        f"Nova Hunt {icon}\n\n"
-        "Target: $TARGET\n"
-        f"Critical/High: $CRIT\n"
-        f"Log lines: $LINES\n"
-        f"Status: {status}\n"
-        "Full report in Issues tab"
-    )
-    data = urllib.parse.urlencode({"chat_id": chat, "text": msg}).encode()
+    msg = 'Nova Hunt Complete\n\nTarget: $TARGET\nCritical/High: $CRIT\nLog lines: $LINES\nStatus: $STATUS\nFull report in Issues tab'
+    data = urllib.parse.urlencode({'chat_id': chat, 'text': msg}).encode()
     try:
-        urllib.request.urlopen(
-            urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data),
-            timeout=10)
+        urllib.request.urlopen(urllib.request.Request('https://api.telegram.org/bot' + token + '/sendMessage', data=data), timeout=10)
     except Exception as e:
-        print(f"Telegram: {e}")
-PYEOF
+        print('Telegram error:', e)
+"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
