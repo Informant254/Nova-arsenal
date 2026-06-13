@@ -340,6 +340,26 @@ class NovaFeedbackCortex:
 
         return report
 
+    def process(self, findings: List[Dict]) -> Dict:
+        """Pipeline entry point — called by NovaPipeline.phase_feedback().
+        Converts generic Nova finding dicts to the format process_results() expects,
+        then returns the full chained-exploit report."""
+        normalised = []
+        for f in findings:
+            normalised.append({
+                "endpoint":        f.get("url", f.get("endpoint", "")),
+                "exploit_type":    f.get("type", "unknown"),
+                "success":         True if str(f.get("severity","")).upper() in ("CRITICAL","HIGH") else "partial",
+                "payload":         f.get("payload", f.get("evidence", "")),
+                "response_body":   f.get("response", ""),
+                "indicators_found": f.get("indicators", f.get("evidence", [])),
+                "severity":        f.get("severity", "info"),
+                "method":          f.get("method", "GET"),
+            })
+        result = self.process_results(normalised)
+        result["chained_exploits"] = result.get("top_chains", [])
+        return result
+
 
 # ---------- INTEGRATION WITH EXPLOIT SYNTHESIZER ----------
 if __name__ == "__main__":
