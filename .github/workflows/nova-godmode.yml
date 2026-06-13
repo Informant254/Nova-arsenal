@@ -28,7 +28,12 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: kalilinux/kali-last-release
+
     timeout-minutes: 330
+
+    defaults:
+      run:
+        shell: bash
 
     env:
       NOVA_WORKSPACE: /root/nova_workspace
@@ -46,41 +51,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Init workspace
+      - name: Init workspace and PATH
         run: |
           mkdir -p /root/nova_workspace/reports /root/nova_workspace/weapons
           mkdir -p /root/nova_workspace/chains /root/nova_workspace/wordlists
-          mkdir -p /root/nova_workspace/subdomains /opt/nova-tools
+          mkdir -p /root/nova_workspace/subdomains /opt/nova-tools /root/go/bin
+          echo "/usr/bin" >> $GITHUB_PATH
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          echo "/root/go/bin" >> $GITHUB_PATH
+          echo "/opt/nova-tools/bin" >> $GITHUB_PATH
+          # verify python3
+          which python3 || (apt-get update -qq && apt-get install -y --no-install-recommends python3 python3-pip)
+          python3 --version
 
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: nova-pip-${{ hashFiles('requirements*.txt') }}
+          key: nova-pip-${{ hashFiles('requirements*.txt') }}-v2
           restore-keys: nova-pip-
 
       - name: Install Python deps
         run: |
-          pip3 install --quiet --upgrade pip 2>/dev/null || true
-          pip3 install --quiet -r requirements.txt 2>/dev/null || true
-          pip3 install --quiet -r requirements-ci.txt 2>/dev/null || true
-          pip3 install --quiet requests beautifulsoup4 colorama pydantic rich tqdm 2>/dev/null || true
-          echo "Python deps done"
+          export PATH=/usr/bin:/usr/local/bin:$PATH
+          python3 -m pip install --quiet --upgrade pip 2>/dev/null || true
+          python3 -m pip install --quiet -r requirements.txt 2>/dev/null || true
+          python3 -m pip install --quiet -r requirements-ci.txt 2>/dev/null || true
+          python3 -m pip install --quiet requests beautifulsoup4 colorama pydantic rich tqdm 2>/dev/null || true
+          python3 -c "import requests; print('requests OK')"
 
       - name: Bootstrap Kali full arsenal
         run: |
           export DEBIAN_FRONTEND=noninteractive
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           apt-get update -qq 2>/dev/null || true
           apt-get install -y --no-install-recommends \
             nmap masscan nikto sqlmap gobuster ffuf hydra medusa \
-            subfinder httpx-toolkit nuclei katana gau waybackurls dalfox \
+            subfinder httpx-toolkit nuclei katana \
             arjun wfuzz dirb seclists wordlists \
-            curl wget git python3-pip \
+            curl wget git python3 python3-pip \
             dnsrecon theharvester netcat-openbsd whois dnsutils \
             john hashcat wpscan joomscan whatweb wafw00f \
             golang-go jq bc 2>/dev/null || true
 
-          export PATH=/root/go/bin:$PATH
           go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest 2>/dev/null || true
           go install github.com/projectdiscovery/httpx/cmd/httpx@latest 2>/dev/null || true
           go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest 2>/dev/null || true
@@ -100,22 +113,23 @@ jobs:
           git clone --depth=1 https://github.com/commixproject/commix /opt/nova-tools/commix 2>/dev/null || true
           git clone --depth=1 https://github.com/devanshbatham/ParamSpider /opt/nova-tools/paramspider 2>/dev/null || true
           git clone --depth=1 https://github.com/m4ll0k/SecretFinder /opt/nova-tools/secretfinder 2>/dev/null || true
-          git clone --depth=1 https://github.com/gitleaks/gitleaks /opt/nova-tools/gitleaks 2>/dev/null || true
           git clone --depth=1 https://github.com/GerbenJavado/LinkFinder /opt/nova-tools/linkfinder 2>/dev/null || true
 
           for d in /opt/nova-tools/*/; do
-            [ -f "$d/requirements.txt" ] && pip3 install --quiet -r "$d/requirements.txt" 2>/dev/null || true
+            [ -f "$d/requirements.txt" ] && python3 -m pip install --quiet -r "$d/requirements.txt" 2>/dev/null || true
           done
 
           WL=/root/nova_workspace/wordlists
           cp /usr/share/seclists/Discovery/Web-Content/common.txt "$WL/" 2>/dev/null || true
           cp /usr/share/seclists/Discovery/Web-Content/big.txt "$WL/" 2>/dev/null || true
 
-          echo "Kali arsenal ready"
-          which nmap nuclei sqlmap subfinder 2>/dev/null || true
+          echo "=== Arsenal ready ==="
+          which nmap nuclei sqlmap subfinder python3 2>/dev/null || true
+          python3 --version
 
       - name: Install Ollama
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           curl -fsSL https://ollama.ai/install.sh | sh 2>/dev/null || true
           ollama serve >/tmp/ollama.log 2>&1 &
           sleep 15
@@ -124,11 +138,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /root/.ollama
-          key: nova-ollama-${{ inputs.model || 'llama3.1:8b' }}-v3
+          key: nova-ollama-${{ inputs.model || 'llama3.1:8b' }}-v4
           restore-keys: nova-ollama-
 
       - name: Pull Ollama model
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           MODEL="${{ inputs.model || 'llama3.1:8b' }}"
           timeout 600 ollama pull "$MODEL" 2>/dev/null || timeout 300 ollama pull llama3.2:3b 2>/dev/null || true
           ollama list 2>/dev/null | head -5
@@ -136,6 +151,7 @@ jobs:
       - name: Resolve target
         id: target
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           INPUT="${{ inputs.target }}"
           PROG="${{ inputs.program || 'shopify' }}"
           if [ -n "$INPUT" ]; then
@@ -161,13 +177,14 @@ jobs:
 
       - name: Notify start
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           T="${{ steps.target.outputs.target }}"
           P="${{ steps.target.outputs.program }}"
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
           RU="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG="Nova+God-Mode+STARTED%0ATarget:+$T%0AProgram:+$P%0AEngines:+8+all%0ARun:+$RU"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=${MSG}" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=${MSG}" >/dev/null 2>&1 || true
 
       - name: Engine 1 - CI Runner 25 modules
         id: eng1
@@ -176,18 +193,21 @@ jobs:
           NOVA_PROGRAM: ${{ steps.target.outputs.program }}
           NOVA_ITERATION: '1'
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 1: CI Runner - all 25 nova.dispatch modes"
+          echo "=== Engine 1: CI Runner - all 25 nova.dispatch modes ==="
+          python3 --version
           timeout 3300 python3 nova_godmode_runner.py --engine 1 --target "$T" 2>&1 | tee -a nova_run.log || true
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "latest=${LATEST}" >> $GITHUB_OUTPUT
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
-          CRIT=$(grep -cE "CRITICAL|HIGH" nova_run.log 2>/dev/null || echo 0)
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+1+done+Critical%2FHigh:+${CRIT}" >/dev/null || true
+          CRIT=$(grep -cE "CRITICAL|HIGH" nova_run.log 2>/dev/null | tr -d '[:space:]' || echo 0)
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+1+done+Crit%2FHigh:+${CRIT}" >/dev/null 2>&1 || true
 
       - name: PoC verify after Engine 1
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
           [ -n "$LATEST" ] && timeout 180 python3 nova_poc_verifier.py "$LATEST" 2>&1 | tee -a nova_run.log || true
 
@@ -199,17 +219,19 @@ jobs:
           NOVA_ITERATION: '2'
           NOVA_PREV_FINDINGS: ${{ steps.eng1.outputs.latest }}
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 2: Pipeline - 11 phase unified hunt"
+          echo "=== Engine 2: Pipeline - 11 phase unified hunt ==="
           timeout 2700 python3 nova_godmode_runner.py --engine 2 --target "$T" 2>&1 | tee -a nova_run.log || true
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "latest=${LATEST}" >> $GITHUB_OUTPUT
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+2+Pipeline+done" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+2+Pipeline+done" >/dev/null 2>&1 || true
 
       - name: PoC verify after Engine 2
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
           [ -n "$LATEST" ] && timeout 120 python3 nova_poc_verifier.py "$LATEST" 2>&1 | tee -a nova_run.log || true
 
@@ -221,12 +243,13 @@ jobs:
           NOVA_ITERATION: '3'
           NOVA_PREV_FINDINGS: ${{ steps.eng2.outputs.latest }}
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 3: Swarm v3 - 6 parallel agents"
+          echo "=== Engine 3: Swarm v3 - 6 parallel agents ==="
           timeout 2400 python3 nova_godmode_runner.py --engine 3 --target "$T" 2>&1 | tee -a nova_run.log || true
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+3+Swarm+done" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+3+Swarm+done" >/dev/null 2>&1 || true
 
       - name: Engine 4 - Weapon Forge exploits per finding
         id: eng4
@@ -235,17 +258,19 @@ jobs:
           NOVA_PROGRAM: ${{ steps.target.outputs.program }}
           NOVA_ITERATION: '4'
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 4: Weapon Forge - real exploit generation"
+          echo "=== Engine 4: Weapon Forge - real exploit generation ==="
           timeout 1200 python3 nova_godmode_runner.py --engine 4 --target "$T" 2>&1 | tee -a nova_run.log || true
 
       - name: PoC verify after Engines 3 and 4
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
           [ -n "$LATEST" ] && timeout 120 python3 nova_poc_verifier.py "$LATEST" 2>&1 | tee -a nova_run.log || true
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engines+3+4+done+Swarm+Weapons" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engines+3+4+done+Swarm+Weapons" >/dev/null 2>&1 || true
 
       - name: Engine 5 - Attack Chain five phases
         id: eng5
@@ -254,8 +279,9 @@ jobs:
           NOVA_PROGRAM: ${{ steps.target.outputs.program }}
           NOVA_ITERATION: '5'
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 5: Attack Chain - recon scan vuln exploit post"
+          echo "=== Engine 5: Attack Chain - recon scan vuln exploit post ==="
           timeout 2400 python3 nova_godmode_runner.py --engine 5 --target "$T" 2>&1 | tee -a nova_run.log || true
 
       - name: Engine 6 - Auto Exploit Loop
@@ -265,15 +291,17 @@ jobs:
           NOVA_PROGRAM: ${{ steps.target.outputs.program }}
           NOVA_ITERATION: '6'
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 6: Auto Exploit Loop - continuous exploitation"
+          echo "=== Engine 6: Auto Exploit Loop - continuous exploitation ==="
           timeout 1500 python3 nova_godmode_runner.py --engine 6 --target "$T" 2>&1 | tee -a nova_run.log || true
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engines+5+6+done+Chain+Loop" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engines+5+6+done+Chain+Loop" >/dev/null 2>&1 || true
 
       - name: PoC verify after Engines 5 and 6
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
           [ -n "$LATEST" ] && timeout 120 python3 nova_poc_verifier.py "$LATEST" 2>&1 | tee -a nova_run.log || true
 
@@ -284,30 +312,31 @@ jobs:
           NOVA_PROGRAM: ${{ steps.target.outputs.program }}
           NOVA_ITERATION: '7'
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          echo "Engine 7: Daybreak AI - 3-stage prioritize sandbox audit"
+          echo "=== Engine 7: Daybreak AI - 3-stage prioritize sandbox audit ==="
           timeout 2400 python3 nova_godmode_runner.py --engine 7 --target "$T" 2>&1 | tee -a nova_run.log || true
 
-      - name: Engine 8 - Kali Agent real tools
+      - name: Engine 8 - Kali Agent and real tools
         id: eng8
         env:
           NOVA_TARGET: ${{ steps.target.outputs.target }}
           NOVA_PROGRAM: ${{ steps.target.outputs.program }}
           NOVA_ITERATION: '8'
         run: |
+          export PATH=/usr/bin:/usr/local/bin:/root/go/bin:$PATH
           T="${{ steps.target.outputs.target }}"
-          export PATH=/root/go/bin:$PATH
-          echo "Engine 8: Kali Agent + direct Kali tools"
+          echo "=== Engine 8: Kali Agent + direct Kali tools ==="
           timeout 1800 python3 nova_godmode_runner.py --engine 8 --target "$T" 2>&1 | tee -a nova_run.log || true
 
           HOST=$(echo "$T" | sed 's|https\?://||' | sed 's|/.*||')
           WS=/root/nova_workspace
 
-          echo "Direct Kali sweep on $HOST"
+          echo "--- Direct Kali sweep on $HOST ---"
           timeout 120 subfinder -d "$HOST" -silent -o "$WS/subdomains/subs.txt" 2>/dev/null || true
           timeout 120 httpx -l "$WS/subdomains/subs.txt" -silent -status-code -title -o "$WS/live.txt" 2>/dev/null || true
-          timeout 60  gau "$HOST" 2>/dev/null | head -2000 > "$WS/gau.txt" || true
-          timeout 60  waybackurls "$HOST" 2>/dev/null | head -2000 > "$WS/wayback.txt" || true
+          timeout 60 gau "$HOST" 2>/dev/null | head -2000 > "$WS/gau.txt" || true
+          timeout 60 waybackurls "$HOST" 2>/dev/null | head -2000 > "$WS/wayback.txt" || true
           timeout 120 katana -u "$T" -silent -depth 3 -o "$WS/katana.txt" 2>/dev/null || true
           cat "$WS/gau.txt" "$WS/wayback.txt" "$WS/katana.txt" 2>/dev/null | sort -u > "$WS/all_urls.txt" || true
           timeout 180 nmap -sV --open -T4 -p 80,443,8080,8443,3000,5000,9000,9200,27017 "$HOST" -oN "$WS/nmap.txt" 2>/dev/null || true
@@ -318,33 +347,35 @@ jobs:
           WL="$WS/wordlists/common.txt"
           [ -f "$WL" ] && timeout 300 ffuf -u "${T}/FUZZ" -w "$WL" -mc 200,201,301,302,401,403 -t 30 -o "$WS/ffuf.json" -of json 2>/dev/null || true
 
-          NUCLEI_F=$(wc -l < "$WS/nuclei.txt" 2>/dev/null || echo 0)
-          SUBS=$(wc -l < "$WS/subdomains/subs.txt" 2>/dev/null || echo 0)
-          URLS=$(wc -l < "$WS/all_urls.txt" 2>/dev/null || echo 0)
-          echo "Engine 8 complete: nuclei=$NUCLEI_F findings | subs=$SUBS | urls=$URLS" | tee -a nova_run.log
-
+          NUCLEI_F=$(wc -l < "$WS/nuclei.txt" 2>/dev/null | tr -d '[:space:]' || echo 0)
+          SUBS=$(wc -l < "$WS/subdomains/subs.txt" 2>/dev/null | tr -d '[:space:]' || echo 0)
+          URLS=$(wc -l < "$WS/all_urls.txt" 2>/dev/null | tr -d '[:space:]' || echo 0)
+          echo "Engine 8 complete: nuclei=${NUCLEI_F} findings | subs=${SUBS} | urls=${URLS}" | tee -a nova_run.log
           cat "$WS/nuclei.txt" >> nova_run.log 2>/dev/null || true
+
           TK="${{ secrets.NOVA_TELEGRAM_TOKEN }}"
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+8+Kali+done+Nuclei:+${NUCLEI_F}+Subs:+${SUBS}" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=Engine+8+Kali+done+Nuclei:+${NUCLEI_F}+Subs:+${SUBS}" >/dev/null 2>&1 || true
 
       - name: Final PoC verification all engines
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
           [ -n "$LATEST" ] && timeout 300 python3 nova_poc_verifier.py "$LATEST" 2>&1 | tee -a nova_run.log || true
 
       - name: Collect findings
         id: findings
         run: |
-          LINES=$(wc -l < nova_run.log 2>/dev/null || echo 0)
-          echo "lines=$LINES" >> $GITHUB_OUTPUT
+          export PATH=/usr/bin:/usr/local/bin:$PATH
+          LINES=$(wc -l < nova_run.log 2>/dev/null | tr -d '[:space:]' || echo 0)
+          echo "lines=${LINES}" >> $GITHUB_OUTPUT
           grep -iE "CRITICAL|HIGH|MEDIUM|finding|vuln|CVE" nova_run.log 2>/dev/null | tail -300 > findings_summary.txt || true
-          CRIT=$(grep -cE "CRITICAL|HIGH" nova_run.log 2>/dev/null || echo 0)
-          echo "critical=$CRIT" >> $GITHUB_OUTPUT
+          CRIT=$(grep -cE "CRITICAL|HIGH" nova_run.log 2>/dev/null | tr -d '[:space:]' || echo 0)
+          echo "critical=${CRIT}" >> $GITHUB_OUTPUT
           tail -c 65000 nova_run.log > nova_trimmed.log 2>/dev/null || true
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
           [ -n "$LATEST" ] && cp "$LATEST" nova_findings.json || true
-          echo "Lines: $LINES | Critical/High: $CRIT"
+          echo "Lines: ${LINES} | Critical/High: ${CRIT}"
 
       - name: Generate H1 report
         id: h1report
@@ -356,6 +387,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           timeout 300 python3 nova_report_generator.py 8 2>&1 | tee -a nova_run.log || true
           H1=/root/nova_workspace/nova_h1_report.md
           [ -f "$H1" ] && cp "$H1" nova_h1_report.md && echo "H1 report: $(wc -l < nova_h1_report.md) lines" || true
@@ -380,7 +412,8 @@ jobs:
               const sum = fs.existsSync('findings_summary.txt') ? fs.readFileSync('findings_summary.txt','utf8') : '';
               body = [
                 '## Nova God-Mode Hunt Results',
-                `| Field | Value |`,`|-------|-------|`,
+                '| Field | Value |',
+                '|-------|-------|',
                 `| **Program** | ${program} |`,
                 `| **Target** | \`${target}\` |`,
                 `| **Date** | ${date} |`,
@@ -403,6 +436,7 @@ jobs:
       - name: Notify complete
         if: always()
         run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
           T="${{ steps.target.outputs.target }}"
           P="${{ steps.target.outputs.program }}"
           CRIT="${{ steps.findings.outputs.critical }}"
@@ -410,7 +444,7 @@ jobs:
           CH="${{ secrets.NOVA_TELEGRAM_CHAT_ID }}"
           RU="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG="Nova+God-Mode+COMPLETE%0AProgram:+${P}%0ATarget:+${T}%0ACritical:+${CRIT}%0AStatus:+${{ job.status }}%0AEngines:+8%0ARun:+${RU}"
-          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=${MSG}" >/dev/null || true
+          [ -n "$TK" ] && curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=${MSG}" >/dev/null 2>&1 || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
