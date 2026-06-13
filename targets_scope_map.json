@@ -1,0 +1,148 @@
+{
+  "_note": "Scope map used by Nova to validate targets before scanning. Auto-generated 2026-06-13.",
+  "programs": {
+    "shopify": {
+      "platform": "hackerone",
+      "handle": "shopify",
+      "url": "https://hackerone.com/shopify",
+      "bounty": true,
+      "in_scope_wildcards": [
+        "*.shopify.com",
+        "*.shopifycloud.com",
+        "*.shopifycs.com",
+        "*.shopify.io",
+        "*.shopifykloud.com",
+        "*.pci.shopifyinc.com"
+      ],
+      "in_scope_explicit": [
+        "admin.shopify.com",
+        "accounts.shopify.com",
+        "partners.shopify.com",
+        "shop.app",
+        "shopify.plus",
+        "shopifyinbox.com",
+        "linkpop.com",
+        "arrive-server.shopifycloud.com"
+      ],
+      "out_of_scope": [
+        "cdn.shopify.com",
+        "community.shopify.com",
+        "community.shopify.dev",
+        "livechat.shopify.com",
+        "investors.shopify.com",
+        "academy.shopify.com",
+        "*.email.shopify.com"
+      ]
+    },
+    "gitlab": {
+      "platform": "hackerone",
+      "handle": "gitlab",
+      "url": "https://hackerone.com/gitlab",
+      "bounty": true,
+      "in_scope_wildcards": [
+        "*.gitlab.net",
+        "*.gitlab.org",
+        "*.gitlap.com"
+      ],
+      "in_scope_explicit": [
+        "gitlab.com",
+        "about.gitlab.com",
+        "customers.gitlab.com",
+        "docs.gitlab.com",
+        "design.gitlab.com",
+        "registry.gitlab.com",
+        "advisories.gitlab.com"
+      ],
+      "out_of_scope": [
+        "*.gitlab.cn",
+        "*.runway.gitlab.net",
+        "*.gitlab-private.org",
+        "*.service-now.com",
+        "dashboards.gitlab.com",
+        "alerts.gitlab.com",
+        "support.gitlab.com",
+        "shop.gitlab.com",
+        "forum.gitlab.com",
+        "status.gitlab.com",
+        "partners.gitlab.com",
+        "translate.gitlab.com",
+        "levelup.gitlab.com",
+        "ir.gitlab.com"
+      ]
+    },
+    "google": {
+      "platform": "bughunters",
+      "handle": "google",
+      "url": "https://bughunters.google.com/about/rules/6625378258649088",
+      "bounty": true,
+      "in_scope_wildcards": [
+        "*.google.com",
+        "*.youtube.com",
+        "*.googleapis.com"
+      ],
+      "in_scope_explicit": [
+        "accounts.google.com",
+        "myaccount.google.com",
+        "google.com",
+        "mail.google.com",
+        "drive.google.com",
+        "cloud.google.com",
+        "console.cloud.google.com",
+        "developers.google.com",
+        "apis.google.com",
+        "oauth2.googleapis.com",
+        "youtube.com",
+        "studio.youtube.com"
+      ],
+      "out_of_scope": [
+        "maps.google.com",
+        "translate.google.com",
+        "play.google.com",
+        "support.google.com"
+      ]
+    },
+    "microsoft": {
+      "platform": "msrc",
+      "handle": "microsoft",
+      "url": "https://www.microsoft.com/en-us/msrc/bounty",
+      "bounty": true,
+      "in_scope_wildcards": [
+        "*.azure.com",
+        "*.microsoft.com",
+        "*.office.com",
+        "*.live.com"
+      ],
+      "in_scope_explicit": [
+        "portal.azure.com",
+        "management.azure.com",
+        "login.microsoftonline.com",
+        "graph.microsoft.com",
+        "outlook.com",
+        "office.com",
+        "office365.com",
+        "onedrive.com",
+        "sharepoint.com",
+        "teams.microsoft.com",
+        "login.live.com",
+        "account.microsoft.com",
+        "bing.com"
+      ],
+      "out_of_scope": [
+        "social.microsoft.com",
+        "technet.microsoft.com",
+        "blogs.microsoft.com",
+        "microsoft.com"
+      ]
+    },
+    "ecitizen": {
+      "platform": "none",
+      "handle": null,
+      "url": "https://ecitizen.go.ke",
+      "bounty": false,
+      "note": "No public BB/VDP program found. Requires written authorization before testing.",
+      "contact": "ict@ecitizen.go.ke",
+      "in_scope_explicit": [],
+      "authorized": false
+    }
+  }
+}
