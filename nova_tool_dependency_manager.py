@@ -621,8 +621,22 @@ class NovaToolDependencyManager:
 
         return report
 
+    def _is_ci(self) -> bool:
+        """Detect CI / non-interactive environment."""
+        if os.getenv("NOVA_CI_MODE") or os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+            return True
+        try:
+            return not sys.stdin.isatty()
+        except Exception:
+            return True
+
     def _prompt_install_choice(self, missing: List[ToolStatus]) -> str:
         """Prompt user to choose install strategy"""
+        # CI / non-interactive: auto-install everything — never block on stdin
+        if self._is_ci():
+            print(f"  [CI] Non-interactive mode — auto-installing all {len(missing)} missing tools")
+            return "all"
+
         print("How would you like to handle missing tools?")
         print("  [1] Install all missing tools")
         print("  [2] Let me choose which ones to install")
@@ -648,6 +662,10 @@ class NovaToolDependencyManager:
         self, missing: List[ToolStatus]
     ) -> Tuple[List[ToolStatus], List[ToolStatus]]:
         """Let user select which tools to install"""
+        # CI / non-interactive: install everything
+        if self._is_ci():
+            return missing, []
+
         to_install = []
         to_skip = []
 
