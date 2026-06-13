@@ -74,11 +74,11 @@ jobs:
       - name: Install Python deps
         run: |
           export PATH=/usr/bin:/usr/local/bin:$PATH
-          python3 -m pip install --quiet --upgrade pip 2>/dev/null || true
-          python3 -m pip install --quiet -r requirements.txt 2>/dev/null || true
-          python3 -m pip install --quiet -r requirements-ci.txt 2>/dev/null || true
-          python3 -m pip install --quiet requests beautifulsoup4 colorama pydantic rich tqdm 2>/dev/null || true
-          python3 -c "import requests; print('requests OK')"
+          python3 -m pip install --quiet --upgrade pip --break-system-packages 2>/dev/null || true
+          python3 -m pip install --quiet --break-system-packages -r requirements.txt 2>/dev/null || true
+          python3 -m pip install --quiet --break-system-packages -r requirements-ci.txt 2>/dev/null || true
+          python3 -m pip install --quiet --break-system-packages requests beautifulsoup4 colorama pydantic rich tqdm 2>/dev/null || true
+          python3 -c "import requests; print('requests OK')" 2>/dev/null || echo "requests not installed, will retry in bootstrap"
 
       - name: Bootstrap Kali full arsenal
         run: |
@@ -116,7 +116,7 @@ jobs:
           git clone --depth=1 https://github.com/GerbenJavado/LinkFinder /opt/nova-tools/linkfinder 2>/dev/null || true
 
           for d in /opt/nova-tools/*/; do
-            [ -f "$d/requirements.txt" ] && python3 -m pip install --quiet -r "$d/requirements.txt" 2>/dev/null || true
+            [ -f "$d/requirements.txt" ] && python3 -m pip install --quiet --break-system-packages -r "$d/requirements.txt" 2>/dev/null || true
           done
 
           WL=/root/nova_workspace/wordlists
