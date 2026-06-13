@@ -1,4 +1,4 @@
-name: 🦅 Nova God-Mode Arsenal — Full Power
+name: Nova God-Mode Arsenal - Full Power
 
 on:
   workflow_dispatch:
@@ -28,7 +28,7 @@ on:
 
 jobs:
   nova-god-mode:
-    name: 🦅 Nova God-Mode — Full Arsenal
+    name: Nova God-Mode - Full Arsenal
     runs-on: ubuntu-latest
     container:
       image: kalilinux/kali-last-release
