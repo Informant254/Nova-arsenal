@@ -240,7 +240,7 @@ jobs:
             --data-urlencode "text=Nova Arsenal STARTED — Program: ${PROGRAM} | Target: ${TARGET} | Model: ${MODEL} | 25 modules | Steps: ${{ inputs.steps || '100' }}" \
             > /dev/null || true
 
-      - name: Run Nova CI Runner — Full Power
+      - name: Run Nova CI Runner — 5-Iteration Learning Loop
         id: nova
         env:
           NOVA_LLM_URL:          http://localhost:11434
@@ -256,22 +256,75 @@ jobs:
           NOVA_TOOL_CLONE_DIR:   /opt/nova-tools
           GOPATH:                /root/go
           PATH:                  /root/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          NOVA_TOTAL_ITERATIONS: '5'
         run: |
           TARGET="${{ steps.target.outputs.target }}"
           MODEL="${NOVA_LLM_MODEL}"; [ -z "$MODEL" ] && MODEL="llama3.1:8b"
           export NOVA_LLM_MODEL="$MODEL"
           export NOVA_TARGET="$TARGET"
-          mkdir -p /root/nova_workspace
-          echo "======================================"
-          echo " Nova Arsenal — Full Power Launch"
-          echo "======================================"
-          echo " Target  : $TARGET"
-          echo " Program : $NOVA_PROGRAM"
-          echo " Model   : $MODEL"
-          echo " Steps   : $NOVA_MAX_STEPS per mode"
-          echo " Phases  : 0-8 (all 25 modules)"
-          echo "======================================"
-          timeout 18000 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee nova_run.log || true
+          mkdir -p /root/nova_workspace /opt/nova-tools
+          > nova_run.log
+
+          echo "╔══════════════════════════════════════════════════╗"
+          echo "║   Nova Arsenal — 5-Iteration Learning Hunt       ║"
+          echo "╠══════════════════════════════════════════════════╣"
+          echo "║  Target  : $TARGET"
+          echo "║  Program : $NOVA_PROGRAM"
+          echo "║  Model   : $MODEL"
+          echo "║  Steps   : $NOVA_MAX_STEPS per mode"
+          echo "║  Iters   : 5 (each learns from previous)"
+          echo "╚══════════════════════════════════════════════════╝"
+
+          TOTAL_ITERATIONS=5
+          for ITERATION in 1 2 3 4 5; do
+            echo "" | tee -a nova_run.log
+            echo "╔══════════════════════════════════════════════════╗" | tee -a nova_run.log
+            echo "║  🦅 NOVA HUNT — ITERATION $ITERATION / $TOTAL_ITERATIONS                  ║" | tee -a nova_run.log
+            echo "╚══════════════════════════════════════════════════╝" | tee -a nova_run.log
+
+            # Pass previous findings file to nova for focused learning
+            PREV_FINDINGS=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
+            export NOVA_ITERATION=$ITERATION
+            export NOVA_PREV_FINDINGS="${PREV_FINDINGS:-}"
+
+            # Deeper focus on later iterations: increase max steps
+            if [ "$ITERATION" -ge 3 ]; then
+              export NOVA_MAX_STEPS=$(( ${{ inputs.steps || 100 }} * 2 ))
+            fi
+
+            echo "  Prev findings: ${PREV_FINDINGS:-none}" | tee -a nova_run.log
+            echo "  Max steps: $NOVA_MAX_STEPS" | tee -a nova_run.log
+
+            ITER_START=$(date +%s)
+            timeout 3000 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee -a nova_run.log || true
+            ITER_END=$(date +%s)
+            ITER_ELAPSED=$(( (ITER_END - ITER_START) / 60 ))
+
+            # Run PoC verifier after each iteration
+            LATEST_F=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
+            if [ -n "$LATEST_F" ]; then
+              echo "  🧪 Running PoC verifier on $LATEST_F..." | tee -a nova_run.log
+              timeout 120 python3 nova_poc_verifier.py "$LATEST_F" 2>&1 | tee -a nova_run.log || true
+            fi
+
+            CRIT_SO_FAR=$(grep -cE "\[CRITICAL\]|\[HIGH\]" nova_run.log 2>/dev/null || echo 0)
+            echo "" | tee -a nova_run.log
+            echo "  ✅ Iter $ITERATION done in ${ITER_ELAPSED}m | Cumulative CRITICAL/HIGH lines: $CRIT_SO_FAR" | tee -a nova_run.log
+
+            # Notify Telegram after each iteration
+            [ -n "$NOVA_TELEGRAM_TOKEN" ] && [ -n "$NOVA_TELEGRAM_CHAT_ID" ] && \
+              curl -s -X POST "https://api.telegram.org/bot${NOVA_TELEGRAM_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${NOVA_TELEGRAM_CHAT_ID}" \
+                --data-urlencode "text=Nova Iter $ITERATION/5 done — Target: $TARGET | Findings: $CRIT_SO_FAR | Time: ${ITER_ELAPSED}m" \
+                > /dev/null || true
+
+            sleep 10
+          done
+
+          echo "" | tee -a nova_run.log
+          echo "╔══════════════════════════════════════════════════╗" | tee -a nova_run.log
+          echo "║  🦅 NOVA 5-ITERATION HUNT COMPLETE               ║" | tee -a nova_run.log
+          echo "╚══════════════════════════════════════════════════╝" | tee -a nova_run.log
 
       - name: Collect findings
         id: findings
