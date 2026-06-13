@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Target domain
+        description: 'Target domain (overrides program selection)'
         required: false
         default: ''
+      program:
+        description: 'BB program to hunt (shopify|gitlab|google|microsoft|all)'
+        required: false
+        default: 'all'
       model:
         description: Ollama model
         required: false
@@ -153,13 +157,208 @@ jobs:
       - name: Resolve target
         id: target
         run: |
-          TARGET="${{ inputs.target }}"
-          if [ -z "$TARGET" ]; then
-            TARGET=$(grep -v '^#' targets_priority.txt | grep -v '^$' | head -1)
+          MANUAL_TARGET="${{ inputs.target }}"
+          PROGRAM="${{ inputs.program }}"
+          if [ -z "$PROGRAM" ]; then PROGRAM="all"; fi
+
+          if [ -n "$MANUAL_TARGET" ]; then
+            # Manual override — use exactly what was provided
+            TARGET="$MANUAL_TARGET"
+            echo "Mode: manual override → $TARGET"
+          else
+            # Select first bounty-eligible target for the chosen program
+            case "$PROGRAM" in
+              shopify)
+                TARGET="admin.shopify.com" ;;
+              gitlab)
+                TARGET="gitlab.com" ;;
+              google)
+                TARGET="accounts.google.com" ;;
+              microsoft)
+                TARGET="portal.azure.com" ;;
+              all|*)
+                # Round-robin from full priority list (skip comments/blanks)
+                TARGET=$(grep -v '^#' targets_priority.txt | grep -v '^*' | grep -v '^
+
+      - name: Notify start
+        env:
+          TG_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+          TG_CHAT: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+        run: |
+          TARGET="${{ steps.target.outputs.target }}"
+          MODEL="${{ inputs.model }}"
+          if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
+          PROG="${{ steps.target.outputs.program }}"
+          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TG_CHAT}" \
+              --data-urlencode "text=Nova Arsenal Hunt Started. Program: ${PROG} | Target: ${TARGET} | Model: ${MODEL} | All 25 modules running." \
+              > /dev/null || true
           fi
-          if ! echo "$TARGET" | grep -q '^http'; then
+
+      - name: Run Nova CI Runner
+        id: nova
+        env:
+          NOVA_LLM_URL: http://localhost:11434
+          NOVA_LLM_MODEL: ${{ inputs.model || 'llama3.1:8b' }}
+          NOVA_MAX_STEPS: ${{ inputs.steps || '40' }}
+          NOVA_TELEGRAM_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+          NOVA_TELEGRAM_CHAT_ID: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+          NOVA_WORKSPACE: /root/nova_workspace
+          NOVA_TARGET: ${{ steps.target.outputs.target }}
+          NOVA_PROGRAM: ${{ steps.target.outputs.program }}
+          NOVA_CI_MODE: '1'
+          NOVA_TOOL_CLONE_DIR: /opt/nova-tools
+          GOPATH: /root/go
+          PATH: /root/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        run: |
+          TARGET="${{ steps.target.outputs.target }}"
+          MODEL="${NOVA_LLM_MODEL}"
+          if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
+          export NOVA_LLM_MODEL="$MODEL"
+          mkdir -p /root/nova_workspace
+          export NOVA_TARGET="$TARGET"
+          echo "Target: $TARGET | Model: $MODEL | Steps: $NOVA_MAX_STEPS"
+          echo "Nova env: LLM=$NOVA_LLM_URL model=$NOVA_LLM_MODEL workspace=$NOVA_WORKSPACE"
+          timeout 18000 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee nova_run.log || true
+
+      - name: Collect findings
+        id: findings
+        run: |
+          LINES=$(wc -l < nova_run.log 2>/dev/null || echo 0)
+          echo "lines=$LINES" >> $GITHUB_OUTPUT
+          grep -iE "CRITICAL|HIGH|MEDIUM|finding|vuln|CVE" nova_run.log \
+            | tail -150 > findings_summary.txt 2>/dev/null || true
+          CRIT=$(grep -cE "CRITICAL|HIGH" nova_run.log 2>/dev/null || echo 0)
+          echo "critical=$CRIT" >> $GITHUB_OUTPUT
+          tail -c 65000 nova_run.log > nova_trimmed.log
+          LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | tail -1)
+          if [ -n "$LATEST" ]; then cp "$LATEST" nova_findings.json; fi
+
+      - name: Post findings issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.existsSync('nova_trimmed.log')
+              ? fs.readFileSync('nova_trimmed.log', 'utf8') : '(no log)';
+            const summary = fs.existsSync('findings_summary.txt')
+              ? fs.readFileSync('findings_summary.txt', 'utf8') : '';
+            const date = new Date().toISOString().split('T')[0];
+            const target = '${{ steps.target.outputs.target }}';
+            const model = '${{ inputs.model }}' || 'llama3.1:8b';
+            const program = '${{ steps.target.outputs.program }}' || 'unknown';
+            const critical = '${{ steps.findings.outputs.critical }}';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              '## Nova Arsenal Hunt Results',
+              '',
+              `**Target:** ${target}`,
+              `**Model:** ${model}`,
+              `**Date:** ${date}`,
+              `**Critical/High:** ${critical}`,
+              `**Run:** ${runUrl}`,
+              '',
+              summary ? `### Findings\n\n${summary.slice(0, 4000)}` : '',
+              '',
+              '<details><summary>Full Output</summary>',
+              '',
+              log,
+              '',
+              '</details>'
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Nova [${program}]: ${target} [${date}] - ${critical} critical/high`,
+              body,
+              labels: ['nova-findings']
+            });
+
+      - name: Notify complete
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+          TG_CHAT: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+        run: |
+          TARGET="${{ steps.target.outputs.target }}"
+          CRIT="${{ steps.findings.outputs.critical }}"
+          STATUS="${{ job.status }}"
+          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TG_CHAT}" \
+              --data-urlencode "text=Nova Hunt Done. Target: ${TARGET} Critical/High: ${CRIT} Status: ${STATUS} Full report in Issues tab." \
+              > /dev/null || true
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nova-results-${{ github.run_id }}
+          path: |
+            nova_run.log
+            findings_summary.txt
+            nova_findings.json
+          retention-days: 90
+ | shuf | head -1)
+                echo "Round-robin selected: $TARGET" ;;
+            esac
+          fi
+
+          # Ensure https:// prefix
+          if ! echo "$TARGET" | grep -qE '^https?://'; then
             TARGET="https://$TARGET"
           fi
+
+          # Scope validation against targets_scope_map.json
+          echo "Validating $TARGET against scope map..."
+          DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d'/' -f1)
+          SCOPE_OK=$(python3 - <<'PYEOF'
+import json, sys, re, os
+domain = os.environ.get('DOMAIN','')
+try:
+    with open('targets_scope_map.json') as f:
+        scope = json.load(f)
+except Exception as e:
+    print(f"WARN: could not load scope map: {e}", file=sys.stderr)
+    print("UNKNOWN")
+    sys.exit(0)
+def matches(domain, pattern):
+    if pattern.startswith('*.'):
+        suffix = pattern[2:]
+        return domain == suffix or domain.endswith('.' + suffix)
+    return domain == pattern or domain.endswith('.' + pattern)
+for prog_name, prog in scope.get('programs', {}).items():
+    if not prog.get('authorized', True): continue
+    all_scope = prog.get('in_scope_wildcards', []) + prog.get('in_scope_explicit', [])
+    out_scope = prog.get('out_of_scope', [])
+    if any(matches(domain, p) for p in out_scope):
+        print(f"OUT_OF_SCOPE:{prog_name}")
+        sys.exit(0)
+    if any(matches(domain, p) for p in all_scope):
+        print(f"IN_SCOPE:{prog_name}")
+        sys.exit(0)
+print("UNVERIFIED")
+PYEOF
+          )
+          export DOMAIN="$DOMAIN"
+
+          echo "Scope check result: $SCOPE_OK"
+          if echo "$SCOPE_OK" | grep -q "^OUT_OF_SCOPE"; then
+            echo "❌ ERROR: $TARGET is OUT OF SCOPE for $(echo $SCOPE_OK | cut -d: -f2)"
+            echo "   Fix: update targets_scope_map.json or choose an in-scope target."
+            exit 1
+          fi
+          if echo "$SCOPE_OK" | grep -q "^IN_SCOPE"; then
+            MATCHED_PROG=$(echo "$SCOPE_OK" | cut -d: -f2)
+            echo "✅ $TARGET is IN SCOPE for program: $MATCHED_PROG"
+            echo "program=$MATCHED_PROG" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  $TARGET not found in scope map (UNVERIFIED) — proceeding with caution"
+            echo "program=unverified" >> $GITHUB_OUTPUT
+          fi
+
           echo "target=$TARGET" >> $GITHUB_OUTPUT
           echo "Hunting: $TARGET"
 
