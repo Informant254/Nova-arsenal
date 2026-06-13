@@ -18,6 +18,9 @@ on:
   schedule:
     - cron: '0 3 * * 1'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   issues: write
   contents: write
@@ -45,6 +48,7 @@ jobs:
             nikto whatweb wafw00f sqlmap \
             gobuster dirb netcat-openbsd \
             tcpdump hydra medusa \
+            zstd \
             chromium chromium-driver golang-go 2>/dev/null || true
           export GOPATH=/root/go
           export PATH=$PATH:/root/go/bin
@@ -86,10 +90,16 @@ jobs:
         run: |
           curl -fsSL https://ollama.ai/install.sh | sh
           ollama serve > /tmp/ollama.log 2>&1 &
+          ollama_ready=0
           for i in $(seq 1 40); do
-            curl -s http://localhost:11434/api/tags > /dev/null 2>&1 && echo "Ollama ready" && break
+            curl -s http://localhost:11434/api/tags > /dev/null 2>&1 && echo "Ollama ready" && ollama_ready=1 && break
             sleep 3
           done
+          if [ "$ollama_ready" -eq 0 ]; then
+            echo "ERROR: Ollama failed to start within timeout"
+            cat /tmp/ollama.log
+            exit 1
+          fi
 
       - name: Cache Ollama model
         uses: actions/cache@v4
