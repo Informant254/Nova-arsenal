@@ -589,15 +589,67 @@ class ApprovalEngine:
 
 
 class ExecutionController:
-    """Executes approved plans"""
-    
+    """Executes approved plans using real Kali Linux tools via subprocess."""
+
+    MAX_TIMEOUT = 120
+
     def execute_plan(self, plan: ExecutionPlan) -> Dict[str, Any]:
-        """Execute the approved plan"""
-        
+        """Execute the approved plan — runs each tool command via subprocess."""
+        import subprocess, shlex, shutil
+
+        outputs          = []
+        commands_run     = 0
+        commands_failed  = 0
+        findings_found   = []
+
+        for cmd_str in plan.tool_commands:
+            if not cmd_str or not cmd_str.strip():
+                continue
+            parts = shlex.split(cmd_str)
+            tool  = parts[0] if parts else ""
+
+            if not shutil.which(tool):
+                logger.warning(f"Tool not found: {tool} — skipping")
+                outputs.append({"command": cmd_str, "status": "skipped", "reason": f"{tool} not in PATH"})
+                continue
+
+            logger.info(f"Executing: {cmd_str[:120]}")
+            try:
+                proc = subprocess.run(
+                    parts,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.MAX_TIMEOUT,
+                )
+                stdout = proc.stdout[:4000]
+                stderr = proc.stderr[:1000]
+                outputs.append({
+                    "command":    cmd_str,
+                    "status":     "completed",
+                    "returncode": proc.returncode,
+                    "stdout":     stdout,
+                    "stderr":     stderr,
+                })
+                commands_run += 1
+                for line in stdout.splitlines():
+                    if any(kw in line.lower() for kw in ("open","vuln","critical","high","found","error","inject","xss","sql","rce","lfi")):
+                        findings_found.append({"tool": tool, "output_line": line.strip()})
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Timeout after {self.MAX_TIMEOUT}s: {cmd_str[:60]}")
+                outputs.append({"command": cmd_str, "status": "timeout", "timeout_s": self.MAX_TIMEOUT})
+                commands_failed += 1
+            except Exception as ex:
+                logger.error(f"Execution error on '{cmd_str[:60]}': {ex}")
+                outputs.append({"command": cmd_str, "status": "error", "error": str(ex)})
+                commands_failed += 1
+
+        logger.info(f"Execution complete: {commands_run} run, {commands_failed} failed, {len(findings_found)} hits")
         return {
-            "status": "completed",
-            "commands_executed": len(plan.tool_commands),
-            "results": {}
+            "status":           "completed",
+            "commands_executed": commands_run,
+            "commands_failed":  commands_failed,
+            "raw_findings":     findings_found,
+            "results":          outputs,
         }
 
 
