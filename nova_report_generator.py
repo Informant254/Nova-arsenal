@@ -502,23 +502,18 @@ def generate(iterations: int = 5) -> Dict:
     print(f"  💾 Saved: {md_path}")
     print(f"  💾 Saved: {json_path}")
 
-    # Post to GitHub Issues
-    crit   = sum(1 for f in h1_ready if str(f.get("severity","")).upper()=="CRITICAL")
-    high_c = sum(1 for f in h1_ready if str(f.get("severity","")).upper()=="HIGH")
-    confirmed = poc_map.get("confirmed_pocs",0)
-    issue_title = (
-        f"[Nova H1 Report] {PROGRAM}: {TARGET} | {DATE} | "
-        f"{crit} Critical · {high_c} High · {confirmed} PoC Confirmed"
-    )
-    issue_url = post_github_issue(issue_title, report_md)
+    crit      = sum(1 for f in h1_ready if str(f.get("severity","")).upper()=="CRITICAL")
+    high_c    = sum(1 for f in h1_ready if str(f.get("severity","")).upper()=="HIGH")
+    confirmed = poc_map.get("confirmed_pocs", 0)
 
     print("\n" + "═"*68)
     print(f"  🎯 REPORT COMPLETE")
+    print(f"     Critical : {crit}")
+    print(f"     High     : {high_c}")
     print(f"     H1-Ready : {len(h1_ready)} findings")
     print(f"     Confirmed: {confirmed} PoCs proven")
     print(f"     Markdown : {stable_md}")
-    if issue_url:
-        print(f"     Issue    : {issue_url}")
+    print(f"     (GitHub Issue will be posted by workflow step)")
     print("═"*68)
 
     return report_data
