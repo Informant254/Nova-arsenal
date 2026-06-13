@@ -1,8 +1,0 @@
-{
-  "h1_researcher": "Informant254",
-  "target": "https://csp-sb-testing-ulix-dev-ulix-grpc-cluster.api.verily.com",
-  "timestamp": "2026-05-27T12:13:37.823416",
-  "findings": [],
-  "total": 0,
-  "safe_harbor": "Traffic identifiable via User-Agent header"
-}

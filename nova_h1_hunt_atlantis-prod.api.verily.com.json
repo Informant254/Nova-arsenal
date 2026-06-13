@@ -1,8 +1,0 @@
-{
-  "h1_researcher": "Informant254",
-  "target": "https://atlantis-prod.api.verily.com",
-  "timestamp": "2026-05-27T11:57:08.524378",
-  "findings": [],
-  "total": 0,
-  "safe_harbor": "Traffic identifiable via User-Agent header"
-}

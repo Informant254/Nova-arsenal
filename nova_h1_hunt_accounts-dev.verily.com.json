@@ -1,8 +1,0 @@
-{
-  "h1_researcher": "Informant254",
-  "target": "https://accounts-dev.verily.com",
-  "timestamp": "2026-05-27T11:55:30.563361",
-  "findings": [],
-  "total": 0,
-  "safe_harbor": "Traffic identifiable via User-Agent header"
-}

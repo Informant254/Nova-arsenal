@@ -1,8 +1,0 @@
-{
-  "h1_researcher": "Informant254",
-  "target": "https://csp-prt-sb-fe.api.verily.com",
-  "timestamp": "2026-05-27T12:13:03.152100",
-  "findings": [],
-  "total": 0,
-  "safe_harbor": "Traffic identifiable via User-Agent header"
-}
