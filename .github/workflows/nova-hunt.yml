@@ -209,6 +209,8 @@ jobs:
           NOVA_TELEGRAM_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
           NOVA_TELEGRAM_CHAT_ID: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
           NOVA_WORKSPACE: /root/nova_workspace
+          NOVA_CI_MODE: '1'
+          NOVA_TOOL_CLONE_DIR: /opt/nova-tools
           GOPATH: /root/go
           PATH: /root/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
           DISPLAY: ':99'
