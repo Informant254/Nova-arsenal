@@ -8,7 +8,7 @@ on:
         required: false
         default: ''
       program:
-        description: 'BB program (shopify|gitlab|google|microsoft|all) — auto-rotates by day if blank'
+        description: 'BB program: shopify|gitlab|google|microsoft|all'
         required: false
         default: ''
       model:
@@ -16,18 +16,17 @@ on:
         required: false
         default: 'llama3.1:8b'
       steps:
-        description: 'Max steps per mode (higher = deeper, max ~100)'
+        description: 'Max steps per mode (higher = deeper)'
         required: false
         default: '100'
   schedule:
-    # Daily rotation — each day hunts a different program at 03:00 UTC
-    - cron: '0 3 * * 1'   # Monday    → Shopify
-    - cron: '0 3 * * 2'   # Tuesday   → GitLab
-    - cron: '0 3 * * 3'   # Wednesday → Google VRP
-    - cron: '0 3 * * 4'   # Thursday  → Microsoft MSRC
-    - cron: '0 3 * * 5'   # Friday    → All (broad sweep)
-    - cron: '0 3 * * 6'   # Saturday  → All (broad sweep)
-    - cron: '0 3 * * 0'   # Sunday    → All (broad sweep)
+    - cron: '0 3 * * 1'
+    - cron: '0 3 * * 2'
+    - cron: '0 3 * * 3'
+    - cron: '0 3 * * 4'
+    - cron: '0 3 * * 5'
+    - cron: '0 3 * * 6'
+    - cron: '0 3 * * 0'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -59,9 +58,7 @@ jobs:
             nikto whatweb wafw00f sqlmap \
             gobuster dirb netcat-openbsd \
             tcpdump hydra medusa \
-            zstd \
-            chromium chromium-driver golang-go 2>/dev/null || true
-          # Install Go tools
+            zstd chromium chromium-driver golang-go 2>/dev/null || true
           export GOPATH=/root/go
           export PATH=$PATH:/root/go/bin
           go install github.com/ffuf/ffuf/v2@latest 2>/dev/null || true
@@ -72,15 +69,12 @@ jobs:
           go install github.com/lc/gau/v2/cmd/gau@latest 2>/dev/null || true
           go install github.com/tomnomnom/waybackurls@latest 2>/dev/null || true
           go install github.com/hahwul/dalfox/v2@latest 2>/dev/null || true
-          # Persist Go toolchain path to ALL subsequent steps
           echo "/root/go/bin" >> $GITHUB_PATH
           echo "/usr/local/go/bin" >> $GITHUB_PATH
           echo "GOPATH=/root/go" >> $GITHUB_ENV
           pip3 install --quiet --break-system-packages arjun 2>/dev/null || true
           echo "Bootstrap complete"
-          echo "Go tools:"
-          ls /root/go/bin/ 2>/dev/null || echo "  (none — cache miss)"
-          which nmap sqlmap nikto 2>/dev/null || true
+          ls /root/go/bin/ 2>/dev/null || echo "(no go bins yet)"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,22 +90,15 @@ jobs:
         run: |
           echo "Installing Python dependencies..."
           pip3 install --break-system-packages -r requirements-ci.txt
-          echo "Python deps installed successfully."
-          # Use system chromium (already installed in Bootstrap — no --with-deps)
+          echo "Python deps installed."
           python3 -m playwright install chromium 2>/dev/null || true
 
       - name: Verify dependencies
         run: |
           echo "=== Python imports ==="
-          python3 -c "import requests;    print('  requests OK')"
-          python3 -c "import aiohttp;     print('  aiohttp OK')"
-          python3 -c "import bs4;         print('  beautifulsoup4 OK')"
-          python3 -c "import httpx;       print('  httpx OK')"
-          python3 -c "import ollama;      print('  ollama OK')"
-          python3 -c "import yaml;        print('  pyyaml OK')"
-          python3 -c "import rich;        print('  rich OK')"
-          python3 -c "import jwt;         print('  PyJWT OK')"
-          python3 -c "import cryptography;print('  cryptography OK')"
+          for mod in requests aiohttp bs4 httpx ollama yaml rich jwt cryptography; do
+            python3 -c "import $mod; print('  $mod OK')" 2>/dev/null || echo "  $mod MISSING"
+          done
           echo "=== System tools ==="
           for t in nmap masscan sqlmap nikto gobuster curl wget git hydra; do
             which $t >/dev/null 2>&1 && echo "  $t OK" || echo "  $t MISSING"
@@ -124,19 +111,18 @@ jobs:
       - name: Download wordlists
         run: |
           mkdir -p ~/nova_workspace/wordlists
-          echo "Downloading wordlists from SecLists..."
+          echo "Downloading wordlists..."
           curl -fsSL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt \
             -o ~/nova_workspace/wordlists/common.txt \
             && echo "  common.txt OK ($(wc -l < ~/nova_workspace/wordlists/common.txt) lines)" \
-            || echo "  common.txt FAILED (continuing)"
+            || echo "  common.txt FAILED"
           curl -fsSL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-20000.txt \
             -o ~/nova_workspace/wordlists/subdomains.txt \
             && echo "  subdomains.txt OK ($(wc -l < ~/nova_workspace/wordlists/subdomains.txt) lines)" \
-            || echo "  subdomains.txt FAILED (continuing)"
+            || echo "  subdomains.txt FAILED"
           curl -fsSL https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt \
             -o ~/nova_workspace/wordlists/directories.txt \
-            && echo "  directories.txt OK" \
-            || echo "  directories.txt FAILED (continuing)"
+            && echo "  directories.txt OK" || echo "  directories.txt FAILED"
           ls -lh ~/nova_workspace/wordlists/
 
       - name: Install Ollama
@@ -145,15 +131,13 @@ jobs:
           ollama serve > /tmp/ollama.log 2>&1 &
           ollama_ready=0
           for i in $(seq 1 40); do
-            curl -s http://localhost:11434/api/tags > /dev/null 2>&1 \
-              && echo "Ollama ready (attempt $i)" && ollama_ready=1 && break
+            curl -s http://localhost:11434/api/tags > /dev/null 2>&1 && ollama_ready=1 && break
             sleep 3
           done
           if [ "$ollama_ready" -eq 0 ]; then
-            echo "ERROR: Ollama failed to start within timeout"
-            cat /tmp/ollama.log
-            exit 1
+            echo "ERROR: Ollama failed to start"; cat /tmp/ollama.log; exit 1
           fi
+          echo "Ollama ready."
 
       - name: Cache Ollama model
         uses: actions/cache@v4
@@ -165,108 +149,74 @@ jobs:
         run: |
           MODEL="${{ inputs.model }}"
           if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
-          ollama pull "$MODEL"
-          ollama list
+          ollama pull "$MODEL" && ollama list
 
       - name: Resolve target
         id: target
         run: |
           MANUAL_TARGET="${{ inputs.target }}"
           MANUAL_PROGRAM="${{ inputs.program }}"
+          DOW=$(date +%u)
 
-          # ── Day-of-week program rotation (used when no manual override) ─────
-          DOW=$(date +%u)   # 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat 7=Sun
+          # Day-of-week automatic program rotation
           case "$DOW" in
             1) AUTO_PROGRAM="shopify"   ; AUTO_TARGET="admin.shopify.com" ;;
             2) AUTO_PROGRAM="gitlab"    ; AUTO_TARGET="gitlab.com" ;;
             3) AUTO_PROGRAM="google"    ; AUTO_TARGET="accounts.google.com" ;;
             4) AUTO_PROGRAM="microsoft" ; AUTO_TARGET="portal.azure.com" ;;
-            *) AUTO_PROGRAM="all"       ; AUTO_TARGET="" ;;
+            *)  AUTO_PROGRAM="all"      ; AUTO_TARGET="" ;;
           esac
 
-          # ── Resolve PROGRAM ────────────────────────────────────────────────
           PROGRAM="${MANUAL_PROGRAM:-$AUTO_PROGRAM}"
 
-          # ── Resolve TARGET ─────────────────────────────────────────────────
           if [ -n "$MANUAL_TARGET" ]; then
             TARGET="$MANUAL_TARGET"
-            echo "Mode: manual override → $TARGET"
+            echo "Manual override: $TARGET"
           else
+            WK=$(date +%V)
             case "$PROGRAM" in
               shopify)
-                # Rotate through bounty-eligible Shopify targets by week number
-                WK=$(date +%V)
                 TARGETS="admin.shopify.com accounts.shopify.com partners.shopify.com shop.app shopify.plus"
-                TARGET=$(echo $TARGETS | tr ' ' '\n' | sed -n "$((($WK % 5) + 1))p")
+                TARGET=$(echo "$TARGETS" | tr ' ' '\n' | awk "NR==$(( (WK % 5) + 1 ))")
                 ;;
               gitlab)
-                WK=$(date +%V)
                 TARGETS="gitlab.com about.gitlab.com customers.gitlab.com docs.gitlab.com registry.gitlab.com"
-                TARGET=$(echo $TARGETS | tr ' ' '\n' | sed -n "$((($WK % 5) + 1))p")
+                TARGET=$(echo "$TARGETS" | tr ' ' '\n' | awk "NR==$(( (WK % 5) + 1 ))")
                 ;;
               google)
-                WK=$(date +%V)
                 TARGETS="accounts.google.com cloud.google.com console.cloud.google.com developers.google.com mail.google.com"
-                TARGET=$(echo $TARGETS | tr ' ' '\n' | sed -n "$((($WK % 5) + 1))p")
+                TARGET=$(echo "$TARGETS" | tr ' ' '\n' | awk "NR==$(( (WK % 5) + 1 ))")
                 ;;
               microsoft)
-                WK=$(date +%V)
                 TARGETS="portal.azure.com login.microsoftonline.com graph.microsoft.com outlook.com teams.microsoft.com"
-                TARGET=$(echo $TARGETS | tr ' ' '\n' | sed -n "$((($WK % 5) + 1))p")
+                TARGET=$(echo "$TARGETS" | tr ' ' '\n' | awk "NR==$(( (WK % 5) + 1 ))")
                 ;;
               all|*)
-                # Broad sweep — random bounty-eligible target from priority list
                 TARGET=$(grep -v '^#' targets_priority.txt | grep -v '^\*' | grep -v '^$' | shuf | head -1)
-                echo "Broad sweep → random pick: $TARGET"
+                echo "Broad sweep pick: $TARGET"
                 ;;
             esac
           fi
 
-          # ── Ensure https:// prefix ─────────────────────────────────────────
           if ! echo "$TARGET" | grep -qE '^https?://'; then
             TARGET="https://$TARGET"
           fi
 
-          # ── Scope validation against targets_scope_map.json ───────────────
+          # Scope validation via standalone script
           DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d'/' -f1)
           echo "Validating $DOMAIN against scope map..."
-          SCOPE_CHECK=$(DOMAIN="$DOMAIN" python3 - <<'PYEOF'
-import json, sys, os, re
-domain = os.environ.get('DOMAIN', '')
-try:
-    with open('targets_scope_map.json') as f:
-        scope = json.load(f)
-except Exception as e:
-    print(f"UNKNOWN (scope map error: {e})", file=sys.stderr)
-    print("UNKNOWN"); sys.exit(0)
-def matches(domain, pattern):
-    pattern = pattern.lstrip('https://').lstrip('http://')
-    if pattern.startswith('*.'):
-        suffix = pattern[2:]
-        return domain == suffix or domain.endswith('.' + suffix)
-    return domain == pattern or domain.endswith('.' + pattern)
-for prog_name, prog in scope.get('programs', {}).items():
-    if prog.get('authorized') == False:
-        continue
-    out = prog.get('out_of_scope', [])
-    ins = prog.get('in_scope_wildcards', []) + prog.get('in_scope_explicit', [])
-    if any(matches(domain, p) for p in out):
-        print(f"OUT_OF_SCOPE:{prog_name}"); sys.exit(0)
-    if any(matches(domain, p) for p in ins):
-        print(f"IN_SCOPE:{prog_name}"); sys.exit(0)
-print("UNVERIFIED")
-PYEOF
-          )
-
+          SCOPE_CHECK=$(python3 nova_scope_validator.py "$DOMAIN" 2>/dev/null || echo "UNKNOWN")
           echo "Scope result: $SCOPE_CHECK"
+
           if echo "$SCOPE_CHECK" | grep -q "^OUT_OF_SCOPE"; then
             PROG_NAME=$(echo "$SCOPE_CHECK" | cut -d: -f2)
-            echo "::error::$TARGET is OUT OF SCOPE for $PROG_NAME. Update targets or scope map."
+            echo "::error::$TARGET is OUT OF SCOPE for $PROG_NAME"
             exit 1
           fi
+
           if echo "$SCOPE_CHECK" | grep -q "^IN_SCOPE"; then
             MATCHED=$(echo "$SCOPE_CHECK" | cut -d: -f2)
-            echo "✅ IN SCOPE: $DOMAIN → $MATCHED"
+            echo "✅ IN SCOPE: $DOMAIN -> $MATCHED"
             echo "program=$MATCHED" >> $GITHUB_OUTPUT
           else
             echo "⚠️  UNVERIFIED scope for $DOMAIN — proceeding"
@@ -274,28 +224,21 @@ PYEOF
           fi
 
           echo "target=$TARGET" >> $GITHUB_OUTPUT
-          echo "day=$DOW" >> $GITHUB_OUTPUT
           echo "Hunting: $TARGET (program: $PROGRAM, DOW: $DOW)"
 
       - name: Notify start
         env:
           TG_TOKEN: ${{ secrets.NOVA_TELEGRAM_TOKEN }}
-          TG_CHAT: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+          TG_CHAT:  ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
         run: |
           TARGET="${{ steps.target.outputs.target }}"
           PROGRAM="${{ steps.target.outputs.program }}"
-          MODEL="${{ inputs.model }}"; if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
-          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TG_CHAT}" \
-              --data-urlencode "text=🚀 Nova Arsenal Hunt STARTED
-Program : ${PROGRAM}
-Target  : ${TARGET}
-Model   : ${MODEL}
-Modules : 25 (all phases)
-Steps   : ${{ inputs.steps || '100' }} per mode" \
-              > /dev/null || true
-          fi
+          MODEL="${{ inputs.model }}"; [ -z "$MODEL" ] && MODEL="llama3.1:8b"
+          [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ] && curl -s -X POST \
+            "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=Nova Arsenal STARTED — Program: ${PROGRAM} | Target: ${TARGET} | Model: ${MODEL} | 25 modules | Steps: ${{ inputs.steps || '100' }}" \
+            > /dev/null || true
 
       - name: Run Nova CI Runner — Full Power
         id: nova
@@ -315,8 +258,7 @@ Steps   : ${{ inputs.steps || '100' }} per mode" \
           PATH:                  /root/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           TARGET="${{ steps.target.outputs.target }}"
-          MODEL="${NOVA_LLM_MODEL}"
-          if [ -z "$MODEL" ]; then MODEL="llama3.1:8b"; fi
+          MODEL="${NOVA_LLM_MODEL}"; [ -z "$MODEL" ] && MODEL="llama3.1:8b"
           export NOVA_LLM_MODEL="$MODEL"
           export NOVA_TARGET="$TARGET"
           mkdir -p /root/nova_workspace
@@ -328,24 +270,20 @@ Steps   : ${{ inputs.steps || '100' }} per mode" \
           echo " Model   : $MODEL"
           echo " Steps   : $NOVA_MAX_STEPS per mode"
           echo " Phases  : 0-8 (all 25 modules)"
-          echo " Workspace: $NOVA_WORKSPACE"
           echo "======================================"
-          # Run all 25 modules — 330min job / 300min timeout
           timeout 18000 python3 nova_ci_runner.py "$TARGET" 2>&1 | tee nova_run.log || true
-          echo "Nova runner exited."
 
       - name: Collect findings
         id: findings
         run: |
           LINES=$(wc -l < nova_run.log 2>/dev/null || echo 0)
           echo "lines=$LINES" >> $GITHUB_OUTPUT
-          grep -iE "CRITICAL|HIGH|MEDIUM|finding|vuln|CVE" nova_run.log \
-            | tail -200 > findings_summary.txt 2>/dev/null || true
+          grep -iE "CRITICAL|HIGH|MEDIUM|finding|vuln|CVE" nova_run.log | tail -200 > findings_summary.txt 2>/dev/null || true
           CRIT=$(grep -cE "CRITICAL|HIGH" nova_run.log 2>/dev/null || echo 0)
           echo "critical=$CRIT" >> $GITHUB_OUTPUT
           tail -c 65000 nova_run.log > nova_trimmed.log
           LATEST=$(ls /root/nova_workspace/nova_ci_all_findings_*.json 2>/dev/null | tail -1)
-          if [ -n "$LATEST" ]; then cp "$LATEST" nova_findings.json; fi
+          [ -n "$LATEST" ] && cp "$LATEST" nova_findings.json
           echo "Log lines: $LINES | Critical/High: $CRIT"
 
       - name: Post findings issue
@@ -353,7 +291,7 @@ Steps   : ${{ inputs.steps || '100' }} per mode" \
         with:
           script: |
             const fs = require('fs');
-            const log     = fs.existsSync('nova_trimmed.log')    ? fs.readFileSync('nova_trimmed.log',    'utf8') : '(no log)';
+            const log     = fs.existsSync('nova_trimmed.log')     ? fs.readFileSync('nova_trimmed.log','utf8')     : '(no log)';
             const summary = fs.existsSync('findings_summary.txt') ? fs.readFileSync('findings_summary.txt','utf8') : '';
             const date    = new Date().toISOString().split('T')[0];
             const target   = '${{ steps.target.outputs.target }}';
@@ -364,7 +302,6 @@ Steps   : ${{ inputs.steps || '100' }} per mode" \
             const runUrl   = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
               '## Nova Arsenal Hunt Results',
-              '',
               `| Field | Value |`,
               `|-------|-------|`,
               `| **Program** | ${program} |`,
@@ -375,22 +312,13 @@ Steps   : ${{ inputs.steps || '100' }} per mode" \
               `| **Log lines** | ${lines} |`,
               `| **Run** | [View](${runUrl}) |`,
               '',
-              summary ? `### Key Findings\n\n\`\`\`\n${summary.slice(0, 4000)}\n\`\`\`` : '### No critical/high findings surfaced.',
-              '',
-              '<details><summary>📋 Full Run Output</summary>',
-              '',
-              '```',
-              log,
-              '```',
-              '',
-              '</details>',
+              summary ? `### Key Findings\n\n\`\`\`\n${summary.slice(0,4000)}\n\`\`\`` : '### No critical/high findings.',
+              '<details><summary>Full Output</summary>\n\n```\n' + log + '\n```\n</details>',
             ].join('\n');
             await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo:  context.repo.repo,
+              owner: context.repo.owner, repo: context.repo.repo,
               title: `Nova [${program}]: ${target} [${date}] — ${critical} critical/high`,
-              body,
-              labels: ['nova-findings'],
+              body, labels: ['nova-findings'],
             });
 
       - name: Notify complete
@@ -402,20 +330,12 @@ Steps   : ${{ inputs.steps || '100' }} per mode" \
           TARGET="${{ steps.target.outputs.target }}"
           PROGRAM="${{ steps.target.outputs.program }}"
           CRIT="${{ steps.findings.outputs.critical }}"
-          LINES="${{ steps.findings.outputs.lines }}"
           STATUS="${{ job.status }}"
-          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TG_CHAT}" \
-              --data-urlencode "text=✅ Nova Hunt COMPLETE
-Program  : ${PROGRAM}
-Target   : ${TARGET}
-Critical : ${CRIT}
-Log lines: ${LINES}
-Status   : ${STATUS}
-→ Full report in Issues tab." \
-              > /dev/null || true
-          fi
+          [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ] && curl -s -X POST \
+            "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=Nova DONE — Program: ${PROGRAM} | Target: ${TARGET} | Critical: ${CRIT} | Status: ${STATUS} | Report in Issues." \
+            > /dev/null || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -427,4 +347,3 @@ Status   : ${STATUS}
             findings_summary.txt
             nova_findings.json
           retention-days: 90
-# re-index: 1781350221986
