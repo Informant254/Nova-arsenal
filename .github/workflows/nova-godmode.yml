@@ -128,11 +128,12 @@ jobs:
           python3 --version
 
       - name: Install Ollama
+        continue-on-error: true
         run: |
           export PATH=/usr/bin:/usr/local/bin:$PATH
           curl -fsSL https://ollama.ai/install.sh | sh 2>/dev/null || true
-          ollama serve >/tmp/ollama.log 2>&1 &
-          sleep 15
+          export PATH=/usr/local/bin:$PATH
+          which ollama 2>/dev/null && (nohup ollama serve >/tmp/ollama.log 2>&1 & sleep 15) || echo "Ollama not installed, skip"
 
       - name: Cache Ollama model
         uses: actions/cache@v4
@@ -142,11 +143,17 @@ jobs:
           restore-keys: nova-ollama-
 
       - name: Pull Ollama model
+        continue-on-error: true
         run: |
           export PATH=/usr/bin:/usr/local/bin:$PATH
           MODEL="${{ inputs.model || 'llama3.1:8b' }}"
-          timeout 600 ollama pull "$MODEL" 2>/dev/null || timeout 300 ollama pull llama3.2:3b 2>/dev/null || true
-          ollama list 2>/dev/null | head -5
+          export PATH=/usr/local/bin:$PATH
+          if which ollama 2>/dev/null; then
+            timeout 600 ollama pull "$MODEL" 2>/dev/null || timeout 300 ollama pull llama3.2:3b 2>/dev/null || true
+            ollama list 2>/dev/null | head -5
+          else
+            echo "Ollama unavailable - Nova engines run in fallback heuristic mode"
+          fi
 
       - name: Resolve target
         id: target
