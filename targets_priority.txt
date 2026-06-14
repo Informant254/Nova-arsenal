@@ -1,21 +1,19 @@
 # ============================================================
-# Nova Arsenal - Priority Bug Bounty Targets
-# Last updated: 2026-06-13
-# Source: HackerOne GraphQL API + official program pages
+# Nova Arsenal - Priority Bug Bounty Targets (Expanded)
+# Last updated: 2026-06-14
+# Source: HackerOne + Bugcrowd + Intigriti + public VDP pages
 # IMPORTANT: Only scan assets explicitly listed in each
 #            program's current scope. Verify at program page
 #            before each hunt. Out-of-scope = ban/legal risk.
 # ============================================================
 
 # ── SHOPIFY (HackerOne: hackerone.com/shopify) ─────────────
-# Bounty-eligible wildcards
 *.shopify.com
 *.shopifycloud.com
 *.shopifycs.com
 *.shopify.io
 *.shopifykloud.com
 *.pci.shopifyinc.com
-# Bounty-eligible specific targets
 admin.shopify.com
 accounts.shopify.com
 partners.shopify.com
@@ -24,24 +22,17 @@ shopify.plus
 shopifyinbox.com
 linkpop.com
 arrive-server.shopifycloud.com
-# Note: your-store.myshopify.com = use YOUR OWN test store only
 
 # ── GITLAB (HackerOne: hackerone.com/gitlab) ───────────────
-# Bounty-eligible wildcards
 *.gitlab.net
 *.gitlab.org
-*.gitlap.com
-# Bounty-eligible specific targets
 gitlab.com
 about.gitlab.com
 customers.gitlab.com
 docs.gitlab.com
-design.gitlab.com
 registry.gitlab.com
-advisories.gitlab.com
 
 # ── GOOGLE VRP (bughunters.google.com) ─────────────────────
-# Core properties (HIGH bounty)
 accounts.google.com
 myaccount.google.com
 google.com
@@ -49,41 +40,259 @@ mail.google.com
 drive.google.com
 cloud.google.com
 console.cloud.google.com
-# Developer / API surfaces
 developers.google.com
 apis.google.com
-# Auth / Identity surfaces
 oauth2.googleapis.com
-# YouTube
 youtube.com
 studio.youtube.com
-# Note: *.google.com wildcard = in scope per VRP rules
 
 # ── MICROSOFT MSRC (microsoft.com/msrc/bounty) ─────────────
-# Azure (HIGH priority - dedicated bounty up to $60k)
 portal.azure.com
 management.azure.com
 login.microsoftonline.com
 graph.microsoft.com
-# Microsoft Online Services
 outlook.com
 office.com
 office365.com
-onedrive.com
-sharepoint.com
+onedrive.live.com
 teams.microsoft.com
-# Microsoft Identity
-login.live.com
-account.microsoft.com
-# Bing
-bing.com
+*.microsoft.com
+*.azure.com
+*.azurewebsites.net
+*.azureedge.net
+*.visualstudio.com
+*.devops.azure.com
 
-# ── ECITIZEN KENYA (ecitizen.go.ke) ────────────────────────
-# NOTE: No formal BB program found on H1/Bugcrowd/Intigriti.
-# Kenya government runs a responsible disclosure policy.
-# Contact: ict@ecitizen.go.ke before testing.
-# Only test with explicit written authorization.
-# Leaving commented out until authorization is confirmed:
-# ecitizen.go.ke
-# accounts.ecitizen.go.ke
-# api.ecitizen.go.ke
+# ── META (HackerOne: hackerone.com/facebook) ───────────────
+facebook.com
+instagram.com
+whatsapp.com
+messenger.com
+oculus.com
+portal.facebook.com
+business.facebook.com
+developers.facebook.com
+graph.facebook.com
+api.instagram.com
+*.facebook.com
+*.instagram.com
+
+# ── APPLE SECURITY RESEARCH (security.apple.com) ──────────
+apple.com
+icloud.com
+appleid.apple.com
+developer.apple.com
+*.apple.com
+*.icloud.com
+
+# ── GITHUB (HackerOne: hackerone.com/github) ───────────────
+github.com
+gist.github.com
+api.github.com
+raw.githubusercontent.com
+copilot.github.com
+education.github.com
+*.github.com
+*.githubcopilot.com
+
+# ── TWITTER/X (HackerOne: hackerone.com/twitter) ──────────
+twitter.com
+x.com
+api.twitter.com
+developer.twitter.com
+ads.twitter.com
+analytics.twitter.com
+*.twitter.com
+*.x.com
+*.twimg.com
+
+# ── UBER (HackerOne: hackerone.com/uber) ───────────────────
+uber.com
+auth.uber.com
+api.uber.com
+developer.uber.com
+riders.uber.com
+*.uber.com
+*.uberfreight.com
+
+# ── AIRBNB (HackerOne: hackerone.com/airbnb) ───────────────
+airbnb.com
+api.airbnb.com
+*.airbnb.com
+*.airbnbchina.cn
+
+# ── DROPBOX (HackerOne: hackerone.com/dropbox) ─────────────
+dropbox.com
+api.dropboxapi.com
+content.dropboxapi.com
+notify.dropboxapi.com
+*.dropbox.com
+*.dropboxapi.com
+*.dropboxbusiness.com
+
+# ── SLACK (HackerOne: hackerone.com/slack) ─────────────────
+slack.com
+api.slack.com
+app.slack.com
+*.slack.com
+*.slack-msgs.com
+*.slackb.com
+
+# ── PAYPAL (HackerOne: hackerone.com/paypal) ───────────────
+paypal.com
+api.paypal.com
+developer.paypal.com
+checkout.paypal.com
+*.paypal.com
+*.paypalobjects.com
+braintreegateway.com
+*.braintreegateway.com
+
+# ── CLOUDFLARE (HackerOne: hackerone.com/cloudflare) ───────
+cloudflare.com
+api.cloudflare.com
+dash.cloudflare.com
+workers.cloudflare.com
+pages.cloudflare.com
+*.cloudflare.com
+*.cloudflareinsights.com
+*.cloudflareworkers.com
+
+# ── STRIPE (HackerOne: hackerone.com/stripe) ───────────────
+stripe.com
+api.stripe.com
+dashboard.stripe.com
+js.stripe.com
+*.stripe.com
+*.stripecdn.com
+
+# ── NETFLIX (HackerOne: hackerone.com/netflix) ─────────────
+netflix.com
+api.netflix.com
+secure.netflix.com
+*.netflix.com
+*.nflximg.net
+*.nflxvideo.net
+
+# ── AMAZON / AWS (HackerOne: hackerone.com/aws) ────────────
+aws.amazon.com
+console.aws.amazon.com
+signin.aws.amazon.com
+s3.amazonaws.com
+lambda.amazonaws.com
+ec2.amazonaws.com
+*.amazonaws.com
+*.aws.amazon.com
+
+# ── MOZILLA (HackerOne: hackerone.com/mozilla) ─────────────
+mozilla.org
+firefox.com
+accounts.firefox.com
+addons.mozilla.org
+monitor.firefox.com
+relay.firefox.com
+vpn.mozilla.org
+*.mozilla.org
+*.firefox.com
+*.mozaws.net
+
+# ── TWILIO (HackerOne: hackerone.com/twilio) ───────────────
+twilio.com
+api.twilio.com
+console.twilio.com
+sendgrid.com
+api.sendgrid.com
+*.twilio.com
+*.sendgrid.com
+*.sendgrid.net
+
+# ── OKTA (Bugcrowd: bugcrowd.com/okta) ─────────────────────
+okta.com
+auth0.com
+developer.okta.com
+*.okta.com
+*.auth0.com
+*.okta-gov.com
+
+# ── HACKERONE (HackerOne: hackerone.com/security) ──────────
+hackerone.com
+api.hackerone.com
+docs.hackerone.com
+*.hackerone.com
+
+# ── BUGCROWD (Bugcrowd: bugcrowd.com/bugcrowd) ─────────────
+bugcrowd.com
+api.bugcrowd.com
+*.bugcrowd.com
+
+# ── KONGHQ (from targets.txt) ──────────────────────────────
+admin-cloud.konghq.com
+api-konnect-portal.konghq.com
+au.api.konghq.com
+konghq.com
+portal-preview.au.api.konghq.com
+klabs.au.api.konghq.com
+
+# ── YAHOO / VERIZON MEDIA ──────────────────────────────────
+yahoo.com
+login.yahoo.com
+api.yahoo.com
+finance.yahoo.com
+mail.yahoo.com
+*.yahoo.com
+*.yahooapis.com
+verizonmedia.com
+
+# ── ATLASSIAN (Bugcrowd: bugcrowd.com/atlassian) ───────────
+atlassian.com
+jira.atlassian.com
+confluence.atlassian.com
+bitbucket.org
+*.atlassian.com
+*.atlassian.net
+*.bitbucket.org
+*.trello.com
+
+# ── SALESFORCE (HackerOne) ─────────────────────────────────
+salesforce.com
+trailhead.salesforce.com
+developer.salesforce.com
+login.salesforce.com
+*.salesforce.com
+*.force.com
+*.salesforceliveagent.com
+
+# ── ADOBE (HackerOne: hackerone.com/adobe) ─────────────────
+adobe.com
+adobeid.adobe.com
+auth.services.adobe.com
+creativecloud.adobe.com
+adobeaemcloud.com
+*.adobe.com
+*.adobeaemcloud.com
+
+# ── WORDPRESS (HackerOne: hackerone.com/automattic) ────────
+wordpress.com
+wordpress.org
+api.wordpress.com
+jetpack.com
+gravatar.com
+*.wordpress.com
+*.wpcomstaging.com
+
+# ── DISCORD (HackerOne: hackerone.com/discord) ─────────────
+discord.com
+discordapp.com
+api.discord.com
+canary.discord.com
+*.discord.com
+*.discordapp.com
+*.discordapp.net
+
+# ── RIOT GAMES (HackerOne: hackerone.com/riotgames) ────────
+riotgames.com
+auth.riotgames.com
+developer.riotgames.com
+*.riotgames.com
+*.leagueoflegends.com
+*.playvalorant.com
