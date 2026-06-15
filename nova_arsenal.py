@@ -16,8 +16,8 @@ BANNER = r"""
 | |\  || (_) |\ V / | (_| || ||  __/| (_| || |   \__ \|  __/ | |
 |_| \_| \___/  \_/   \__,_||_| \___| \__,_||_|   |___/ \___| |_|
 
-                     Bug Bounty Arsenal v2.0
-         [ Windows Exploits | LLM Jailbreaks | SSRF | Recon ]
+                     Bug Bounty Arsenal v2.1
+    [ Windows Exploits | LLM Jailbreaks | SSRF | Recon | Cracking ]
 """
 
 def load_scope_map(path="targets_scope_map.json"):
@@ -38,6 +38,26 @@ def main():
     sub.add_parser("jailbreak",    help="Run LLM jailbreak against an AI endpoint")
     sub.add_parser("recon",        help="Full recon pipeline on a target")
     sub.add_parser("list-modules", help="List all loaded arsenal modules")
+
+    # crack subcommand
+    crack_p = sub.add_parser("crack", help="Password cracking chain (hashcat + impacket + kerbrute)")
+    crack_p.add_argument("--hashcat",      metavar="FILE",   help="Crack a hash file with hashcat")
+    crack_p.add_argument("--type",         metavar="TYPE",   default="ntlm",
+                         help="Hash type: ntlm|ntlmv2|md5|sha1|sha256|sha512|bcrypt|kerberoast|asreproast|wpa2 (default: ntlm)")
+    crack_p.add_argument("--wordlist",     metavar="FILE",   help="Custom wordlist (default: rockyou from SecLists)")
+    crack_p.add_argument("--mask",         metavar="MASK",   help="Brute-force mask e.g. ?u?l?l?l?d?d")
+    crack_p.add_argument("--kerberoast",   action="store_true", help="Run impacket Kerberoast against AD")
+    crack_p.add_argument("--asreproast",   action="store_true", help="Run AS-REP Roast (no creds needed)")
+    crack_p.add_argument("--enum",         action="store_true", help="Kerbrute username enumeration")
+    crack_p.add_argument("--spray",        metavar="PASS",   help="Kerbrute password spray with this password")
+    crack_p.add_argument("--chain",        action="store_true", help="Full AD chain: enum → AS-REP roast → crack")
+    crack_p.add_argument("--modes",        action="store_true", help="List all supported hash types")
+    crack_p.add_argument("--wordlists",    action="store_true", help="List available SecLists wordlists")
+    crack_p.add_argument("--domain",  "-d", metavar="DOMAIN", help="AD domain (e.g. corp.local)")
+    crack_p.add_argument("--dc",           metavar="IP",     help="Domain controller IP")
+    crack_p.add_argument("--user",    "-u", metavar="USER",  help="AD username for authenticated attacks")
+    crack_p.add_argument("--password","-P", metavar="PASS",  help="AD password for authenticated attacks")
+    crack_p.add_argument("--userlist", "-U", metavar="FILE", help="User list file for enum/spray/asreproast")
 
     parser.add_argument("--target",  "-t", help="Target host or URL")
     parser.add_argument("--program", "-p", help="Bug bounty program name (from scope map)")
@@ -88,6 +108,46 @@ def main():
         if result["in_scope"] or args.verbose:
             scanner = SSRFScanner(target=args.target, verbose=args.verbose)
             scanner.run()
+
+    elif args.command == "crack":
+        from modules.crack.crack_chain import CrackChain
+        cc = CrackChain(verbose=args.verbose)
+
+        if args.modes:
+            cc.show_modes()
+        elif args.wordlists:
+            cc.list_wordlists()
+        elif args.chain:
+            if not args.domain or not args.dc:
+                print("[!] --domain and --dc required for --chain")
+                sys.exit(1)
+            cc.full_ad_chain(args.domain, args.dc, args.userlist)
+        elif args.hashcat:
+            cc.crack_hashcat(args.hashcat, hash_type=args.type,
+                             wordlist=args.wordlist, brute=args.mask)
+        elif args.kerberoast:
+            if not all([args.domain, args.dc, args.user, args.password]):
+                print("[!] --domain, --dc, --user, --password required for --kerberoast")
+                sys.exit(1)
+            cc.kerberoast(args.domain, args.user, args.password, args.dc)
+        elif args.asreproast:
+            if not all([args.domain, args.dc]):
+                print("[!] --domain and --dc required for --asreproast")
+                sys.exit(1)
+            ul = args.userlist or "users.txt"
+            cc.asrep_roast(args.domain, args.dc, ul)
+        elif args.enum:
+            if not all([args.domain, args.dc]):
+                print("[!] --domain and --dc required for --enum")
+                sys.exit(1)
+            cc.kerbrute_enum(args.domain, args.dc, args.userlist)
+        elif args.spray:
+            if not all([args.domain, args.dc, args.userlist]):
+                print("[!] --domain, --dc, --userlist required for --spray")
+                sys.exit(1)
+            cc.kerbrute_spray(args.domain, args.dc, args.userlist, args.spray)
+        else:
+            crack_p.print_help()
 
     else:
         parser.print_help()
