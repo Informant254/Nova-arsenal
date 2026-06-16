@@ -1,0 +1,154 @@
+name: "🦅 Nova — Ollama Model Cache"
+
+# Pre-pulls and caches Ollama models so hunt workflows start instantly.
+# Run manually or on a weekly schedule to refresh the cache.
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: 'Space-separated list of models to cache'
+        required: false
+        default: 'qwen3:1.7b qwen3:8b phi3:mini deepseek-r1:1.5b llama3.1:8b'
+  schedule:
+    - cron: '0 0 * * 0'   # Every Sunday 00:00 UTC — refresh cache weekly
+
+jobs:
+  cache-models:
+    name: "Pull & Cache Ollama Models"
+    runs-on: ubuntu-latest
+    container:
+      image: kalilinux/kali-last-release
+      options: --privileged --shm-size=4g
+
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+      actions: write
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      MODELS: ${{ inputs.models || 'qwen3:1.7b qwen3:8b phi3:mini deepseek-r1:1.5b llama3.1:8b' }}
+      OLLAMA_MODELS: /root/.ollama/models
+
+    steps:
+
+      - name: "⚙️ Install system deps"
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq 2>/dev/null | tail -1
+          apt-get install -y -qq curl pciutils 2>/dev/null | tail -1
+          echo "Runner: $(uname -a)"
+          echo "Disk  : $(df -h / | tail -1)"
+          echo "RAM   : $(free -h | awk '/^Mem:/{print $2}')"
+
+      - name: "📦 Restore Ollama model cache"
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: /root/.ollama/models
+          key: nova-ollama-models-${{ hashFiles('.github/workflows/nova-ollama-models.yml') }}
+          restore-keys: |
+            nova-ollama-models-
+
+      - name: "🚀 Install & start Ollama"
+        run: |
+          echo "[1/3] Installing Ollama..."
+          curl -fsSL https://ollama.ai/install.sh | sh
+          echo "      Version: $(ollama --version 2>/dev/null)"
+
+          echo "[2/3] Starting Ollama server..."
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          sleep 8
+
+          echo "[3/3] Waiting for API readiness..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
+              echo "      ✅ Ollama API ready (${i}s)"
+              break
+            fi
+            [ $i -eq 20 ] && { echo "❌ Ollama failed"; cat /tmp/ollama.log; exit 1; }
+            sleep 3
+          done
+
+      - name: "🧠 Pull models"
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  🦅 NOVA — PULLING OLLAMA MODELS"
+          echo "  Models: $MODELS"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+
+          DISK_FREE_GB=$(df -BG / | awk 'NR==2{gsub("G",""); print $4}')
+          RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
+          echo "  Disk free : ${DISK_FREE_GB}GB"
+          echo "  RAM total : ${RAM_MB}MB"
+          echo ""
+
+          PULLED=()
+          FAILED=()
+
+          for MODEL in $MODELS; do
+            echo "  ┌─ Pulling: $MODEL"
+
+            # Skip large models if disk is tight (< 8GB free)
+            if [ "${DISK_FREE_GB}" -lt 8 ] && echo "$MODEL" | grep -qE '(8b|13b|70b)'; then
+              echo "  │  ⚠ Skipping $MODEL — disk < 8GB"
+              echo "  └─ SKIPPED"
+              FAILED+=("$MODEL (disk)")
+              continue
+            fi
+
+            # Skip 8b+ models if RAM < 10GB
+            if [ "${RAM_MB}" -lt 10000 ] && echo "$MODEL" | grep -qE ':8b|:13b|:70b'; then
+              echo "  │  ⚠ Skipping $MODEL — RAM < 10GB (use qwen3:1.7b on this runner)"
+              echo "  └─ SKIPPED"
+              FAILED+=("$MODEL (RAM)")
+              continue
+            fi
+
+            if timeout 900 ollama pull "$MODEL" 2>&1 | tail -3; then
+              echo "  └─ ✅ $MODEL ready"
+              PULLED+=("$MODEL")
+            else
+              echo "  └─ ❌ $MODEL failed (non-fatal)"
+              FAILED+=("$MODEL (pull error)")
+            fi
+            echo ""
+          done
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ✅ Pulled  : ${PULLED[*]:-none}"
+          echo "  ⚠  Skipped : ${FAILED[*]:-none}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          ollama list
+          echo ""
+          echo "  Cache dir size: $(du -sh $OLLAMA_MODELS 2>/dev/null | cut -f1)"
+
+          # Fail if zero models were pulled
+          [ ${#PULLED[@]} -eq 0 ] && echo "❌ No models pulled" && exit 1 || true
+
+      - name: "💾 Save Ollama model cache"
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /root/.ollama/models
+          key: nova-ollama-models-${{ hashFiles('.github/workflows/nova-ollama-models.yml') }}
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          echo "## 🦅 Nova Ollama Model Cache" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Models cached:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ollama list 2>/dev/null >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cache size:** $(du -sh /root/.ollama/models 2>/dev/null | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Hunt workflows will restore this cache and skip model download entirely." >> $GITHUB_STEP_SUMMARY
