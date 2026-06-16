@@ -124,6 +124,9 @@ _PAYLOAD_MAP: Dict[str, List[str]] = {
     "xxe":                _XXE_BASE,
     "prototype_pollution": _PROTO_POLLUTION,
     "open_redirect":      _OPEN_REDIRECT,
+    "rce":                [],
+    "reverse_shells":     [],
+    "web_shells":         [],
 }
 
 
@@ -153,6 +156,8 @@ def _add_noise(payload: str) -> str:
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 
+from nova_payload_library import get_payloads
+
 class NovaPayloadEngine:
     """
     Polymorphic payload generator.
@@ -161,6 +166,7 @@ class NovaPayloadEngine:
 
     def __init__(self, reasoning: Any = None):
         self._reasoning = reasoning
+        self.library = get_payloads
 
     def generate(self, vuln_type: str, count: int = 10,
                  waf_mode: bool = False) -> List[str]:
@@ -168,7 +174,13 @@ class NovaPayloadEngine:
         Return `count` payloads for the given vulnerability type.
         If waf_mode=True, each payload is mutated for WAF evasion.
         """
-        base = _PAYLOAD_MAP.get(vuln_type.lower(), _SQLI_BASE)
+        # Pull from centralized library if available
+        lib_payloads = self.library(vuln_type)
+        if lib_payloads:
+            base = lib_payloads
+        else:
+            base = _PAYLOAD_MAP.get(vuln_type.lower(), _SQLI_BASE)
+            
         pool = list(base)
 
         # Extend with mutations

@@ -37,6 +37,8 @@ def main():
     sub.add_parser("cve",          help="Search local CVE/PoC cache for relevant exploits")
     sub.add_parser("jailbreak",    help="Run LLM jailbreak against an AI endpoint")
     sub.add_parser("recon",        help="Full recon pipeline on a target")
+    sub.add_parser("exploit",      help="Run automated exploitation engine")
+    sub.add_parser("fuzz",         help="Run advanced polymorphic fuzzer")
     sub.add_parser("list-modules", help="List all loaded arsenal modules")
 
     # ── crack ──────────────────────────────────────────────────
@@ -104,16 +106,25 @@ def main():
         if not args.target:
             print("[!] --target required for recon")
             sys.exit(1)
-        from modules.recon.ssrf_scanner import SSRFScanner
-        from modules.recon.scope_validator import ScopeValidator
-        scope = load_scope_map()
-        print(f"[*] Starting full recon on: {args.target}")
-        v = ScopeValidator(scope)
-        result = v.check(args.target)
-        print(f"    Scope: {'IN-SCOPE' if result['in_scope'] else 'OUT-OF-SCOPE'} — {result['reason']}")
-        if result["in_scope"] or args.verbose:
-            scanner = SSRFScanner(target=args.target, verbose=args.verbose)
-            scanner.run()
+        from nova_core import NovaCore
+        nova = NovaCore(base_url=args.target)
+        nova.phase_1_recon()
+
+    elif args.command == "exploit":
+        if not args.target:
+            print("[!] --target required for exploit")
+            sys.exit(1)
+        from nova_core import NovaCore
+        nova = NovaCore(base_url=args.target)
+        nova.phase_2_exploit()
+
+    elif args.command == "fuzz":
+        if not args.target:
+            print("[!] --target required for fuzz")
+            sys.exit(1)
+        from nova_core import NovaCore
+        nova = NovaCore(base_url=args.target)
+        nova.phase_3_fuzz()
 
     elif args.command == "crack":
         from modules.crack.crack_chain import CrackChain
