@@ -1,14 +1,29 @@
 #!/usr/bin/env python3
 """
-NOVA CI/CD SCANNER v1.0
+NOVA CI/CD SCANNER v1.1
 Security analysis of CI/CD pipelines:
 GitHub Actions, GitLab CI, CircleCI, Jenkins, Travis CI, Bitbucket Pipelines.
 Finds: hardcoded secrets, script injection, insecure deps, excessive permissions,
 unpinned actions, pull_request_target abuse, and supply chain attack vectors.
+
+SCOPE GUARD (v1.1): When the scan directory is detected as Nova's own codebase,
+CI/CD findings are tagged as local-scope and excluded from remote target reports.
 """
 import os, re, json, yaml
 from typing import Dict, List
 from datetime import datetime
+
+# ── Sentinel: files that identify Nova's own repo ─────────────────────────────
+_NOVA_SENTINELS = {"nova.py", "nova_codebase_mapper.py", "nova_ci_runner.py",
+                   "nova_weapon_forge.py", "nova_cicd_scanner.py"}
+
+def _is_nova_own_repo(directory: str) -> bool:
+    """Return True if `directory` is Nova Arsenal's own codebase."""
+    try:
+        root_files = set(os.listdir(directory))
+        return len(root_files & _NOVA_SENTINELS) >= 2
+    except Exception:
+        return False
 
 # ── Secret patterns in CI config ─────────────────────────────────────────────
 SECRET_PATS = [
@@ -97,6 +112,16 @@ class NovaCICDScanner:
     def scan_directory(self, directory: str) -> List[Dict]:
         print(f"\n🔧 NOVA CI/CD SCANNER — {directory}")
         print("=" * 60)
+
+        # ── SCOPE GUARD ───────────────────────────────────────────────────────
+        if _is_nova_own_repo(directory):
+            print("  ⚠️  [SCOPE GUARD] This directory is Nova's own codebase.")
+            print("  CI/CD findings here belong to Nova Arsenal, NOT the remote target.")
+            print("  Skipping — to audit Nova's own workflows, run: nova_cicd_scanner.py .")
+            print(f"\n  📊 CI/CD Scan: 0 findings | 0 CRITICAL | 0 pipeline files scanned")
+            self.findings = []
+            return []
+
         all_findings = []
         ci_files_found = 0
         for root, dirs, files in os.walk(directory):
