@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-NOVA CSRF TESTER v1.0
+NOVA CSRF TESTER v1.1
 Cross-Site Request Forgery detection:
 SameSite cookie analysis, CSRF token validation, origin checking,
 custom header reliance, JSON CSRF, and multipart CSRF testing.
+
+FIX (v1.1): Removed hardcoded Juice Shop endpoint defaults.
+Now probes only endpoints that are confirmed live on the actual target.
+Endpoints seeded from the codebase map are no longer blindly tested —
+they must pass a pre-flight existence check against the live target first.
 """
 import json, re, urllib.request, urllib.error, urllib.parse
 from typing import Dict, List, Tuple
@@ -13,8 +18,6 @@ STATE_CHANGE_METHODS = ["POST","PUT","PATCH","DELETE"]
 CSRF_HEADER_NAMES    = ["x-csrf-token","x-xsrf-token","x-requested-with","csrf-token","_csrf","csrftoken"]
 
 def _req(url, method="GET", data=None, headers=None, timeout=10):
-    h = {"User-Agent":"Mozilla/5.0 Nova/4.0",(headers or {}).get("k",""):(headers or {}).get("v","")
-         if headers and "k" in headers else ""}
     h = {k:v for k,v in {**(headers or {}), "User-Agent":"Mozilla/5.0 Nova/4.0"}.items() if v}
     req = urllib.request.Request(url, method=method)
     for k,v in h.items(): req.add_header(k,v)
@@ -28,6 +31,26 @@ def _req(url, method="GET", data=None, headers=None, timeout=10):
         return e.code, body, {}
     except Exception as e:
         return 0, str(e), {}
+
+
+def _endpoint_exists(base_url: str, path: str, headers: Dict = None) -> bool:
+    """
+    Pre-flight check: verify the endpoint actually exists on the LIVE target.
+    Returns True only if the server responds with a non-404/non-empty response
+    that suggests the path is a real endpoint (not a catch-all HTML fallback).
+    """
+    url = base_url.rstrip("/") + path
+    code, body, hdrs = _req(url, headers=headers or {})
+    if code in (404, 405, 410):
+        return False
+    if code == 0:
+        return False
+    # Reject generic HTML catch-all responses (SPA fallback / 200 with full HTML)
+    content_type = hdrs.get("Content-Type", hdrs.get("content-type", ""))
+    if "text/html" in content_type and len(body) > 5000:
+        # Likely a SPA catch-all returning the full page — not a real API endpoint
+        return False
+    return True
 
 
 class NovaCsrfTester:
@@ -67,13 +90,11 @@ class NovaCsrfTester:
     def _check_csrf_token_validation(self, endpoint: str, method: str = "POST") -> List[Dict]:
         findings = []
         url = self.base_url + endpoint
-        # Step 1: Get page to extract CSRF token
         code, body, hdrs = _req(url, headers=self.base_headers)
         if code not in (200,): return findings
 
         token_match = re.search(r'(?:csrf[_-]?token|_csrf|csrfmiddlewaretoken)["\s]*[=:]["\s]*([A-Za-z0-9+/\-_]{16,})', body, re.IGNORECASE)
         if not token_match:
-            # Try to POST without a CSRF token
             code2, body2, _ = _req(url, method=method,
                 data=urllib.parse.urlencode({"test":"nova_csrf_probe"}),
                 headers={**self.base_headers, "Content-Type":"application/x-www-form-urlencoded"})
@@ -83,7 +104,6 @@ class NovaCsrfTester:
                     "description":"State-changing request accepted without CSRF token"})
         else:
             token = token_match.group(1)
-            # Replay with invalid token
             code3, body3, _ = _req(url, method=method,
                 data=urllib.parse.urlencode({"csrfmiddlewaretoken":"INVALID_TOKEN_NOVA","test":"value"}),
                 headers={**self.base_headers, "Content-Type":"application/x-www-form-urlencoded"})
@@ -97,7 +117,6 @@ class NovaCsrfTester:
         findings = []
         url = self.base_url + endpoint
         evil_origin = "https://evil-attacker.com"
-        # Test with evil Origin header
         code, body, _ = _req(url, method=method,
             data=urllib.parse.urlencode({"test":"nova"}),
             headers={**self.base_headers, "Origin": evil_origin,
@@ -106,7 +125,6 @@ class NovaCsrfTester:
             findings.append({"type":"CSRF — Evil Origin Accepted","severity":"HIGH",
                 "endpoint": url, "description": f"Request from Origin: {evil_origin} accepted",
                 "status_code": code})
-        # Test with null Origin
         code2, body2, _ = _req(url, method=method,
             data=urllib.parse.urlencode({"test":"nova"}),
             headers={**self.base_headers, "Origin": "null",
@@ -127,7 +145,6 @@ class NovaCsrfTester:
             findings.append({"type":"JSON CSRF","severity":"MEDIUM",
                 "endpoint": url,
                 "description":"JSON POST with evil Origin accepted — may allow CSRF if SameSite not enforced"})
-        # Attempt with text/plain (browser-sendable without preflight)
         code2, _, _ = _req(url, method="POST",
             data='{"action":"test"}',
             headers={**self.base_headers, "Content-Type":"text/plain"})
@@ -161,15 +178,32 @@ class NovaCsrfTester:
     def run(self, endpoints: List[str] = None) -> List[Dict]:
         print(f"\n🔐 NOVA CSRF TESTER — {self.base_url}")
         print("=" * 60)
-        test_paths = endpoints or ["/", "/api/user", "/api/account", "/profile",
-                                    "/settings", "/api/login", "/api/transfer"]
+
+        # ── ENDPOINT VALIDATION ───────────────────────────────────────────────
+        # Only test endpoints that are explicitly provided AND confirmed live.
+        # The old default list (/api/user, /api/account, /profile etc.) was from
+        # OWASP Juice Shop and caused false positives against every target.
+        # Without explicit endpoints, only the root path is checked for cookies/CORS.
+        candidate_paths = endpoints or ["/"]
+        live_paths = []
+        for path in candidate_paths:
+            if path == "/" or _endpoint_exists(self.base_url, path, self.base_headers):
+                live_paths.append(path)
+            else:
+                print(f"  ⏭  Skipping {path} — endpoint not found on live target")
+
+        if not live_paths:
+            print("  ℹ️  No live endpoints found to test — CSRF scan skipped")
+            self.findings = []
+            return []
+
         all_findings = []
 
-        # Cookie analysis
+        # Cookie analysis on root
         _, _, hdrs = _req(self.base_url, headers=self.base_headers)
         all_findings.extend(self._analyze_set_cookie(hdrs))
 
-        for path in test_paths[:8]:
+        for path in live_paths[:8]:
             all_findings.extend(self._check_csrf_token_validation(path))
             all_findings.extend(self._check_origin_referer(path))
             all_findings.extend(self._check_json_csrf(path))
