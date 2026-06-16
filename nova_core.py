@@ -41,6 +41,9 @@ try:
     from nova_reasoning_core  import NovaReasoningCore, get_reasoning_core
     from nova_knowledge_rag   import NovaKnowledgeRAG, get_rag
     from nova_payload_engine  import NovaPayloadEngine
+    from nova_trace_isolator  import get_isolator
+    from nova_identity_takeover import NovaIdentityTakeover
+    from nova_cloud_strike    import NovaCloudStrike
     _INTELLIGENCE_AVAILABLE = True
 except ImportError as _ie:
     print(f"  ⚠️  Intelligence modules not loaded: {_ie}")
@@ -75,10 +78,16 @@ class NovaCore:
             self.reasoning = get_reasoning_core()
             self.rag       = get_rag()
             self.payloads  = NovaPayloadEngine(reasoning=self.reasoning)
+            self.stealth   = get_isolator()
+            self.identity  = NovaIdentityTakeover()
+            self.cloud     = NovaCloudStrike()
         else:
             self.reasoning = None
             self.rag       = None
             self.payloads  = None
+            self.stealth   = None
+            self.identity  = None
+            self.cloud     = None
 
     # ── v2.0 helpers (unchanged) ──────────────────────────────────
 

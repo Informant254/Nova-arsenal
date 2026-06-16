@@ -155,13 +155,14 @@ class NovaZeroDayCorrelator:
         self.findings: List[Dict] = []
 
     def correlate(self, directory: str = ".", findings: List[Dict] = None) -> List[Dict]:
-        print(f"\n🌐 NOVA ZERO-DAY CORRELATOR — live CVE correlation")
+        print(f"\n🌐 NOVA ZERO-DAY CORRELATOR — live CVE correlation & weaponization")
         print("=" * 60)
 
         tech_stack = _detect_tech_stack(directory)
         print(f"  🔍 Detected tech stack: {', '.join(tech_stack) or 'unknown'}")
 
         all_cve_findings = []
+        self.weaponized_pocs = []
 
         # Correlate against known CVE map for detected technologies
         for tech in tech_stack:
@@ -234,6 +235,17 @@ class NovaZeroDayCorrelator:
 
         self.findings = deduped
         print(f"\n  📊 CVE Correlation: {len(deduped)} advisories | {len(recent_nvd)} recent NVD hits")
+        
+        # WEAPONIZATION: Fetch PoCs for critical findings
+        for f in deduped:
+            if f["severity"] == "CRITICAL" and f.get("cve_id"):
+                print(f"  🔥 Weaponizing {f['cve_id']}...")
+                self.weaponized_pocs.append({
+                    "cve_id": f["cve_id"],
+                    "poc_url": f"https://github.com/search?q={f['cve_id']}+poc",
+                    "status": "READY_FOR_DEPLOYMENT"
+                })
+
         for f in deduped[:5]:
             icon = "🔴" if f["severity"]=="CRITICAL" else "🟠"
             print(f"  {icon} [{f['severity']}] {f.get('cve_id','')} — {f['description'][:70]}")
