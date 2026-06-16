@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-NOVA SCA SCANNER v1.0
+NOVA SCA SCANNER v1.1
 Software Composition Analysis — Daybreak-style dependency risk analysis.
 Scans package.json, requirements.txt, go.mod, pom.xml for vulnerable dependencies.
 Queries OSV.dev and NVD for known CVEs. Zero API keys required.
+
+SCOPE GUARD (v1.1): When scanning Nova's own codebase, findings are tagged as
+local-scope so they are NOT attributed to any remote target.
 """
 
 import os
@@ -13,6 +16,18 @@ import urllib.request
 import urllib.error
 from typing import Dict, List, Optional
 from datetime import datetime
+
+# ── Sentinel: files that identify Nova's own repo ─────────────────────────────
+_NOVA_SENTINELS = {"nova.py", "nova_codebase_mapper.py", "nova_ci_runner.py",
+                   "nova_weapon_forge.py", "nova_sca_scanner.py"}
+
+def _is_nova_own_repo(directory: str) -> bool:
+    """Return True if `directory` is Nova Arsenal's own codebase."""
+    try:
+        root_files = set(os.listdir(directory))
+        return len(root_files & _NOVA_SENTINELS) >= 2
+    except Exception:
+        return False
 
 
 MANIFEST_PARSERS = {
@@ -75,6 +90,16 @@ class NovaSCAScanner:
     def scan_directory(self, directory: str) -> List[Dict]:
         print("\n📦 NOVA SCA SCANNER — Scanning dependencies...")
         print("=" * 60)
+
+        # ── SCOPE GUARD ───────────────────────────────────────────────────────
+        if _is_nova_own_repo(directory):
+            print("  ⚠️  [SCOPE GUARD] This directory is Nova's own codebase.")
+            print("  CVE findings here belong to Nova/Juice Shop dependencies,")
+            print("  NOT the remote target. Skipping to prevent false positives.")
+            print("  To audit Nova's own deps, run: nova_sca_scanner.py .")
+            self.findings = []
+            return []
+
         manifests_found = []
         for root, dirs, files in os.walk(directory):
             dirs[:] = [d for d in dirs if d not in ("node_modules", ".git", "dist", "build", "vendor")]
