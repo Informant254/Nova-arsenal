@@ -681,39 +681,52 @@ def dispatch(intent: dict) -> List[Dict]:
 
     # ════════════════════════════════════════════════════════════════════════════
     # PHASE 0 (already ran before dispatch) — inject secrets from map as findings
+    # SCOPE GUARD: Only inject codebase findings when the map is NOT from Nova's
+    # own repo. When Nova scans itself (e.g. in CI against a remote target), the
+    # secrets/deps belong to Nova/Juice Shop — not the remote target.
     # ════════════════════════════════════════════════════════════════════════════
     if _CMAP and mode in ("full_stack", "sast", "hunt", "map"):
-        sec_findings = []
-        for s in _CMAP.secret_findings:
-            sec_findings.append({
-                "type":        "SecretExposure",
-                "severity":    "HIGH",
-                "file":        s.get("file",""),
-                "line":        s.get("line", 0),
-                "description": f"Potential {s.get('pattern','secret')} in source",
-                "snippet":     s.get("snippet",""),
-                "source":      "codebase_mapper",
-            })
-        if sec_findings:
-            _emit_findings(sec_findings, "mapper")
-            findings.extend(sec_findings)
-            print(f"  🔑 Mapper: {len(sec_findings)} potential secrets injected as findings")
+        _own_repo = getattr(_CMAP, "is_own_repo", False)
+        if _own_repo:
+            print("  ℹ️  Mapper: Codebase map is Nova's own repo — "
+                  "secrets/deps are local, NOT target findings. Skipping injection.")
+        else:
+            sec_findings = []
+            for s in _CMAP.secret_findings:
+                # Skip any findings already marked as local scope
+                if s.get("scope") == "local_nova_codebase":
+                    continue
+                sec_findings.append({
+                    "type":        "SecretExposure",
+                    "severity":    "HIGH",
+                    "file":        s.get("file",""),
+                    "line":        s.get("line", 0),
+                    "description": f"Potential {s.get('pattern','secret')} in source",
+                    "snippet":     s.get("snippet",""),
+                    "source":      "codebase_mapper",
+                })
+            if sec_findings:
+                _emit_findings(sec_findings, "mapper")
+                findings.extend(sec_findings)
+                print(f"  🔑 Mapper: {len(sec_findings)} potential secrets injected as findings")
 
-        # Risky deps as findings
-        dep_findings = []
-        for d in _CMAP.risky_deps:
-            dep_findings.append({
-                "type":        "VulnerableDependency",
-                "severity":    "HIGH",
-                "description": f"{d['package']} {d['version']} — {d['risk']}",
-                "cve":         d.get("cve",""),
-                "file":        "package.json / requirements.txt",
-                "source":      "codebase_mapper",
-            })
-        if dep_findings:
-            _emit_findings(dep_findings, "mapper")
-            findings.extend(dep_findings)
-            print(f"  ⚠️  Mapper: {len(dep_findings)} CVE-affected dependencies")
+            # Risky deps as findings
+            dep_findings = []
+            for d in _CMAP.risky_deps:
+                if d.get("scope") == "local_nova_codebase":
+                    continue
+                dep_findings.append({
+                    "type":        "VulnerableDependency",
+                    "severity":    "HIGH",
+                    "description": f"{d['package']} {d['version']} — {d['risk']}",
+                    "cve":         d.get("cve",""),
+                    "file":        "package.json / requirements.txt",
+                    "source":      "codebase_mapper",
+                })
+            if dep_findings:
+                _emit_findings(dep_findings, "mapper")
+                findings.extend(dep_findings)
+                print(f"  ⚠️  Mapper: {len(dep_findings)} CVE-affected dependencies")
 
     # standalone map mode
     if mode == "map":
