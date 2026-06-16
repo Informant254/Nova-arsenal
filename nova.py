@@ -292,18 +292,42 @@ def _run_phase0_mapper(target: str, force: bool = False) -> Optional[Any]:
     Map the target directory before any scan runs.
     Returns a CodebaseMap (or None if target is not a directory / mapper unavailable).
     The map is stored in the global _CMAP and injected into every subsequent phase.
+
+    Target resolution rules (in priority order):
+      1. If `target` is a local directory path → map it directly.
+      2. If NOVA_SOURCE_DIR env var is set → map that directory (caller explicitly
+         provided a cloned copy of the target's source code).
+      3. If `target` is a remote URL → skip codebase mapping entirely.
+         Do NOT fall back to os.getcwd(): that would scan Nova's own repo and
+         inject its secrets / Juice Shop dependencies as target findings.
     """
     global _CMAP
 
     if _CMAP and not force:
         return _CMAP
 
+    is_remote_url = target.startswith(("http://", "https://", "ftp://"))
     is_dir = os.path.isdir(target)
-    if not is_dir and not os.path.isdir(os.getcwd()):
+
+    # Priority 1: explicit local directory target
+    if is_dir:
+        map_target = target
+
+    # Priority 2: caller provided a source dir via env var
+    elif os.environ.get("NOVA_SOURCE_DIR") and os.path.isdir(os.environ["NOVA_SOURCE_DIR"]):
+        map_target = os.environ["NOVA_SOURCE_DIR"]
+        print(f"\n  🗺  Phase 0: Using NOVA_SOURCE_DIR={map_target} as source context")
+
+    # Priority 3: remote URL with no source dir — skip mapping
+    elif is_remote_url:
+        print(f"\n  ℹ️  Phase 0: Target is a remote URL — codebase mapping skipped.")
+        print( "     To enable source-code analysis, clone the target repo and set:")
+        print( "     NOVA_SOURCE_DIR=/path/to/cloned/target/repo")
         return None
 
-    # For URL targets, try to map the current working directory as the companion codebase
-    map_target = target if is_dir else os.getcwd()
+    # No usable target
+    else:
+        return None
 
     if not get_codebase_map and not NovaCodebaseMapper:
         return None
