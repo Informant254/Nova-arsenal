@@ -469,7 +469,15 @@ class NovaWeaponForge:
         return result
 
     def forge_from_finding(self, finding: Dict) -> Dict:
-        """Generate exploit code from a Nova finding dict."""
+        """
+        Enrich an existing finding with generated exploit code.
+
+        ENRICHMENT MODE (v1.1 fix): Instead of creating a separate new finding
+        with a "WeaponForge:" prefix (which doubled every finding in reports),
+        this method now adds exploit_code / exploit_file / exploit_path fields
+        to the ORIGINAL finding dict and returns it. The finding count stays
+        the same — no duplicates are created.
+        """
         vuln_type = _classify_vuln(
             f"{finding.get('type','')} {finding.get('description','')}"
         )
@@ -477,12 +485,19 @@ class NovaWeaponForge:
                      f"NOVA-{vuln_type.upper()}-{int(time.time())}")
         desc      = finding.get("description","")
         code      = self._generate_code(vuln_id, vuln_type, desc)
-        result    = self._package(vuln_id, vuln_type, code,
+        pkg       = self._package(vuln_id, vuln_type, code,
                                   {"description": desc, "cvss": finding.get("cvss_score",0)})
-        # Embed the original finding
-        result["source_finding"] = finding
-        self.results.append(result)
-        return result
+
+        # ── ENRICHMENT: attach exploit to original finding (no duplicate) ──
+        enriched = dict(finding)
+        enriched["exploit_code"]     = pkg.get("exploit_code","")
+        enriched["exploit_file"]     = pkg.get("exploit_file","")
+        enriched["exploit_path"]     = pkg.get("exploit_path","")
+        enriched["weapon_forged"]    = True
+        enriched["forge_vuln_type"]  = vuln_type
+        enriched["forge_vuln_id"]    = vuln_id
+        self.results.append(enriched)
+        return enriched
 
     def forge_from_description(self, description: str,
                                 lang: str = "python") -> Dict:
@@ -497,7 +512,13 @@ class NovaWeaponForge:
         return result
 
     def batch_forge(self, findings: List[Dict]) -> List[Dict]:
-        """Forge exploits for a list of findings (Critical/High prioritised)."""
+        """
+        Enrich findings with exploit code (Critical/High prioritised).
+
+        Returns the SAME finding objects, now enriched with exploit_code /
+        exploit_file / weapon_forged fields. Does NOT create new findings —
+        the list length stays the same to prevent report duplication.
+        """
         prioritised = sorted(
             findings,
             key=lambda f: (
@@ -505,7 +526,10 @@ class NovaWeaponForge:
                 1 if str(f.get("severity","")).upper() == "HIGH" else 2
             )
         )
-        return [self.forge_from_finding(f) for f in prioritised[:10]]
+        enriched = [self.forge_from_finding(f) for f in prioritised[:10]]
+        # Return only the enriched findings (not the full original list);
+        # callers that merge these back should update in-place by matching on type+endpoint.
+        return enriched
 
     # ── Internal ──────────────────────────────────────────────────
 
