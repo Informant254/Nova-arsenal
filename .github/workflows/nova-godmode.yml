@@ -52,10 +52,32 @@ jobs:
       PYTHONUNBUFFERED: '1'
       GOPATH: /root/go
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      # NOVA_SOURCE_DIR: leave empty for remote URL targets.
+      # Set only when providing a cloned copy of the target's source.
+      NOVA_SOURCE_DIR: ''
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate and confirm scan target
+        run: |
+          TARGET="${{ inputs.target || 'https://shopify.plus' }}"
+          echo '═══════════════════════════════════════════════'
+          echo '  NOVA ARSENAL — TARGET CONFIRMATION'
+          echo '═══════════════════════════════════════════════'
+          echo "  Remote target  : $TARGET"
+          echo "  Nova repo      : ${{ github.repository }}"
+          echo "  Runner CWD     : $(pwd)"
+          echo '  NOVA_SOURCE_DIR: (empty — remote URL scan, local codebase map skipped)'
+          echo '═══════════════════════════════════════════════'
+          if echo "$TARGET" | grep -qiE '(localhost|127\.0\.0\.1|::1|0\.0\.0\.0)'; then
+            echo 'ERROR: Target is localhost. Set a valid external URL.' && exit 1
+          fi
+          if echo "$TARGET" | grep -qiE 'Nova-arsenal|Informant254/Nova'; then
+            echo 'ERROR: Target points to Nova Arsenal itself. Use NOVA_SOURCE_DIR for source analysis.' && exit 1
+          fi
+          echo "Target validated: $TARGET"
 
       - name: Init workspace and PATH
         run: |
