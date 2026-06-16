@@ -1,0 +1,16 @@
+name: Nova Dispatch Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target'
+        required: false
+        default: 'https://shopify.plus'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify dispatch
+        run: echo "Dispatch works - target=${{ inputs.target }}"
