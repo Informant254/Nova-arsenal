@@ -384,6 +384,7 @@ class CodebaseMap:
     attack_surface:  Dict
     strategic_summary: str = ""
     raw_map_path:    str = ""
+    is_own_repo:     bool = False   # True when scanning Nova's own codebase
 
     def summary(self) -> str:
         langs = ", ".join(
@@ -475,6 +476,24 @@ class CodebaseMap:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SCOPE GUARD: Own-repo detection
+# ─────────────────────────────────────────────────────────────────────────────
+
+_NOVA_SENTINEL_FILES: Set[str] = {
+    "nova.py", "nova_codebase_mapper.py", "nova_ci_runner.py",
+    "nova_weapon_forge.py", "nova_cicd_scanner.py",
+}
+
+def _is_nova_own_repo(directory) -> bool:
+    """Return True when `directory` is the Nova Arsenal codebase itself."""
+    try:
+        root_files = {f.name for f in directory.iterdir() if f.is_file()}
+        return len(root_files & _NOVA_SENTINEL_FILES) >= 2
+    except Exception:
+        return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # NOVA CODEBASE MAPPER
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -504,6 +523,13 @@ class NovaCodebaseMapper:
         self._deps:         Dict[str,str]  = {}
         self._test_count:   int            = 0
         self._src_count:    int            = 0
+
+        # Scope guard: detect if scanning Nova's own codebase
+        self._own_repo: bool = _is_nova_own_repo(self.target)
+        if self._own_repo and verbose:
+            print("  ⚠️  [SCOPE GUARD] Scanning Nova's own codebase detected.")
+            print("     Secret and dependency findings will be tagged 'local_nova_codebase'")
+            print("     and will NOT be injected as remote target findings.")
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -558,6 +584,17 @@ class NovaCodebaseMapper:
                            if k not in ("JSON","YAML","Markdown","Text","EnvFile","Config")),
                           primary)
 
+        # ── SCOPE GUARD: tag secrets/deps when scanning own codebase ────────
+        raw_secrets   = self._secrets[:50]
+        raw_risky_deps = self._check_risky_deps()
+        if self._own_repo:
+            for s in raw_secrets:
+                s.setdefault("scope", "local_nova_codebase")
+                s.setdefault("warning", "Found in Nova's own codebase — NOT a target vulnerability")
+            for d in raw_risky_deps:
+                d.setdefault("scope", "local_nova_codebase")
+                d.setdefault("warning", "Dependency from Nova/Juice Shop — NOT a target vulnerability")
+
         cmap = CodebaseMap(
             target          = str(self.target),
             scan_time_ms    = elapsed,
@@ -573,14 +610,15 @@ class NovaCodebaseMapper:
             auth_patterns   = sorted(self._auth_hits),
             databases       = sorted(self._db_hits),
             config_files    = self._config_files[:30],
-            secret_findings = self._secrets[:50],
-            risky_deps      = self._check_risky_deps(),
+            secret_findings = raw_secrets,
+            risky_deps      = raw_risky_deps,
             all_deps        = dict(sorted(self._deps.items())[:200]),
             data_models     = sorted(self._models)[:50],
             test_files      = self._test_count,
             source_files    = self._src_count,
             attack_surface  = attack_surface,
             strategic_summary = strategic_summary,
+            is_own_repo     = self._own_repo,
         )
 
         # ── Save output ─────────────────────────────────────────────────────
