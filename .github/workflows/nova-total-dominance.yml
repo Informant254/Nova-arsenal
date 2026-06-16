@@ -139,10 +139,10 @@ jobs:
 
       - name: "Python dependencies"
         run: |
-          python3 -m pip install -q --upgrade pip
-          python3 -m pip install -q requests aiohttp httpx urllib3 openai anthropic ollama playwright selenium beautifulsoup4 lxml rich colorama tabulate tqdm pyyaml python-dotenv click sqlite-utils sqlalchemy networkx PyGithub gitpython cryptography packaging semver 2>/dev/null | tail -2
-          python3 -m pip install -q -r requirements.txt 2>/dev/null | tail -2 || true
-          python3 -m playwright install chromium 2>/dev/null || true
+          python3 -m pip install -q --upgrade pip --break-system-packages
+          python3 -m pip install -q --break-system-packages requests aiohttp httpx urllib3 openai anthropic ollama playwright selenium beautifulsoup4 lxml rich colorama tabulate tqdm pyyaml python-dotenv click sqlite-utils sqlalchemy networkx PyGithub gitpython cryptography packaging semver 2>/dev/null | tail -2
+          python3 -m pip install -q --break-system-packages -r requirements.txt 2>/dev/null | tail -2 || true
+          python3 -m playwright install chromium --with-deps 2>/dev/null || true
 
       - name: "Go tools"
         run: |
@@ -157,7 +157,7 @@ jobs:
           for rp in "ticarpi/jwt_tool /opt/nova-tools/jwt_tool" "swisskyrepo/SSRFmap /opt/nova-tools/ssrfmap" "s0md3v/XSStrike /opt/nova-tools/xsstrike" "s0md3v/Corsy /opt/nova-tools/corsy" "devanshbatham/ParamSpider /opt/nova-tools/paramspider" "m4ll0k/SecretFinder /opt/nova-tools/secretfinder" "GerbenJavado/LinkFinder /opt/nova-tools/linkfinder"; do
             repo=$(echo "$rp" | awk '{print $1}'); dest=$(echo "$rp" | awk '{print $2}')
             git clone --depth=1 "https://github.com/$repo" "$dest" 2>/dev/null || true
-            [ -f "$dest/requirements.txt" ] && python3 -m pip install -q -r "$dest/requirements.txt" 2>/dev/null || true
+            [ -f "$dest/requirements.txt" ] && python3 -m pip install -q --break-system-packages -r "$dest/requirements.txt" 2>/dev/null || true
           done
 
       - name: "Restore Ollama cache"
