@@ -1,0 +1,42 @@
+{
+  "name": "Nova Arsenal",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "upgradePackages": true
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteEnv": {
+    "NOVA_LLM_URL": "http://localhost:11434",
+    "NOVA_LLM_MODEL": "qwen3:1.7b",
+    "NOVA_WORKSPACE": "${containerWorkspaceFolder}/nova_workspace",
+    "NOVA_PERMISSION_PROFILE": "scoped",
+    "OLLAMA_KEEP_ALIVE": "-1"
+  },
+  "forwardPorts": [11434],
+  "portsAttributes": {
+    "11434": {
+      "label": "Ollama LLM",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "ms-python.black-formatter",
+        "GitHub.copilot"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python3",
+        "terminal.integrated.env.linux": {
+          "NOVA_LLM_URL": "http://localhost:11434",
+          "NOVA_LLM_MODEL": "qwen3:1.7b"
+        }
+      }
+    }
+  }
+}
