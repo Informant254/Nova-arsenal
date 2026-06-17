@@ -112,6 +112,21 @@ get_auto_exploit   = getattr(_auto_ex_mod, "get_auto_exploit_loop", None)
 _truth_mod      = _try_import("nova_truth_engine")
 NovaTruthEngine = getattr(_truth_mod, "NovaTruthEngine", None)
 get_truth_engine= getattr(_truth_mod, "get_truth_engine", None)
+# Payload Engine — polymorphic WAF-bypass payload generation
+_payload_eng_mod     = _try_import("nova_payload_engine")
+NovaPayloadEngine    = getattr(_payload_eng_mod, "NovaPayloadEngine", None)
+
+# Trace Isolator — stealth headers + proxy rotation for all HTTP phases
+_isolator_mod        = _try_import("nova_trace_isolator")
+get_isolator         = getattr(_isolator_mod, "get_isolator", None)
+
+# Cloud Strike — S3/GCP/Azure recon, metadata SSRF payload generation
+_cloud_mod           = _try_import("nova_cloud_strike")
+NovaCloudStrike      = getattr(_cloud_mod, "NovaCloudStrike", None)
+
+# Identity Takeover — Entra ID, IAM misconfig, cross-tenant audit
+_identity_mod        = _try_import("nova_identity_takeover")
+NovaIdentityTakeover = getattr(_identity_mod, "NovaIdentityTakeover", None)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CODEBASE MAPPER — Phase 0 of every run
@@ -139,6 +154,10 @@ _RAG:      "Optional[Any]" = None   # NovaRAGBuilder
 _FORGE:    "Optional[Any]" = None   # NovaWeaponForge singleton
 _AUTO_EX:  "Optional[Any]" = None   # AutoExploitLoop singleton
 _TRUTH:    "Optional[Any]" = None   # NovaTruthEngine singleton
+_PAYLOAD_ENG: "Optional[Any]" = None   # NovaPayloadEngine singleton
+_ISOLATOR:    "Optional[Any]" = None   # NovaTraceIsolator singleton
+_CLOUD:       "Optional[Any]" = None   # NovaCloudStrike singleton
+_IDENTITY:    "Optional[Any]" = None   # NovaIdentityTakeover singleton
 
 
 def _init_provider_layer(target: str = "", scope: List[str] = None,
@@ -255,7 +274,39 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
         except Exception:
             pass
 
-    _PROVIDER_READY = True
+    # ── Payload Engine (polymorphic payload generation) ─────────────────────────
+    global _PAYLOAD_ENG
+    if NovaPayloadEngine:
+        try:
+            _PAYLOAD_ENG = NovaPayloadEngine(reasoning=_ROUTER)
+        except Exception:
+            pass
+
+    # ── Trace Isolator (stealth headers + proxy rotation) ────────────────────
+    global _ISOLATOR
+    if get_isolator:
+        try:
+            _ISOLATOR = get_isolator()
+        except Exception:
+            pass
+
+    # ── Cloud Strike (S3/GCP/Azure recon, metadata SSRF) ─────────────────────
+    global _CLOUD
+    if NovaCloudStrike:
+        try:
+            _CLOUD = NovaCloudStrike()
+        except Exception:
+            pass
+
+    # ── Identity Takeover (Entra ID, IAM, cross-tenant audit) ────────────────
+    global _IDENTITY
+    if NovaIdentityTakeover:
+        try:
+            _IDENTITY = NovaIdentityTakeover()
+        except Exception:
+            pass
+
+        _PROVIDER_READY = True
     return True
 
 
@@ -485,6 +536,15 @@ KEYWORD_MODES = {
     "bootstrap":       ["bootstrap","health check","verify install","check modules","status"],
     "continuous":      ["continuous","monitor","watch","loop","scheduled","ongoing"],
     "swarm":           ["swarm","parallel","10 agents","mass scan"],
+    # ── Newly wired module modes ─────────────────────────────────────────────
+    "cloud":      ["cloud strike","aws recon","azure recon","gcp recon","s3 bucket",
+                   "cloud audit","cloud security","cloud pentest","storage bucket",
+                   "metadata endpoint","cloud native","iam roles","cloud infra",
+                   "cloud recon","cloud scan","ec2","lambda","blob storage"],
+    "identity":   ["identity takeover","entra id","entra","azure ad","iam hijack",
+                   "cloud identity","cross-tenant","actor token","sso bypass",
+                   "managed identity","service principal","global admin",
+                   "identity audit","oauth abuse","token hijack"],
     # ── Newly wired modes ────────────────────────────────────────────────────
     "multi_target":    ["multi target","multiple targets","bulk scan","target list","batch scan"],
     "attack":          ["attack chain","full attack","unified attack","exploit chain","chained exploit"],
@@ -1762,7 +1822,80 @@ def dispatch(intent: dict) -> List[Dict]:
         print(f"{'━'*64}\n")
 
 
-    # ── Truth Engine: eliminate false positives before reporting ─────────────
+    # ════════════════════════════════════════════════════════════════════════════
+    # PHASE: CLOUD STRIKE — S3/GCP/Azure recon + metadata SSRF vectors
+    # Runs on: cloud, ssrf, hunt, full_stack
+    # ════════════════════════════════════════════════════════════════════════════
+    if mode in ("cloud", "ssrf", "hunt", "full_stack"):
+        with _span("CloudStrike", "tool"):
+            global _CLOUD
+            if _CLOUD:
+                try:
+                    _cloud_findings: list = []
+                    bucket_r = _CLOUD.audit_s3_buckets(target)
+                    for r in bucket_r.get("results", []):
+                        if r.get("status", "PRIVATE") != "PRIVATE":
+                            _cloud_findings.append({
+                                "type":     "cloud_storage_misconfiguration",
+                                "severity": r.get("risk", "HIGH"),
+                                "title":    f"Exposed Cloud Storage: {r.get('bucket')}",
+                                "evidence": f"Bucket {r['bucket']} is {r['status']}",
+                                "endpoint": target,
+                            })
+                    for _ct in ("aws", "gcp", "azure"):
+                        _payls = _CLOUD.probe_metadata_service(_ct)
+                        if _payls:
+                            _cloud_findings.append({
+                                "type":     "ssrf_cloud_metadata",
+                                "severity": "HIGH",
+                                "title":    f"Cloud Metadata SSRF Vectors ({_ct.upper()})",
+                                "payloads": _payls[:5],
+                                "endpoint": target,
+                            })
+                    if _cloud_findings:
+                        _emit_findings(_cloud_findings, "cloud_strike")
+                        findings.extend(_cloud_findings)
+                    _CLOUD.execute_cloud_recon(target)
+                except Exception as _ce:
+                    print(f"  ⚠️  Cloud Strike: {_ce}")
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # PHASE: IDENTITY TAKEOVER — Entra ID / IAM / cloud identity audit
+    # Runs on: identity, cloud, hunt, full_stack
+    # ════════════════════════════════════════════════════════════════════════════
+    if mode in ("identity", "cloud", "hunt", "full_stack"):
+        with _span("IdentityTakeover", "tool"):
+            global _IDENTITY
+            if _IDENTITY:
+                try:
+                    _tech = []
+                    _tl = target.lower()
+                    if any(k in _tl for k in ("aws", "amazon", "ec2", "s3.")):
+                        _tech.append("aws")
+                    if any(k in _tl for k in ("azure", "microsoft", "onmicrosoft")):
+                        _tech.append("azure")
+                    if not _tech:
+                        _tech = ["aws", "azure"]   # probe both by default
+                    _id_findings = _IDENTITY.audit_cloud_identity(_tech)
+                    for _f in _id_findings:
+                        _f.setdefault("endpoint", target)
+                        _f.setdefault("type", "cloud_identity_misconfiguration")
+                    if _id_findings:
+                        _emit_findings(_id_findings, "identity_takeover")
+                        findings.extend(_id_findings)
+                except Exception as _ie:
+                    print(f"  ⚠️  Identity Takeover: {_ie}")
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # PASSIVE: TRACE ISOLATOR — stealth headers applied to session (no findings)
+    # ════════════════════════════════════════════════════════════════════════════
+    if _ISOLATOR and mode in ("hunt", "full_stack", "recon", "cloud", "identity"):
+        try:
+            _ISOLATOR.get_stealth_headers()   # warm up the session
+        except Exception:
+            pass
+
+        # ── Truth Engine: eliminate false positives before reporting ─────────────
     global _TRUTH
     if _TRUTH and findings:
         try:
