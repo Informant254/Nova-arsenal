@@ -194,11 +194,43 @@ class NovaNotifications:
         if not self._should_notify(severity):
             return False
 
+        # Enrich message with Truth Engine confidence if available
+        truth   = finding.get("_truth", {})
+        conf    = truth.get("confidence")
+        oob_ok  = truth.get("oob_used", False)
+        v_pass  = truth.get("verifications_passed", "?")
+        v_total = truth.get("verifications_total", "?")
+
+        SEV_EMOJI = {
+            "CRITICAL": "🔴", "HIGH": "🟠",
+            "MEDIUM": "🟡", "LOW": "🟢", "INFO": "ℹ️"
+        }
+        emoji = SEV_EMOJI.get(str(severity).upper(), "⚠️")
+
+        title_str  = finding.get("title", "Unknown")
+        ep         = finding.get("endpoint", finding.get("url", ""))
+        desc       = finding.get("description", "")
+
+        if conf is not None:
+            conf_line = f"\nConfidence: {conf:.0%} ({truth.get('confidence_label', '')})"
+            oob_line  = " ✅ OOB confirmed" if oob_ok else ""
+            ver_line  = f"\nVerifications: {v_pass}/{v_total} passed"
+            ep_line   = f"\nEndpoint: `{ep}`" if ep else ""
+            msg = (
+                f"{emoji} *Nova Confirmed Finding*\n"
+                f"*{severity.upper()}* — {title_str}"
+                f"{ep_line}"
+                f"{conf_line}{oob_line}"
+                f"{ver_line}"
+            )
+        else:
+            msg = desc or title_str
+
         notification = Notification(
-            title=f"Finding: {finding.get('title', 'Unknown')}",
-            message=finding.get("description", ""),
+            title=f"{emoji} {severity.upper()}: {title_str}",
+            message=msg,
             severity=severity,
-            target=finding.get("target", ""),
+            target=finding.get("target", ep),
             session_id=session_id,
             metadata=finding
         )
