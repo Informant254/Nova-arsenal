@@ -1,0 +1,509 @@
+name: Nova v6 - Unified Hunt Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target URL (blank = auto-rotate)"
+        required: false
+        default: ""
+      program:
+        description: "Bug bounty program (shopify/gitlab/google/microsoft)"
+        required: false
+        default: "shopify"
+      model:
+        description: "LLM model for Ollama"
+        required: false
+        default: "qwen3:8b"
+      engines:
+        description: "Engines to run (1-8, comma-separated, or all)"
+        required: false
+        default: "all"
+      depth:
+        description: "Scan depth (fast/normal/deep)"
+        required: false
+        default: "normal"
+      live_exploit:
+        description: "Fire exploits live (true=LIVE, false=dry-run)"
+        required: false
+        default: "false"
+      min_confidence:
+        description: "Min PoC confidence gate (0.0-1.0)"
+        required: false
+        default: "0.80"
+  schedule:
+    - cron: "0 0 * * 1"
+    - cron: "0 0 * * 2"
+    - cron: "0 0 * * 3"
+    - cron: "0 0 * * 4"
+    - cron: "0 0 * * 5"
+    - cron: "0 0 * * 6"
+    - cron: "0 0 * * 0"
+
+jobs:
+  select-target:
+    name: "Select Target"
+    runs-on: ubuntu-latest
+    outputs:
+      target:  ${{ steps.pick.outputs.target }}
+      program: ${{ steps.pick.outputs.program }}
+      label:   ${{ steps.pick.outputs.label }}
+    steps:
+      - name: Pick and validate target
+        id: pick
+        run: |
+          INPUT="${{ inputs.target }}"
+          PROG="${{ inputs.program }}"
+          if [ -n "$INPUT" ]; then
+            TARGET="$INPUT"
+            PROGRAM="${PROG:-manual}"
+            LABEL="Manual: $INPUT"
+          else
+            DOW=$(date +%u)
+            case "$DOW" in
+              1) TARGET="https://shopify.plus"           ; PROGRAM="shopify"   ; LABEL="Shopify Primary"  ;;
+              2) TARGET="https://accounts.shopify.com"   ; PROGRAM="shopify"   ; LABEL="Shopify Accounts" ;;
+              3) TARGET="https://gitlab.com"             ; PROGRAM="gitlab"    ; LABEL="GitLab Core"      ;;
+              4) TARGET="https://accounts.google.com"    ; PROGRAM="google"    ; LABEL="Google Accounts"  ;;
+              5) TARGET="https://portal.azure.com"       ; PROGRAM="microsoft" ; LABEL="Azure Portal"     ;;
+              6) TARGET="https://partners.shopify.com"   ; PROGRAM="shopify"   ; LABEL="Shopify Partners" ;;
+              7) TARGET="https://customers.gitlab.com"   ; PROGRAM="gitlab"    ; LABEL="GitLab Customers" ;;
+            esac
+          fi
+          if echo "$TARGET" | grep -qiE "localhost|127\.0\.0\.1|::1"; then
+            echo "ERROR: Target is localhost" && exit 1
+          fi
+          echo "target=$TARGET"   >> $GITHUB_OUTPUT
+          echo "program=$PROGRAM" >> $GITHUB_OUTPUT
+          echo "label=$LABEL"     >> $GITHUB_OUTPUT
+          echo "Target: $TARGET  Program: $PROGRAM  Label: $LABEL"
+
+  nova-v6:
+    name: "Nova v6 - ${{ needs.select-target.outputs.label }}"
+    needs: select-target
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      issues: write
+      contents: read
+      actions: read
+
+    env:
+      NOVA_TARGET:           ${{ needs.select-target.outputs.target }}
+      NOVA_PROGRAM:          ${{ needs.select-target.outputs.program }}
+      NOVA_LABEL:            ${{ needs.select-target.outputs.label }}
+      NOVA_WORKSPACE:        ${{ github.workspace }}/nova_workspace
+      NOVA_LLM_MODEL:        ${{ inputs.model || 'qwen3:8b' }}
+      NOVA_LLM_URL:          "http://localhost:11434"
+      NOVA_ENGINES:          ${{ inputs.engines || 'all' }}
+      NOVA_SCAN_DEPTH:       ${{ inputs.depth || 'normal' }}
+      NOVA_AUTO_EXPLOIT:     "1"
+      NOVA_EXPLOIT_DRY:      ${{ (inputs.live_exploit == 'true') && '0' || '1' }}
+      NOVA_MIN_CONFIDENCE:   ${{ inputs.min_confidence || '0.80' }}
+      NOVA_MAX_STEPS:        "120"
+      NOVA_ENABLE_KALI_KB:   "true"
+      NOVA_GRAPH_PATH:       ${{ github.workspace }}/nova_workspace/knowledge_graph.json
+      OPENAI_API_KEY:        ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY:     ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY:        ${{ secrets.GOOGLE_API_KEY }}
+      NOVA_TELEGRAM_TOKEN:   ${{ secrets.NOVA_TELEGRAM_TOKEN }}
+      NOVA_TELEGRAM_CHAT_ID: ${{ secrets.NOVA_TELEGRAM_CHAT_ID }}
+      DISCORD_WEBHOOK_URL:   ${{ secrets.DISCORD_WEBHOOK_URL }}
+      GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY:     ${{ github.repository }}
+      GITHUB_RUN_ID:         ${{ github.run_id }}
+      NVD_API_KEY:           ${{ secrets.NVD_API_KEY }}
+      PYTHONUNBUFFERED:      "1"
+      GOPATH:                ${{ github.workspace }}/go
+
+    steps:
+
+      - name: "Step 1 - Checkout Nova Arsenal"
+        uses: actions/checkout@v4
+
+      - name: "Step 2 - Python 3.12 setup"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: "Step 3 - Bootstrap workspace and system tools"
+        run: |
+          echo "Nova v6 - $NOVA_TARGET ($NOVA_PROGRAM) | $(date -u)"
+          mkdir -p $NOVA_WORKSPACE/{targets,reports,exploits,chains,evidence,patches,graph,subdomains,weapons,sessions}
+          mkdir -p ${{ github.workspace }}/go/bin /opt/nova-tools/bin
+          echo "${{ github.workspace }}/go/bin" >> $GITHUB_PATH
+          echo "/opt/nova-tools/bin" >> $GITHUB_PATH
+
+          sudo apt-get update -qq 2>/dev/null | tail -1
+          sudo apt-get install -y -qq             nmap masscan nikto gobuster sqlmap wafw00f sslscan             dnsrecon whatweb net-tools iputils-ping dnsutils whois             netcat-openbsd libssl-dev libffi-dev build-essential jq bc             2>/dev/null | tail -2 || true
+
+      - name: "Step 4 - Python dependencies"
+        run: |
+          pip install --upgrade pip --quiet
+          pip install --quiet -r requirements-ci.txt 2>/dev/null | tail -2 || true
+          pip install --quiet requests aiohttp httpx urllib3             openai anthropic ollama             playwright selenium beautifulsoup4 lxml             rich colorama tabulate tqdm             pyyaml python-dotenv click             sqlite-utils sqlalchemy networkx             PyGithub gitpython cryptography packaging semver             dnspython python-whois tldextract httpx PyJWT             curl-cffi pydantic 2>/dev/null | tail -2 || true
+          python3 -m playwright install chromium 2>/dev/null || true
+          echo "Python deps OK"
+
+      - name: "Step 5 - Go security tools"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          for tool in             "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"             "github.com/projectdiscovery/httpx/cmd/httpx@latest"             "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"             "github.com/projectdiscovery/katana/cmd/katana@latest"             "github.com/lc/gau/v2/cmd/gau@latest"             "github.com/tomnomnom/waybackurls@latest"             "github.com/hahwul/dalfox/v2@latest"             "github.com/dwisiswant0/crlfuzz@latest"             "github.com/OJ/gobuster/v3@latest"; do
+            go install "$tool" 2>/dev/null || true
+          done
+          nuclei -update-templates 2>/dev/null || true
+          echo "Go tools: $(ls ${{ github.workspace }}/go/bin | wc -l) installed"
+
+      - name: "Step 6 - Clone specialist tools"
+        run: |
+          for pair in             "ticarpi/jwt_tool /opt/nova-tools/jwt_tool"             "swisskyrepo/SSRFmap /opt/nova-tools/ssrfmap"             "s0md3v/XSStrike /opt/nova-tools/xsstrike"             "s0md3v/Corsy /opt/nova-tools/corsy"             "devanshbatham/ParamSpider /opt/nova-tools/paramspider"             "m4ll0k/SecretFinder /opt/nova-tools/secretfinder"             "GerbenJavado/LinkFinder /opt/nova-tools/linkfinder"; do
+            repo=$(echo "$pair" | awk "{print \$1}")
+            dest=$(echo "$pair" | awk "{print \$2}")
+            git clone --depth=1 "https://github.com/$repo" "$dest" 2>/dev/null || true
+            if [ -f "$dest/requirements.txt" ]; then
+              pip install --quiet -r "$dest/requirements.txt" 2>/dev/null || true
+            fi
+          done
+
+      - name: "Step 7 - Ollama install and model pull"
+        continue-on-error: true
+        run: |
+          curl -fsSL https://ollama.ai/install.sh | sh 2>/dev/null || true
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:11434/api/tags > /dev/null 2>&1 && break
+            sleep 3
+          done
+          if ! ollama list 2>/dev/null | grep -q "${NOVA_LLM_MODEL%%:*}"; then
+            timeout 600 ollama pull "$NOVA_LLM_MODEL" 2>/dev/null ||             timeout 300 ollama pull qwen3:1.7b 2>/dev/null || true
+          fi
+          ollama list 2>/dev/null | head -5 || true
+
+      - name: "Step 8 - Knowledge Graph init and scope validation"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          python3 -c "
+          import sys, os; sys.path.insert(0, '.')
+          t = os.environ['NOVA_TARGET']
+          ws = os.environ['NOVA_WORKSPACE']
+          prog = os.environ['NOVA_PROGRAM']
+
+          try:
+            from nova_knowledge_graph import NovaKnowledgeGraph, NodeType
+            kg = NovaKnowledgeGraph()
+            kg._g['meta']['session'] = os.environ.get('GITHUB_RUN_ID', 'local')
+            kg._g['meta']['nova_version'] = 'v6.0'
+            kg._g['meta']['target'] = t
+            kg.save()
+            print('  KG: initialized at', kg.path)
+          except Exception as e:
+            print('  KG:', e)
+
+          try:
+            from nova_scope_manager import NovaScopeManager
+            sm = NovaScopeManager()
+            in_scope = sm.is_in_scope(t, prog) if hasattr(sm, 'is_in_scope') else True
+            print('  Scope:', 'IN SCOPE' if in_scope else 'CHECK MANUALLY')
+          except Exception as e:
+            print('  Scope:', e)
+
+          try:
+            from nova_sessions import SessionStore
+            s = SessionStore().create(target=t, mission='nova_v6_hunt')
+            print('  Session:', s.session_id[:12] if hasattr(s, 'session_id') else 'ok')
+          except Exception as e:
+            print('  Session:', e)
+          " 2>/dev/null || true
+
+      - name: "Step 9 - Engine 1: CI Runner (25 scan modes)"
+        env:
+          NOVA_ITERATION: "1"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 1: CI Runner - 25 nova.dispatch modes"
+          timeout 1200 python3 nova_godmode_runner.py --engine 1 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+      - name: "Step 10 - Engine 2: Pipeline (11-phase recon to synthesis)"
+        env:
+          NOVA_ITERATION: "2"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 2: Pipeline - recon, think, hypothesize, attack, synth"
+          timeout 1800 python3 nova_godmode_runner.py --engine 2 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+      - name: "Step 11 - Engine 3: Swarm v3 (6 parallel agents)"
+        env:
+          NOVA_ITERATION: "3"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 3: Swarm v3 - brain + fuzzer + session + race + JWT + code"
+          timeout 1800 python3 nova_godmode_runner.py --engine 3 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+      - name: "Step 12 - Engine 4: Weapon Forge (real exploit generation)"
+        env:
+          NOVA_ITERATION: "4"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 4: Weapon Forge - CVE lookup + LLM exploit codegen"
+          timeout 1200 python3 nova_godmode_runner.py --engine 4 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+          LATEST=$(ls $NOVA_WORKSPACE/nova_ci_all_findings_*.json 2>/dev/null | sort | tail -1)
+          if [ -n "$LATEST" ]; then
+            timeout 120 python3 nova_poc_verifier.py "$LATEST" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+          fi
+
+      - name: "Step 13 - Engine 5: Attack Chain (recon to post-exploit)"
+        env:
+          NOVA_ITERATION: "5"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 5: Attack Chain - 5-phase full kill chain"
+          timeout 2400 python3 nova_godmode_runner.py --engine 5 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+      - name: "Step 14 - Engine 6: Auto Exploit Loop (continuous)"
+        env:
+          NOVA_ITERATION: "6"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 6: Auto Exploit Loop - continuous exploitation"
+          timeout 1500 python3 nova_godmode_runner.py --engine 6 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+      - name: "Step 15 - Engine 7: Daybreak AI (3-stage prioritize validate audit)"
+        env:
+          NOVA_ITERATION: "7"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 7: Daybreak - AI threat prioritization + scoped sandbox validation"
+          timeout 2400 python3 nova_godmode_runner.py --engine 7 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+      - name: "Step 16 - Engine 8: Kali Direct (nmap nuclei nikto sqlmap dalfox)"
+        env:
+          NOVA_ITERATION: "8"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          echo "Engine 8: Kali Direct - real tool execution"
+          timeout 1800 python3 nova_godmode_runner.py --engine 8 --target "$NOVA_TARGET" 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+
+          DOMAIN=$(echo "$NOVA_TARGET" | sed -E "s|https?://([^/]+).*|\1|")
+          WS=$NOVA_WORKSPACE
+          echo "--- Direct sweep: $DOMAIN ---"
+          timeout 90  subfinder -d "$DOMAIN" -silent -o $WS/subdomains/subs.txt 2>/dev/null || true
+          timeout 90  httpx -l $WS/subdomains/subs.txt -silent -status-code -title -o $WS/subdomains/live.txt 2>/dev/null || true
+          timeout 60  gau "$DOMAIN" 2>/dev/null | head -2000 > $WS/targets/gau.txt || true
+          timeout 60  waybackurls "$DOMAIN" 2>/dev/null | head -2000 > $WS/targets/wayback.txt || true
+          timeout 90  katana -u "$NOVA_TARGET" -silent -depth 3 -o $WS/targets/katana.txt 2>/dev/null || true
+          cat $WS/targets/gau.txt $WS/targets/wayback.txt $WS/targets/katana.txt 2>/dev/null | sort -u > $WS/targets/all_urls.txt || true
+          timeout 180 nuclei -u "$NOVA_TARGET" -t exposures,vulnerabilities,misconfiguration,cves -severity critical,high,medium -silent -o $WS/reports/nuclei.txt 2>/dev/null || true
+          timeout 240 nikto -h "$NOVA_TARGET" -maxtime 200 -o $WS/reports/nikto.txt 2>/dev/null || true
+          timeout 240 sqlmap -u "${NOVA_TARGET}/?id=1" --level=3 --risk=2 --batch --forms --crawl=2 --output-dir=$WS/reports/sqlmap 2>/dev/null || true
+          timeout 180 dalfox url "$NOVA_TARGET" --silence -o $WS/reports/dalfox.txt 2>/dev/null || true
+          timeout 60  wafw00f "$NOVA_TARGET" 2>/dev/null | tee $WS/reports/waf.txt || true
+          timeout 60  sslscan "$NOVA_TARGET" 2>/dev/null | tee $WS/reports/sslscan.txt || true
+
+          NUCLEI_F=$(wc -l < $WS/reports/nuclei.txt 2>/dev/null | tr -d " " || echo 0)
+          SUBS=$(wc -l < $WS/subdomains/subs.txt 2>/dev/null | tr -d " " || echo 0)
+          URLS=$(wc -l < $WS/targets/all_urls.txt 2>/dev/null | tr -d " " || echo 0)
+          echo "Engine 8: nuclei=${NUCLEI_F} subs=${SUBS} urls=${URLS}"
+
+      - name: "Step 17 - Hypothesis Engine and Chain Reasoner"
+        run: |
+          python3 -c "
+          import sys, os, json; sys.path.insert(0, '.')
+          t = os.environ['NOVA_TARGET']
+          ws = os.environ['NOVA_WORKSPACE']
+
+          try:
+            from nova_hypothesis_engine import NovaHypothesisEngine
+            eng = NovaHypothesisEngine(t)
+            hyps = eng.generate_and_test() if hasattr(eng, 'generate_and_test') else eng.run()
+            hyp_list = hyps if isinstance(hyps, list) else hyps.get('hypotheses', [])
+            json.dump(hyp_list, open(ws + '/hypotheses.json', 'w'), indent=2, default=str)
+            print('  HypothesisEngine:', len(hyp_list), 'hypotheses')
+          except Exception as e:
+            print('  HypothesisEngine:', e)
+
+          try:
+            from nova_chain_reasoner import ChainReasoner
+            hyps = json.load(open(ws + '/hypotheses.json')) if os.path.exists(ws + '/hypotheses.json') else []
+            cr = ChainReasoner()
+            chains = cr.analyze(hyps) if hasattr(cr, 'analyze') else cr.chain(hyps) if hasattr(cr, 'chain') else []
+            chain_list = [c.__dict__ if hasattr(c, '__dict__') else c for c in chains]
+            json.dump(chain_list, open(ws + '/attack_chains.json', 'w'), indent=2, default=str)
+            print('  ChainReasoner:', len(chain_list), 'chains')
+          except Exception as e:
+            print('  ChainReasoner:', e)
+
+          try:
+            from nova_chain_deduplicator import NovaChainDeduplicator
+            chains = json.load(open(ws + '/attack_chains.json')) if os.path.exists(ws + '/attack_chains.json') else []
+            chains = NovaChainDeduplicator().deduplicate(chains)
+            json.dump(chains, open(ws + '/attack_chains.json', 'w'), indent=2, default=str)
+            print('  Deduplicator: done ->', len(chains), 'unique chains')
+          except Exception as e:
+            print('  Deduplicator:', e)
+          " 2>/dev/null || true
+
+      - name: "Step 18 - Collect and triage all findings"
+        id: findings
+        run: |
+          python3 -c "
+          import sys, os, json, glob; sys.path.insert(0, '.')
+          ws = os.environ['NOVA_WORKSPACE']
+
+          all_f = []
+          for pat in [ws + '/nova_ci_all_findings_*.json', ws + '/nova_godmode_findings_*.json', ws + '/reports/*.json']:
+            for fp in glob.glob(pat):
+              try:
+                d = json.load(open(fp))
+                found = d.get('findings', d.get('results', []))
+                if isinstance(found, list): all_f.extend(found)
+              except: pass
+
+          unique = {str(f.get('type','?')) + str(f.get('endpoint', f.get('url',''))): f for f in all_f}
+          all_f = list(unique.values())
+          json.dump(all_f, open(ws + '/all_findings_merged.json', 'w'), indent=2, default=str)
+
+          c = sum(1 for f in all_f if str(f.get('severity','')).upper() == 'CRITICAL')
+          h = sum(1 for f in all_f if str(f.get('severity','')).upper() == 'HIGH')
+          m = sum(1 for f in all_f if str(f.get('severity','')).upper() == 'MEDIUM')
+          print(f'Total: {len(all_f)} findings | C={c} H={h} M={m}')
+          " 2>/dev/null || true
+
+          LOG=$NOVA_WORKSPACE/nova_run.log
+          LINES=$(wc -l < "$LOG" 2>/dev/null | tr -d " " || echo 0)
+          CRIT=$(grep -cE "CRITICAL|\[crit\]" "$LOG" 2>/dev/null | tr -d " " || echo 0)
+          echo "lines=$LINES"  >> $GITHUB_OUTPUT
+          echo "critical=$CRIT" >> $GITHUB_OUTPUT
+          grep -iE "CRITICAL|HIGH|MEDIUM|finding|vuln|CVE" "$LOG" 2>/dev/null | tail -300 > $NOVA_WORKSPACE/findings_summary.txt || true
+          echo "Log: $LINES lines  Critical/High hits: $CRIT"
+
+      - name: "Step 19 - Generate H1-ready report"
+        run: |
+          export PATH=${{ github.workspace }}/go/bin:/usr/local/go/bin:$PATH
+          timeout 300 python3 nova_report_generator.py 8 2>&1 | tee -a $NOVA_WORKSPACE/nova_run.log || true
+          H1=$NOVA_WORKSPACE/nova_h1_report.md
+          if [ -f "$H1" ]; then
+            echo "Report: $(wc -l < $H1) lines"
+            cp "$H1" $NOVA_WORKSPACE/reports/nova_v6_h1_report.md
+          fi
+          cp $NOVA_WORKSPACE/nova_poc_report.json $NOVA_WORKSPACE/reports/ 2>/dev/null || true
+
+      - name: "Step 20 - Knowledge Graph update with findings"
+        run: |
+          python3 -c "
+          import sys, os, json; sys.path.insert(0, '.')
+          ws = os.environ['NOVA_WORKSPACE']
+          t = os.environ['NOVA_TARGET']
+          try:
+            from nova_knowledge_graph import NovaKnowledgeGraph
+            kg = NovaKnowledgeGraph()
+            all_f = json.load(open(ws + '/all_findings_merged.json')) if os.path.exists(ws + '/all_findings_merged.json') else []
+            for f in all_f[:100]:
+              try: kg.add_finding(t, f)
+              except: pass
+            chains = json.load(open(ws + '/attack_chains.json')) if os.path.exists(ws + '/attack_chains.json') else []
+            for c in chains[:50]:
+              try: kg.add_node(str(c.get('chain_id', 'chain')), 'chain', c)
+              except: pass
+            kg.save()
+            print(f'  KG updated: {len(all_f)} findings, {len(chains)} chains')
+          except Exception as e:
+            print('  KG update:', e)
+          " 2>/dev/null || true
+
+      - name: "Step 21 - GitHub Issue report"
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs   = require("fs");
+            const date = new Date().toISOString().split("T")[0];
+            const target  = process.env.NOVA_TARGET  || "";
+            const program = process.env.NOVA_PROGRAM || "";
+            const runUrl  = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const ws      = process.env.NOVA_WORKSPACE || "";
+
+            let body = "";
+            const h1path = ws + "/reports/nova_v6_h1_report.md";
+            if (fs.existsSync(h1path)) {
+              body = fs.readFileSync(h1path, "utf8").slice(0, 65000);
+            } else {
+              const sumPath = ws + "/findings_summary.txt";
+              const sum = fs.existsSync(sumPath) ? fs.readFileSync(sumPath, "utf8").slice(0, 8000) : "(none)";
+              body = [
+                "## Nova v6 Hunt Results",
+                `| | |`, `|---|---|`,
+                `| **Target** | ${target} |`,
+                `| **Program** | ${program} |`,
+                `| **Date** | ${date} |`,
+                `| **Engines** | 1-8 (full godmode + v5 modules) |`,
+                `| **Run** | [View](${runUrl}) |`,
+                "",
+                sum ? "### Findings
+```
+" + sum + "
+```" : "### No findings recorded.",
+              ].join("
+");
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              title: `[Nova v6] ${program}: ${target} — ${date}`,
+              body,
+              labels: ["nova-v6", "security", "bug-bounty", "automated"],
+            });
+
+      - name: "Step 22 - Telegram and Discord notify"
+        if: always()
+        run: |
+          RUN_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          TK="$NOVA_TELEGRAM_TOKEN"
+          CH="$NOVA_TELEGRAM_CHAT_ID"
+          MSG="Nova+v6+COMPLETE%0ATarget:+$NOVA_TARGET%0AProgram:+$NOVA_PROGRAM%0AEngines:+1-8%0AStatus:+${{ job.status }}%0ARun:+$RUN_URL"
+          if [ -n "$TK" ] && [ -n "$CH" ]; then
+            curl -sf "https://api.telegram.org/bot${TK}/sendMessage?chat_id=${CH}&text=${MSG}" > /dev/null 2>&1 || true
+          fi
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sf -X POST "$DISCORD_WEBHOOK_URL"               -H "Content-Type: application/json"               -d "{\"content\":\"Nova v6 Complete - $NOVA_TARGET ($NOVA_PROGRAM). Run: $RUN_URL\"}" > /dev/null 2>&1 || true
+          fi
+
+      - name: "Step 23 - Upload all artifacts"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nova-v6-${{ needs.select-target.outputs.program }}-${{ github.run_id }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            ${{ env.NOVA_WORKSPACE }}/reports/
+            ${{ env.NOVA_WORKSPACE }}/exploits/
+            ${{ env.NOVA_WORKSPACE }}/evidence/
+            ${{ env.NOVA_WORKSPACE }}/weapons/
+            ${{ env.NOVA_WORKSPACE }}/knowledge_graph.json
+            ${{ env.NOVA_WORKSPACE }}/all_findings_merged.json
+            ${{ env.NOVA_WORKSPACE }}/attack_chains.json
+            ${{ env.NOVA_WORKSPACE }}/hypotheses.json
+            ${{ env.NOVA_WORKSPACE }}/nova_run.log
+
+      - name: "Step 24 - Run summary"
+        if: always()
+        run: |
+          echo "## Nova v6 - Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | $NOVA_TARGET |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Program** | $NOVA_PROGRAM |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Model** | $NOVA_LLM_MODEL |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Engines** | 1-8 (CI Runner, Pipeline, Swarm v3, Weapon Forge, Attack Chain, Auto Exploit, Daybreak AI, Kali Direct) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Modules** | KnowledgeGraph, HypothesisEngine, ChainReasoner, DaybreakAI, SwarmV3, WeaponForge, PoCVerifier |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          NUCLEI=$(wc -l < $NOVA_WORKSPACE/reports/nuclei.txt 2>/dev/null || echo 0)
+          SUBS=$(wc -l < $NOVA_WORKSPACE/subdomains/subs.txt 2>/dev/null || echo 0)
+          URLS=$(wc -l < $NOVA_WORKSPACE/targets/all_urls.txt 2>/dev/null || echo 0)
+          echo "| **Subdomains** | $SUBS |" >> $GITHUB_STEP_SUMMARY
+          echo "| **URLs** | $URLS |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Nuclei** | $NUCLEI |" >> $GITHUB_STEP_SUMMARY
