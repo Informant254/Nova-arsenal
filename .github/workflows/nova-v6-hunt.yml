@@ -93,13 +93,13 @@ jobs:
       NOVA_PROGRAM:          ${{ needs.select-target.outputs.program }}
       NOVA_LABEL:            ${{ needs.select-target.outputs.label }}
       NOVA_WORKSPACE:        ${{ github.workspace }}/nova_workspace
-      NOVA_LLM_MODEL:        ${{ inputs.model || 'qwen3:8b' }}
+      NOVA_LLM_MODEL:        "${{ inputs.model || 'qwen3:8b' }}"
       NOVA_LLM_URL:          "http://localhost:11434"
-      NOVA_ENGINES:          ${{ inputs.engines || 'all' }}
-      NOVA_SCAN_DEPTH:       ${{ inputs.depth || 'normal' }}
+      NOVA_ENGINES:          "${{ inputs.engines || 'all' }}"
+      NOVA_SCAN_DEPTH:       "${{ inputs.depth || 'normal' }}"
       NOVA_AUTO_EXPLOIT:     "1"
-      NOVA_EXPLOIT_DRY:      ${{ (inputs.live_exploit == 'true') && '0' || '1' }}
-      NOVA_MIN_CONFIDENCE:   ${{ inputs.min_confidence || '0.80' }}
+      NOVA_EXPLOIT_DRY:      "${{ (inputs.live_exploit == 'true') && '0' || '1' }}"
+      NOVA_MIN_CONFIDENCE:   "${{ inputs.min_confidence || '0.80' }}"
       NOVA_MAX_STEPS:        "120"
       NOVA_ENABLE_KALI_KB:   "true"
       NOVA_GRAPH_PATH:       ${{ github.workspace }}/nova_workspace/knowledge_graph.json
@@ -451,7 +451,7 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo:  context.repo.repo,
-              title: `[Nova v6] ${program}: ${target} — ${date}`,
+              title: `[Nova v6] ${program}: ${target} - ${date}`,
               body,
               labels: ["nova-v6", "security", "bug-bounty", "automated"],
             });
