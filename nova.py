@@ -108,6 +108,11 @@ _auto_ex_mod       = _try_import("nova_auto_exploit_loop")
 AutoExploitLoop    = getattr(_auto_ex_mod, "AutoExploitLoop",       None)
 get_auto_exploit   = getattr(_auto_ex_mod, "get_auto_exploit_loop", None)
 
+# Truth Engine — zero false positive verification
+_truth_mod      = _try_import("nova_truth_engine")
+NovaTruthEngine = getattr(_truth_mod, "NovaTruthEngine", None)
+get_truth_engine= getattr(_truth_mod, "get_truth_engine", None)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CODEBASE MAPPER — Phase 0 of every run
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -133,6 +138,7 @@ _CTX_ENG:  "Optional[Any]" = None   # NovaContextEngine
 _RAG:      "Optional[Any]" = None   # NovaRAGBuilder
 _FORGE:    "Optional[Any]" = None   # NovaWeaponForge singleton
 _AUTO_EX:  "Optional[Any]" = None   # AutoExploitLoop singleton
+_TRUTH:    "Optional[Any]" = None   # NovaTruthEngine singleton
 
 
 def _init_provider_layer(target: str = "", scope: List[str] = None,
@@ -234,6 +240,18 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
         try:
             _AUTO_EX = get_auto_exploit(target=target,
                                          session_id=session_id or "")
+        except Exception:
+            pass
+
+    # ── Truth Engine (zero false positive gate) ──────────────────────────────
+    global _TRUTH
+    if get_truth_engine:
+        try:
+            import os as _os
+            _TRUTH = get_truth_engine(
+                llm_router=_ROUTER,
+                confidence_threshold=float(_os.getenv("NOVA_TRUTH_THRESHOLD", "0.85"))
+            )
         except Exception:
             pass
 
@@ -1742,6 +1760,21 @@ def dispatch(intent: dict) -> List[Dict]:
                 print(f"  {icon} [{f.get('severity','?')}] {f.get('type','?')}"
                       f" — {f.get('file') or f.get('endpoint','?')}")
         print(f"{'━'*64}\n")
+
+
+    # ── Truth Engine: eliminate false positives before reporting ─────────────
+    global _TRUTH
+    if _TRUTH and findings:
+        try:
+            findings, _truth_reports = _TRUTH.filter_real_findings(
+                findings, show_progress=True
+            )
+            _save_findings([
+                {**f, "_truth_meta": f.get("_truth", {})}
+                for f in findings
+            ], "truth_verified")
+        except Exception as _te:
+            print(f"  ⚠️  Truth Engine error: {_te}")
 
     return findings
 
