@@ -7,6 +7,7 @@ Mutation-based with success pattern recognition.
 
 import json
 import random
+import re
 import string
 import time
 import requests
@@ -343,7 +344,6 @@ class NovaFuzzer:
 
 
 if __name__ == "__main__":
-    import re  # needed for anomaly patterns
     fuzzer = NovaFuzzer()
 
     targets = [

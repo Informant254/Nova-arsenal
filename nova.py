@@ -306,7 +306,7 @@ def _init_provider_layer(target: str = "", scope: List[str] = None,
         except Exception:
             pass
 
-        _PROVIDER_READY = True
+    _PROVIDER_READY = True
     return True
 
 
