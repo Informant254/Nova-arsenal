@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# AUDIT BATCH 1 - dispatch module review
 """
 NOVA IDOR SCANNER v1.0
 Broken Object Level Authorization (BOLA/IDOR) + Privilege Escalation.
