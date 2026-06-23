@@ -1,10 +1,10 @@
-# 🦅 Nova Arsenal v4.2
+# ð¦ Nova Arsenal v4.2
 
 > **The most capable open-source autonomous security research agent.**
 > 
 > Reads your entire codebase in seconds, maps every language and framework strategically, connects all 35+ modules together, and hunts vulnerabilities with the intelligence of a senior penetration tester.
 
-**Status:** ✅ Production-Ready | 🦅 35+ Modules | 🤖 Multi-Agent LLM | 🚀 Cloud-Native
+**Status:** â Production-Ready | ð¦ 35+ Modules | ð¤ Multi-Agent LLM | ð Cloud-Native
 
 
 ## Nova Autonomous Agent Runtime
@@ -201,21 +201,21 @@ python3 nova_evolution.py --goal "Improve import smoke tests" --repo . --test-co
 
 ---
 
-## 📖 Table of Contents
+## ð Table of Contents
 
-1. [🚀 Quick Start](#-quick-start)
-2. [📋 Installation (Detailed)](#-installation-detailed)
-3. [🏗️ Architecture](#️-architecture)
-4. [🎯 Capabilities](#-capabilities)
-5. [📚 All Modules](#-all-modules)
-6. [🔧 Configuration](#-configuration)
-7. [🎓 Next Steps](#-next-steps)
+1. [ð Quick Start](#-quick-start)
+2. [ð Installation (Detailed)](#-installation-detailed)
+3. [ðï¸ Architecture](#ï¸-architecture)
+4. [ð¯ Capabilities](#-capabilities)
+5. [ð All Modules](#-all-modules)
+6. [ð§ Configuration](#-configuration)
+7. [ð Next Steps](#-next-steps)
 
 ---
 
-## 🚀 Quick Start
+## ð Quick Start
 
-### 1️⃣ Clone and Install (2 minutes)
+### 1ï¸â£ Clone and Install (2 minutes)
 
 ```bash
 git clone https://github.com/Informant254/Nova-arsenal
@@ -229,7 +229,7 @@ pip install -r requirements.txt
 ollama serve  # In another terminal
 ```
 
-### 2️⃣ Verify Installation (30 seconds)
+### 2ï¸â£ Verify Installation (30 seconds)
 
 ```bash
 # Check all 35+ modules are working
@@ -239,7 +239,7 @@ python3 nova_features.py --check
 python3 nova_features.py
 ```
 
-### 3️⃣ Run Your First Hunt (5-30 minutes)
+### 3ï¸â£ Run Your First Hunt (5-30 minutes)
 
 ```bash
 # Hunt localhost for vulnerabilities
@@ -254,21 +254,21 @@ nova report
 
 ---
 
-## 📋 Installation (Detailed)
+## ð Installation (Detailed)
 
 ### Step 1: Prerequisites
 
-✅ **Python 3.10+**
+â **Python 3.10+**
 ```bash
 python3 --version  # Should be 3.10 or higher
 ```
 
-✅ **Git**
+â **Git**
 ```bash
 git --version
 ```
 
-✅ **Ollama** (for local LLM, completely free)
+â **Ollama** (for local LLM, completely free)
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ```
@@ -286,12 +286,12 @@ cd Nova-arsenal
 ```bash
 bash nova_setup_enhanced.sh
 # This will:
-# ✓ Create virtual environment
-# ✓ Install all 100+ Python packages
-# ✓ Install Ollama + models
-# ✓ Install Playwright browser
-# ✓ Create .env configuration
-# ✓ Verify all modules
+# â Create virtual environment
+# â Install all 100+ Python packages
+# â Install Ollama + models
+# â Install Playwright browser
+# â Create .env configuration
+# â Verify all modules
 ```
 
 **Option B: Manual setup**
@@ -349,96 +349,96 @@ python3 nova_features.py --check
 
 ---
 
-## 🏗️ Architecture
+## ðï¸ Architecture
 
 ### System Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         🦅 NOVA ARSENAL v4.2                                │
-│                    Autonomous Security Research Agent                        │
-└─────────────────────────────────────────────────────────────────────────────┘
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â                         ð¦ NOVA ARSENAL v4.2                                â
+â                    Autonomous Security Research Agent                        â
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
                               USER INTENT
-                                  │
-                  ┌───────────────▼───────────────┐
-                  │   Intent Parser & CLI Router   │
-                  │  (nova.py / nova_cli.py)      │
-                  │  "Hunt target.com"            │
-                  │  "Full pipeline on ./app"     │
-                  │  "Orchestrate attack"         │
-                  └───────────────┬───────────────┘
-                                  │
-      ┌───────────────────────────▼───────────────────────────┐
-      │           PHASE 0: CODEBASE MAPPER                    │
-      │  (nova_codebase_mapper.py)                            │
-      ├─────────────────────────────────────────────────────┤
-      │  30+ Languages  │ 25+ Frameworks  │ All Endpoints    │
-      │  Secrets        │ CVE Deps        │ Attack Surface   │
-      └───────────────────────────┬───────────────────────────┘
-                                  │
-                    CodebaseMap (_CMAP) → Distributed to all phases
-                                  │
-      ┌───────────────────────────▼───────────────────────────┐
-      │          PROVIDER LAYER (Infrastructure)              │
-      ├─────────────────────────────────────────────────────┤
-      │  • nova_llm_router.py      (OpenAI→Anthropic→Ollama) │
-      │  • nova_context.py         (Shared RunContext)       │
-      │  • nova_sessions.py        (Scan State Persistence)  │
-      │  • nova_tool_kit.py        (Governed Tools + Audit)   │
-      │  • nova_hooks.py           (Event Lifecycle)         │
-      │  • nova_skills.py          (System Prompts)          │
-      └───────────────────────────┬───────────────────────────┘
-                                  │
-  ┌───────────────────────────────┼───────────────────────────────┐
-  │                               │                               │
-  ▼                               ▼                               ▼
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│ PHASE 1: STATIC  │     │ PHASE 2: ACTIVE  │     │ PHASE 3: AGENTS  │
-│ ANALYSIS         │     │ SCANNING         │     │ & ORCHESTRATION  │
-├──────────────────┤     ├──────────────────┤     ├──────────────────┤
-│ SAST             │     │ SQLi Testing     │     │ ReconAgent       │
-│ SCA              │     │ XSS Fuzzing      │     │ ↓ discovers      │
-│ Git Secret Scan  │     │ IDOR Testing     │     │ AttackAgent      │
-│ CI/CD Scan       │     │ JWT Forge        │     │ ↓ chains         │
-│ Container Scan   │     │ CSRF Testing     │     │ ReportAgent      │
-│ IaC Scan         │     │ GraphQL Tests    │     │ ↓ generates      │
-│ Supply Chain     │     │ Race Conditions  │     │ Patches & Rules  │
-└────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
-         │                        │                        │
-         └────────────────────────┼────────────────────────┘
-                                  │
-      ┌───────────────────────────▼───────────────────────────┐
-      │     PHASE 4: INTELLIGENCE & VERIFICATION              │
-      ├─────────────────────────────────────────────────────┤
-      │  • nova_ast_intel.py       (Dataflow Analysis)       │
-      │  • nova_verify_engine.py   (Triple-Confirm)         │
-      │  • nova_browser_session.py (XSS Execution Check)    │
-      │  • nova_triage.py          (H1 Scoring)             │
-      │  • nova_zero_day_correlator.py (CVE Correlation)    │
-      └───────────────────────────┬───────────────────────────┘
-                                  │
-      ┌───────────────────────────▼───────────────────────────┐
-      │        PHASE 5: OUTPUT GENERATION                    │
-      ├─────────────────────────────────────────────────────┤
-      │  • nova_patch_generator.py (AI Code Fixes)          │
-      │  • nova_detection_engineer.py (Sigma Rules)         │
-      │  • nova_audit_reporter.py (Reports: HTML/JSON/MD)   │
-      │  • nova_vuln_tracker.py (SQLite Database)           │
-      └───────────────────────────┬───────────────────────────┘
-                                  │
-      ┌───────────────────────────▼───────────────────────────┐
-      │        CONTINUOUS IMPROVEMENT                        │
-      ├─────────────────────────────────────────────────────┤
-      │  • nova_diff_watcher.py    (Real-time Monitoring)   │
-      │  • nova_eval.py            (20 Benchmarks)          │
-      │  • nova_evolution.py       (Self-Improvement)       │
-      │  • nova_rag_builder.py     (Knowledge Learning)     │
-      └─────────────────────────────────────────────────────┘
+                                  â
+                  âââââââââââââââââ¼ââââââââââââââââ
+                  â   Intent Parser & CLI Router   â
+                  â  (nova.py / nova_cli.py)      â
+                  â  "Hunt target.com"            â
+                  â  "Full pipeline on ./app"     â
+                  â  "Orchestrate attack"         â
+                  âââââââââââââââââ¬ââââââââââââââââ
+                                  â
+      âââââââââââââââââââââââââââââ¼ââââââââââââââââââââââââââââ
+      â           PHASE 0: CODEBASE MAPPER                    â
+      â  (nova_codebase_mapper.py)                            â
+      âââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
+      â  30+ Languages  â 25+ Frameworks  â All Endpoints    â
+      â  Secrets        â CVE Deps        â Attack Surface   â
+      âââââââââââââââââââââââââââââ¬ââââââââââââââââââââââââââââ
+                                  â
+                    CodebaseMap (_CMAP) â Distributed to all phases
+                                  â
+      âââââââââââââââââââââââââââââ¼ââââââââââââââââââââââââââââ
+      â          PROVIDER LAYER (Infrastructure)              â
+      âââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
+      â  â¢ nova_llm_router.py      (OpenAIâAnthropicâOllama) â
+      â  â¢ nova_context.py         (Shared RunContext)       â
+      â  â¢ nova_sessions.py        (Scan State Persistence)  â
+      â  â¢ nova_tool_kit.py        (Governed Tools + Audit)   â
+      â  â¢ nova_hooks.py           (Event Lifecycle)         â
+      â  â¢ nova_skills.py          (System Prompts)          â
+      âââââââââââââââââââââââââââââ¬ââââââââââââââââââââââââââââ
+                                  â
+  âââââââââââââââââââââââââââââââââ¼ââââââââââââââââââââââââââââââââ
+  â                               â                               â
+  â¼                               â¼                               â¼
+ââââââââââââââââââââ     ââââââââââââââââââââ     ââââââââââââââââââââ
+â PHASE 1: STATIC  â     â PHASE 2: ACTIVE  â     â PHASE 3: AGENTS  â
+â ANALYSIS         â     â SCANNING         â     â & ORCHESTRATION  â
+ââââââââââââââââââââ¤     ââââââââââââââââââââ¤     ââââââââââââââââââââ¤
+â SAST             â     â SQLi Testing     â     â ReconAgent       â
+â SCA              â     â XSS Fuzzing      â     â â discovers      â
+â Git Secret Scan  â     â IDOR Testing     â     â AttackAgent      â
+â CI/CD Scan       â     â JWT Forge        â     â â chains         â
+â Container Scan   â     â CSRF Testing     â     â ReportAgent      â
+â IaC Scan         â     â GraphQL Tests    â     â â generates      â
+â Supply Chain     â     â Race Conditions  â     â Patches & Rules  â
+ââââââââââ¬ââââââââââ     ââââââââââ¬ââââââââââ     ââââââââââ¬ââââââââââ
+         â                        â                        â
+         ââââââââââââââââââââââââââ¼âââââââââââââââââââââââââ
+                                  â
+      âââââââââââââââââââââââââââââ¼ââââââââââââââââââââââââââââ
+      â     PHASE 4: INTELLIGENCE & VERIFICATION              â
+      âââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
+      â  â¢ nova_ast_intel.py       (Dataflow Analysis)       â
+      â  â¢ nova_verify_engine.py   (Triple-Confirm)         â
+      â  â¢ nova_browser_session.py (XSS Execution Check)    â
+      â  â¢ nova_triage.py          (H1 Scoring)             â
+      â  â¢ nova_zero_day_correlator.py (CVE Correlation)    â
+      âââââââââââââââââââââââââââââ¬ââââââââââââââââââââââââââââ
+                                  â
+      âââââââââââââââââââââââââââââ¼ââââââââââââââââââââââââââââ
+      â        PHASE 5: OUTPUT GENERATION                    â
+      âââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
+      â  â¢ nova_patch_generator.py (AI Code Fixes)          â
+      â  â¢ nova_detection_engineer.py (Sigma Rules)         â
+      â  â¢ nova_audit_reporter.py (Reports: HTML/JSON/MD)   â
+      â  â¢ nova_vuln_tracker.py (SQLite Database)           â
+      âââââââââââââââââââââââââââââ¬ââââââââââââââââââââââââââââ
+                                  â
+      âââââââââââââââââââââââââââââ¼ââââââââââââââââââââââââââââ
+      â        CONTINUOUS IMPROVEMENT                        â
+      âââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
+      â  â¢ nova_diff_watcher.py    (Real-time Monitoring)   â
+      â  â¢ nova_eval.py            (20 Benchmarks)          â
+      â  â¢ nova_evolution.py       (Self-Improvement)       â
+      â  â¢ nova_rag_builder.py     (Knowledge Learning)     â
+      âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
                               OUTPUTS
-                    ┌─────────────┬─────────────┐
-                    ▼             ▼             ▼
+                    âââââââââââââââ¬ââââââââââââââ
+                    â¼             â¼             â¼
             HTML Report      JSON Findings   Sigma Rules
             Executive Brief   CVSS Scores    Patches
 ```
@@ -446,167 +446,167 @@ python3 nova_features.py --check
 ### Data Flow Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Query: "Hunt http://target.com for vulnerabilities"           │
-└──────────────────┬──────────────────────────────────────────────┘
-                   │
-        ┌──────────▼──────────┐
-        │  Parse Intent       │
-        │  Initialize Context │
-        └──────────┬──────────┘
-                   │
-        ┌──────────▼──────────────────────────────────┐
-        │  PHASE 0: CODEBASE MAPPER                   │
-        │  • Enumerate all files (128 threads)       │
-        │  • Detect 30+ languages                    │
-        │  • Extract routes (25+ frameworks)         │
-        │  • Scan for secrets & CVE deps             │
-        │  • AI: "Top 3 bugs in this stack"          │
-        │  → _CMAP (global map)                      │
-        └──────────┬──────────────────────────────────┘
-                   │
-        ┌──────────▼──────────────────────────────────┐
-        │  Seed Findings into Context                │
-        │  • Secrets → HIGH                          │
-        │  • CVE deps → HIGH                         │
-        │  • Endpoints → active scanners             │
-        │  • Brief → agent system prompts            │
-        └──────────┬──────────────────────────────────┘
-                   │
-        ┌──────────▼──────────────────────────────────┐
-        │  Dispatch to Phases (1-5)                  │
-        │  • Run in parallel or sequence             │
-        │  • Each uses _CMAP for optimization        │
-        └──────────┬──────────────────────────────────┘
-                   │
-        ┌──────────▼──────────────────────────────────┐
-        │  Emit Findings (Atomic)                    │
-        │  • HookBus.fire_finding()                  │
-        │  • RunContext.add_finding()                │
-        │  • Session.add_finding()                   │
-        │  • VulnTracker.ingest()                    │
-        └──────────┬──────────────────────────────────┘
-                   │
-        ┌──────────▼──────────────────────────────────┐
-        │  Generate Output Reports                   │
-        │  • HTML dashboard                          │
-        │  • JSON for parsing                        │
-        │  • Markdown for HackerOne                  │
-        │  • Sigma rules for SOC                     │
-        └──────────┬──────────────────────────────────┘
-                   │
-        ┌──────────▼──────────────────────────────────┐
-        │  Save to Workspace                         │
-        │  ~/nova_workspace/                         │
-        │  ├── reports/                              │
-        │  ├── findings/                             │
-        │  ├── sessions/                             │
-        │  └── logs/                                 │
-        └───────────────────────────────────────────┘
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â  Query: "Hunt http://target.com for vulnerabilities"           â
+ââââââââââââââââââââ¬âââââââââââââââââââââââââââââââââââââââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââ
+        â  Parse Intent       â
+        â  Initialize Context â
+        ââââââââââââ¬âââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââââââââââââââââââââââââââ
+        â  PHASE 0: CODEBASE MAPPER                   â
+        â  â¢ Enumerate all files (128 threads)       â
+        â  â¢ Detect 30+ languages                    â
+        â  â¢ Extract routes (25+ frameworks)         â
+        â  â¢ Scan for secrets & CVE deps             â
+        â  â¢ AI: "Top 3 bugs in this stack"          â
+        â  â _CMAP (global map)                      â
+        ââââââââââââ¬âââââââââââââââââââââââââââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââââââââââââââââââââââââââ
+        â  Seed Findings into Context                â
+        â  â¢ Secrets â HIGH                          â
+        â  â¢ CVE deps â HIGH                         â
+        â  â¢ Endpoints â active scanners             â
+        â  â¢ Brief â agent system prompts            â
+        ââââââââââââ¬âââââââââââââââââââââââââââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââââââââââââââââââââââââââ
+        â  Dispatch to Phases (1-5)                  â
+        â  â¢ Run in parallel or sequence             â
+        â  â¢ Each uses _CMAP for optimization        â
+        ââââââââââââ¬âââââââââââââââââââââââââââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââââââââââââââââââââââââââ
+        â  Emit Findings (Atomic)                    â
+        â  â¢ HookBus.fire_finding()                  â
+        â  â¢ RunContext.add_finding()                â
+        â  â¢ Session.add_finding()                   â
+        â  â¢ VulnTracker.ingest()                    â
+        ââââââââââââ¬âââââââââââââââââââââââââââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââââââââââââââââââââââââââ
+        â  Generate Output Reports                   â
+        â  â¢ HTML dashboard                          â
+        â  â¢ JSON for parsing                        â
+        â  â¢ Markdown for HackerOne                  â
+        â  â¢ Sigma rules for SOC                     â
+        ââââââââââââ¬âââââââââââââââââââââââââââââââââââ
+                   â
+        ââââââââââââ¼âââââââââââââââââââââââââââââââââââ
+        â  Save to Workspace                         â
+        â  ~/nova_workspace/                         â
+        â  âââ reports/                              â
+        â  âââ findings/                             â
+        â  âââ sessions/                             â
+        â  âââ logs/                                 â
+        âââââââââââââââââââââââââââââââââââââââââââââ
 ```
 
 ### Multi-Agent Orchestration Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ MULTI-AGENT ORCHESTRATION: nova_orchestrator.py                │
-└─────────────────────────────────────────────────────────────────┘
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â MULTI-AGENT ORCHESTRATION: nova_orchestrator.py                â
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     PHASE 1: RECONNAISSANCE AGENT
-    ┌──────────────────────────────────┐
-    │ "Discover all endpoints & tech"  │
-    │                                  │
-    │ Input:  CodebaseMap              │
-    │ Task:   • Probe endpoints        │
-    │         • Identify frameworks    │
-    │         • Map auth mechanisms    │
-    │         • Find CDNs/WAFs         │
-    │                                  │
-    │ Output: AttackBrief + Endpoints  │
-    └──────────────────┬───────────────┘
-                       │ Handoff
-                       ▼
+    ââââââââââââââââââââââââââââââââââââ
+    â "Discover all endpoints & tech"  â
+    â                                  â
+    â Input:  CodebaseMap              â
+    â Task:   â¢ Probe endpoints        â
+    â         â¢ Identify frameworks    â
+    â         â¢ Map auth mechanisms    â
+    â         â¢ Find CDNs/WAFs         â
+    â                                  â
+    â Output: AttackBrief + Endpoints  â
+    ââââââââââââââââââââ¬ââââââââââââââââ
+                       â Handoff
+                       â¼
     PHASE 2: ATTACK AGENT
-    ┌──────────────────────────────────┐
-    │ "Chain exploits & verify"        │
-    │                                  │
-    │ Input:  AttackBrief + Endpoints  │
-    │ Task:   • Craft payloads         │
-    │         • Execute attacks       │
-    │         • Verify findings       │
-    │         • Chain vulns (SSRF→RCE)│
-    │                                  │
-    │ Output: Verified Findings        │
-    └──────────────────┬───────────────┘
-                       │ Handoff
-                       ▼
+    ââââââââââââââââââââââââââââââââââââ
+    â "Chain exploits & verify"        â
+    â                                  â
+    â Input:  AttackBrief + Endpoints  â
+    â Task:   â¢ Craft payloads         â
+    â         â¢ Execute attacks       â
+    â         â¢ Verify findings       â
+    â         â¢ Chain vulns (SSRFâRCE)â
+    â                                  â
+    â Output: Verified Findings        â
+    ââââââââââââââââââââ¬ââââââââââââââââ
+                       â Handoff
+                       â¼
     PHASE 3: REPORT AGENT
-    ┌──────────────────────────────────┐
-    │ "Generate fixes & detection"     │
-    │                                  │
-    │ Input:  Verified Findings        │
-    │ Task:   • Score by CVSS          │
-    │         • Generate patches      │
-    │         • Create detection rules│
-    │         • Write executive brief │
-    │                                  │
-    │ Output: Final Report             │
-    └──────────────────────────────────┘
+    ââââââââââââââââââââââââââââââââââââ
+    â "Generate fixes & detection"     â
+    â                                  â
+    â Input:  Verified Findings        â
+    â Task:   â¢ Score by CVSS          â
+    â         â¢ Generate patches      â
+    â         â¢ Create detection rulesâ
+    â         â¢ Write executive brief â
+    â                                  â
+    â Output: Final Report             â
+    ââââââââââââââââââââââââââââââââââââ
 ```
 
 ---
 
-## 🎯 Capabilities
+## ð¯ Capabilities
 
 ### By User Role
 
-#### 🔰 Beginner (Any skill level)
-- ✅ One-command vulnerability hunt: `nova hunt http://target.com`
-- ✅ Full pipeline: `nova full ./my-app`
-- ✅ Codebase mapping: `nova map ./my-app`
-- ✅ View reports: `nova report`
-- ✅ Health check: `nova status`
+#### ð° Beginner (Any skill level)
+- â One-command vulnerability hunt: `nova hunt http://target.com`
+- â Full pipeline: `nova full ./my-app`
+- â Codebase mapping: `nova map ./my-app`
+- â View reports: `nova report`
+- â Health check: `nova status`
 
-#### 👨‍💻 Intermediate (Security Pro)
-- ✅ Specific scanners: `nova scan sqli`, `nova scan xss`, etc.
-- ✅ Multi-agent orchestration: `nova orch http://target.com`
-- ✅ Real-time monitoring: `nova-watch ./my-app --staged`
-- ✅ Session management: `nova session list`, `resume <id>`
-- ✅ Telegram alerts: Set `TELEGRAM_BOT_TOKEN`
-- ✅ Custom reporting: `nova report --template executive`
+#### ð¨âð» Intermediate (Security Pro)
+- â Specific scanners: `nova scan sqli`, `nova scan xss`, etc.
+- â Multi-agent orchestration: `nova orch http://target.com`
+- â Real-time monitoring: `nova-watch ./my-app --staged`
+- â Session management: `nova session list`, `resume <id>`
+- â Telegram alerts: Set `TELEGRAM_BOT_TOKEN`
+- â Custom reporting: `nova report --template executive`
 
-#### 🔒 Advanced (Red Team)
-- ✅ Threat modeling: `python3 nova_threat_model.py ./my-app`
-- ✅ Patch generation: `nova generate-patch <finding-id>`
-- ✅ Detection rules: `nova generate-detection <finding-id>`
-- ✅ Cloud hunting: `nova-cloud hunt http://target.com`
-- ✅ Self-evolution: `python3 nova_evolution.py --goal "..."`
-- ✅ Custom RAG: `python3 nova_rag_builder.py`
+#### ð Advanced (Red Team)
+- â Threat modeling: `python3 nova_threat_model.py ./my-app`
+- â Patch generation: `nova generate-patch <finding-id>`
+- â Detection rules: `nova generate-detection <finding-id>`
+- â Cloud hunting: `nova-cloud hunt http://target.com`
+- â Self-evolution: `python3 nova_evolution.py --goal "..."`
+- â Custom RAG: `python3 nova_rag_builder.py`
 
 ### Scanning Coverage
 
 ```
-✅ SQL Injection       - Fuzzing + Blind SQLi detection
-✅ XSS (Reflected)     - DOM + Reflected + Stored
-✅ XSS (DOM)           - JavaScript execution verification
-✅ IDOR / BOLA         - Multi-user context testing
-✅ SSRF                - Blind + Callback-based detection
-✅ JWT                 - alg:none, key confusion, expiry bypass
-✅ CSRF                - Token validation bypass
-✅ GraphQL             - Introspection, batching, IDOR
-✅ Business Logic      - Price manipulation, race conditions
-✅ Race Conditions     - Concurrency testing
-✅ LLM Injection       - Prompt injection attacks
-✅ Secrets             - API keys, DB credentials, tokens
-✅ CVE Dependencies    - Known-risky packages
-✅ CI/CD Misconfiguration
-✅ IaC (Terraform)     - Security group misconfigs
-✅ Container Security  - Dockerfile + Kubernetes
+â SQL Injection       - Fuzzing + Blind SQLi detection
+â XSS (Reflected)     - DOM + Reflected + Stored
+â XSS (DOM)           - JavaScript execution verification
+â IDOR / BOLA         - Multi-user context testing
+â SSRF                - Blind + Callback-based detection
+â JWT                 - alg:none, key confusion, expiry bypass
+â CSRF                - Token validation bypass
+â GraphQL             - Introspection, batching, IDOR
+â Business Logic      - Price manipulation, race conditions
+â Race Conditions     - Concurrency testing
+â LLM Injection       - Prompt injection attacks
+â Secrets             - API keys, DB credentials, tokens
+â CVE Dependencies    - Known-risky packages
+â CI/CD Misconfiguration
+â IaC (Terraform)     - Security group misconfigs
+â Container Security  - Dockerfile + Kubernetes
 ```
 
 ---
 
-## 📚 All Modules
+## ð All Modules
 
 See [CAPABILITIES.md](CAPABILITIES.md) for complete feature matrix.
 
@@ -656,7 +656,7 @@ SQLi, XSS, IDOR, SSRF, JWT, CSRF, Race Conditions, GraphQL, Business Logic, LLM 
 
 ---
 
-## 🔧 Configuration
+## ð§ Configuration
 
 ### Environment Variables
 
@@ -695,7 +695,7 @@ export NOVA_PERMISSION_PROFILE=full
 
 ---
 
-## 🎓 Next Steps
+## ð Next Steps
 
 ### For First-Time Users
 
@@ -720,28 +720,28 @@ export NOVA_PERMISSION_PROFILE=full
 
 ---
 
-## 📖 Documentation
+## ð Documentation
 
-- **[INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md)** — Full post-install guide
-- **[CAPABILITIES.md](CAPABILITIES.md)** — Feature matrix by role
-- **[SOLUTIONS.md](SOLUTIONS.md)** — Hacking guides and walkthroughs
-- **[REFERENCES.md](REFERENCES.md)** — Research and talks
-- **[.env.example](.env.example)** — Configuration template
-- **[nova_features.py](nova_features.py)** — Feature discovery tool
-
----
-
-## 🏛️ Architecture Principles
-
-1. **Phase 0 is Mandatory** — Codebase mapper runs first, optimizes all downstream phases
-2. **Single Emission Path** — All findings go through `_emit_findings()` atomically
-3. **Tool Governance Required** — Every tool wrapped, audited, rate-limited
-4. **Map-Aware Better Than Blind** — Read source code to discover, probe to verify
-5. **Quality Driven by Benchmarks** — `nova_eval.py` gates all changes
+- **[INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md)** â Full post-install guide
+- **[CAPABILITIES.md](CAPABILITIES.md)** â Feature matrix by role
+- **[SOLUTIONS.md](SOLUTIONS.md)** â Hacking guides and walkthroughs
+- **[REFERENCES.md](REFERENCES.md)** â Research and talks
+- **[.env.example](.env.example)** â Configuration template
+- **[nova_features.py](nova_features.py)** â Feature discovery tool
 
 ---
 
-## ⚙️ CLI Quick Reference
+## ðï¸ Architecture Principles
+
+1. **Phase 0 is Mandatory** â Codebase mapper runs first, optimizes all downstream phases
+2. **Single Emission Path** â All findings go through `_emit_findings()` atomically
+3. **Tool Governance Required** â Every tool wrapped, audited, rate-limited
+4. **Map-Aware Better Than Blind** â Read source code to discover, probe to verify
+5. **Quality Driven by Benchmarks** â `nova_eval.py` gates all changes
+
+---
+
+## âï¸ CLI Quick Reference
 
 ### Core Commands
 ```bash
@@ -777,7 +777,7 @@ nova eval --quick            # Quick benchmarks
 
 ---
 
-## 📊 Performance
+## ð Performance
 
 | Task | Time | Output |
 |------|------|--------|
@@ -790,19 +790,19 @@ nova eval --quick            # Quick benchmarks
 
 ---
 
-## 🤝 Contributing
+## ð¤ Contributing
 
 See [AGENTS.md](AGENTS.md) for AI assistant guidelines and [CONTRIBUTING.md](CONTRIBUTING.md) for development practices.
 
 ---
 
-## 📜 License
+## ð License
 
-MIT License — See LICENSE file
+MIT License â See LICENSE file
 
 ---
 
-## 🙏 Acknowledgments
+## ð Acknowledgments
 
 Built by the Nova Arsenal team with contributions from the security community.
 
@@ -810,4 +810,4 @@ Built by the Nova Arsenal team with contributions from the security community.
 
 **Version:** 4.2  
 **Last Updated:** June 2026  
-**Status:** ✅ Production Ready
+**Status:** â Production Ready
