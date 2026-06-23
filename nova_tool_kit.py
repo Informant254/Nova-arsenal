@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  🔧 NOVA TOOL KIT — Hardened Tool Governance Engine                        ║
-║                                                                              ║
-║  Addresses GAP 2: every tool call now goes through:                        ║
-║    1. Scope enforcement — target must be in session scope                  ║
-║    2. Permission model  — read_only | scoped | full (default: scoped)      ║
-║    3. Hook bus audit    — PreTool / PostTool / ToolError events             ║
-║    4. Tracer spans      — every call gets a span with full args/result      ║
-║    5. Redacted logging  — secrets stripped before any log write            ║
-║    6. Rollback story    — read-only tools never need rollback;              ║
-║                           destructive tools require explicit confirmation   ║
-║    7. Rate limiting     — per-tool call budget to prevent runaway loops    ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â  ð§ NOVA TOOL KIT â Hardened Tool Governance Engine                        â
+â                                                                              â
+â  Addresses GAP 2: every tool call now goes through:                        â
+â    1. Scope enforcement â target must be in session scope                  â
+â    2. Permission model  â read_only | scoped | full (default: scoped)      â
+â    3. Hook bus audit    â PreTool / PostTool / ToolError events             â
+â    4. Tracer spans      â every call gets a span with full args/result      â
+â    5. Redacted logging  â secrets stripped before any log write            â
+â    6. Rollback story    â read-only tools never need rollback;              â
+â                           destructive tools require explicit confirmation   â
+â    7. Rate limiting     â per-tool call budget to prevent runaway loops    â
+ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 """
 
 import json
@@ -31,7 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 WORKSPACE = Path(os.path.expanduser(os.getenv("NOVA_WORKSPACE", "~/nova_workspace")))
 WORKSPACE.mkdir(parents=True, exist_ok=True)
 
-# ── Permission Profiles ────────────────────────────────────────────────────────
+# ââ Permission Profiles ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 class PermissionProfile(str, Enum):
     READ_ONLY = "read_only"   # No network writes, no shell writes
@@ -42,7 +42,7 @@ DEFAULT_PROFILE: PermissionProfile = PermissionProfile(
     os.getenv("NOVA_PERMISSION_PROFILE", "scoped"))
 STRICT_SCOPE = os.getenv("NOVA_STRICT_SCOPE", "true").lower() != "false"
 
-# ── Destructive patterns that are BLOCKED in all profiles except explicit ─────
+# ââ Destructive patterns that are BLOCKED in all profiles except explicit âââââ
 
 BLOCKED_SHELL_PATTERNS: List[str] = [
     r"rm\s+-rf?\s+/",
@@ -75,7 +75,7 @@ ALLOWED_SHELL_COMMANDS: Set[str] = {
     "sqlmap", "nikto", "wfuzz",
 }
 
-# ── Secret redaction patterns ──────────────────────────────────────────────────
+# ââ Secret redaction patterns ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 REDACT_PATTERNS: List[Tuple[str, str]] = [
     (r"(?:AKIA|ASIA|AROA)[A-Z0-9]{16}",         "[AWS_KEY_REDACTED]"),
@@ -100,7 +100,7 @@ def redact(text: str) -> str:
     return text
 
 
-# ── Tool Audit Log ─────────────────────────────────────────────────────────────
+# ââ Tool Audit Log âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @dataclass
 class ToolAuditEntry:
@@ -173,7 +173,7 @@ class ToolAuditLog:
 _AUDIT_LOG = ToolAuditLog()
 
 
-# ── Rate Limiter ───────────────────────────────────────────────────────────────
+# ââ Rate Limiter âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 class ToolRateLimiter:
     """Prevent runaway tool loops by capping calls per-tool per-session."""
@@ -202,7 +202,7 @@ class ToolRateLimiter:
 _RATE_LIMITER = ToolRateLimiter()
 
 
-# ── Scope Guard ────────────────────────────────────────────────────────────────
+# ââ Scope Guard ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 class ScopeGuard:
     """Ensures tool calls target only declared in-scope hosts."""
@@ -248,13 +248,13 @@ class ScopeGuard:
 _SCOPE_GUARD = ScopeGuard()
 
 
-# ── Governed Tool Wrapper ──────────────────────────────────────────────────────
+# ââ Governed Tool Wrapper ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @dataclass
 class GovernedTool:
     """
     Wraps any callable with the full governance stack:
-    scope check → rate limit → permission check → audit → hook bus → span → call
+    scope check â rate limit â permission check â audit â hook bus â span â call
     """
     name:            str
     description:     str
@@ -278,7 +278,7 @@ class GovernedTool:
         blocked  = False
         reason   = ""
 
-        # ── 1. Permission profile check ────────────────────────────────────
+        # ââ 1. Permission profile check ââââââââââââââââââââââââââââââââââââ
         profile_order = {
             PermissionProfile.READ_ONLY: 0,
             PermissionProfile.SCOPED:    1,
@@ -290,13 +290,13 @@ class GovernedTool:
             reason  = (f"Profile '{profile}' insufficient; "
                        f"tool '{self.name}' requires '{self.min_profile}'")
 
-        # ── 2. Destructive tool block ──────────────────────────────────────
+        # ââ 2. Destructive tool block ââââââââââââââââââââââââââââââââââââââ
         if not blocked and self.is_destructive and profile != PermissionProfile.FULL:
             blocked = True
             reason  = (f"Destructive tool '{self.name}' requires FULL profile. "
                        f"Current: {profile}")
 
-        # ── 3. Shell safety check ──────────────────────────────────────────
+        # ââ 3. Shell safety check ââââââââââââââââââââââââââââââââââââââââââ
         if not blocked and self.category == "shell":
             cmd = str(args.get("command",""))
             ok, msg = _check_shell_safety(cmd)
@@ -304,7 +304,7 @@ class GovernedTool:
                 blocked = True
                 reason  = msg
 
-        # ── 4. Scope check ─────────────────────────────────────────────────
+        # ââ 4. Scope check âââââââââââââââââââââââââââââââââââââââââââââââââ
         if not blocked and self.requires_scope and (self._scope or _SCOPE_GUARD):
             guard = self._scope or _SCOPE_GUARD
             url   = args.get("url","") or args.get("target","")
@@ -314,7 +314,7 @@ class GovernedTool:
                     blocked = True
                     reason  = msg
 
-        # ── 5. File path safety ────────────────────────────────────────────
+        # ââ 5. File path safety ââââââââââââââââââââââââââââââââââââââââââââ
         if not blocked and self.category == "file":
             path = str(args.get("path",""))
             if path:
@@ -323,14 +323,14 @@ class GovernedTool:
                     blocked = True
                     reason  = msg
 
-        # ── 6. Rate limit ──────────────────────────────────────────────────
+        # ââ 6. Rate limit ââââââââââââââââââââââââââââââââââââââââââââââââââ
         if not blocked:
             ok, msg = _RATE_LIMITER.check(self.name)
             if not ok:
                 blocked = True
                 reason  = msg
 
-        # ── 7. PreTool hook ────────────────────────────────────────────────
+        # ââ 7. PreTool hook ââââââââââââââââââââââââââââââââââââââââââââââââ
         if self._bus and not blocked:
             try:
                 allow = self._bus.fire_pre_tool(self.name, args, agent=agent_name)
@@ -340,7 +340,7 @@ class GovernedTool:
             except Exception:
                 pass
 
-        # ── EXECUTE (or return block message) ─────────────────────────────
+        # ââ EXECUTE (or return block message) âââââââââââââââââââââââââââââ
         if blocked:
             result = f"[BLOCKED] {reason}"
             elapsed_ms = 0.0
@@ -370,7 +370,7 @@ class GovernedTool:
                         pass
             elapsed_ms = (time.monotonic() - t0) * 1000
 
-        # ── 8. PostTool hook ───────────────────────────────────────────────
+        # ââ 8. PostTool hook âââââââââââââââââââââââââââââââââââââââââââââââ
         if self._bus and not blocked:
             try:
                 self._bus.fire_post_tool(
@@ -379,7 +379,7 @@ class GovernedTool:
             except Exception:
                 pass
 
-        # ── 9. Audit log (redacted) ────────────────────────────────────────
+        # ââ 9. Audit log (redacted) ââââââââââââââââââââââââââââââââââââââââ
         _AUDIT_LOG.record(ToolAuditEntry(
             ts          = datetime.now().isoformat(),
             tool        = self.name,
@@ -401,7 +401,7 @@ class GovernedTool:
             req = k in self.schema.get("required", [])
             parts.append(
                 f"  {k} ({'req' if req else 'opt'}): "
-                f"{v.get('type','str')} — {v.get('description','')}")
+                f"{v.get('type','str')} â {v.get('description','')}")
         return "\n".join(parts) or "  (no parameters)"
 
 
@@ -414,14 +414,14 @@ def _check_shell_safety(cmd: str) -> Tuple[bool, str]:
     if not parts:
         return False, "Empty command"
     # Check base command is in allow list
-    base = Path(parts[0]).name  # handle /usr/bin/curl → curl
+    base = Path(parts[0]).name  # handle /usr/bin/curl â curl
     if base not in ALLOWED_SHELL_COMMANDS:
         return False, (f"'{base}' not in shell allow-list. "
                        f"Allowed: {sorted(ALLOWED_SHELL_COMMANDS)}")
     return True, "ok"
 
 
-# ── Tool Factories ─────────────────────────────────────────────────────────────
+# ââ Tool Factories âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 def make_http_probe(scope: ScopeGuard = None) -> GovernedTool:
     import urllib.request as _ur, urllib.error as _ue
@@ -576,7 +576,7 @@ def make_grep_code() -> GovernedTool:
 
 
 def make_python_eval() -> GovernedTool:
-    """Safe sandboxed Python eval — no I/O, no imports, no builtins."""
+    """Safe sandboxed Python eval â no I/O, no imports, no builtins."""
     def fn(args: Dict) -> str:
         import io, contextlib
         code = args.get("code","")
@@ -617,7 +617,7 @@ def make_python_eval() -> GovernedTool:
 
 
 def make_write_file() -> GovernedTool:
-    """Write a file — ONLY within NOVA_WORKSPACE, never outside."""
+    """Write a file â ONLY within NOVA_WORKSPACE, never outside."""
     def fn(args: Dict) -> str:
         path    = args.get("path","")
         content = args.get("content","")
@@ -648,7 +648,7 @@ def make_write_file() -> GovernedTool:
         },"required":["path","content"]})
 
 
-# ── ToolKit Assembler ──────────────────────────────────────────────────────────
+# ââ ToolKit Assembler ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 class NovaToolKit:
     """
@@ -701,7 +701,7 @@ class NovaToolKit:
         return [e.to_dict() for e in _AUDIT_LOG.blocked_calls()]
 
 
-# ── Module-level default kit ───────────────────────────────────────────────────
+# ââ Module-level default kit âââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 def get_default_kit(scope: List[str] = None) -> NovaToolKit:
     """Get the default governed tool kit. Wire bus/tracer from provider layer."""
@@ -723,10 +723,10 @@ def get_default_kit(scope: List[str] = None) -> NovaToolKit:
         tracer=tracer)
 
 
-# ── Backward-compatibility exports matching old nova_tool_kit API ─────────────
+# ââ Backward-compatibility exports matching old nova_tool_kit API âââââââââââââ
 
 class Tool:
-    """Thin compatibility shim — wraps GovernedTool."""
+    """Thin compatibility shim â wraps GovernedTool."""
     def __init__(self, name, description, function,
                  schema=None, category="generic"):
         self._governed = GovernedTool(
@@ -748,7 +748,7 @@ class Tool:
         return self._governed.schema_str()
 
 
-# ── Public tool registry used by autonomous agents ─────────────────────────────
+# ââ Public tool registry used by autonomous agents âââââââââââââââââââââââââââââ
 
 _DEFAULT_TOOLS: Dict[str, GovernedTool] = {}
 TOOL_SCHEMAS: Dict[str, Dict] = {}
