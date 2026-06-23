@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# AUDIT BATCH 1 - dispatch module review
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║   🔍 NOVA RECON v1.0 — ADVANCED RECONNAISSANCE ENGINE           ║
