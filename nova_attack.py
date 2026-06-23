@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# AUDIT BATCH 1 - dispatch module review
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║   ⚡ NOVA ATTACK v1.0 — ADVANCED ATTACK CHAIN ORCHESTRATOR      ║
