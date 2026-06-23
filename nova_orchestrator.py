@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# AUDIT BATCH 1 - dispatch module review
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  🧠 NOVA ORCHESTRATOR v3.0 — Production Multi-Agent Engine                 ║
