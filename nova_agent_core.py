@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# AUDIT BATCH 1 - dispatch module review
 """
 NOVA AGENT CORE v2.0 — AUTONOMOUS REASONING ENGINE
 
