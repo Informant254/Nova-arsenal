@@ -4,7 +4,11 @@ Nova-Arsenal API Routes
 FastAPI routes for the REST API.
 """
 
+import asyncio
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +17,32 @@ from nova_arsenal.db import get_db
 from nova_arsenal.db.models import Agent, AgentStatus, Finding, Scope, User
 
 router = APIRouter(prefix="/api")
+
+
+# ── Request/Response Models ────────────────────────────────────────────────
+
+class RunAgentRequest(BaseModel):
+    target: str
+    objective: str = "Find and exploit all critical vulnerabilities"
+    max_steps: int = 40
+    scope: Optional[list[str]] = None
+    sandbox_mode: Optional[str] = None
+
+
+class StepAgentRequest(BaseModel):
+    instruction: str = ""
+
+
+# ── In-memory agent runners (replace with DB-backed in production) ─────────
+
+_active_runners: dict[int, "AgentRunner"] = {}
+_runner_results: dict[int, dict] = {}
+
+
+async def _event_bridge(agent_id: int, event_type: str, data: dict):
+    """Bridge agent events to WebSocket."""
+    from nova_arsenal.api.websocket.events import emit_agent_event
+    await emit_agent_event(agent_id, event_type, data)
 
 
 # Health routes
@@ -320,3 +350,221 @@ async def remove_scope(
     
     scope.is_active = False
     return {"message": "Target removed from scope"}
+
+
+# ── Autonomous Agent Runner Endpoints ──────────────────────────────────────
+
+@router.post("/agents/{agent_id}/run", status_code=status.HTTP_202_ACCEPTED)
+async def run_agent(
+    agent_id: int,
+    request: RunAgentRequest,
+    current_user: User = Depends(require_analyst),
+    db: AsyncSession = Depends(get_db),
+):
+    """Start the fully autonomous agent loop."""
+    from nova_arsenal.agent_runner import create_runner
+
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if current_user.role.value != "admin" and agent.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if agent_id in _active_runners and _active_runners[agent_id]._running:
+        raise HTTPException(status_code=409, detail="Agent is already running")
+
+    runner = create_runner(
+        target=request.target,
+        objective=request.objective,
+        max_steps=request.max_steps,
+        scope=request.scope,
+        sandbox_mode=request.sandbox_mode,
+        on_event=lambda et, data: _event_bridge(agent_id, et, data),
+    )
+
+    _active_runners[agent_id] = runner
+
+    # Update agent status
+    agent.status = AgentStatus.RUNNING
+    agent.started_at = __import__("datetime").datetime.utcnow()
+    await db.commit()
+
+    # Run in background
+    async def _run_background():
+        try:
+            result = await runner.run()
+            _runner_results[agent_id] = result
+            agent.status = AgentStatus.COMPLETED if result["status"] == "completed" else AgentStatus.FAILED
+            agent.completed_at = __import__("datetime").datetime.utcnow()
+            agent.current_step = result.get("steps_taken", 0)
+            await db.commit()
+        except Exception as e:
+            agent.status = AgentStatus.FAILED
+            await db.commit()
+            _runner_results[agent_id] = {"status": "failed", "error": str(e)}
+
+    asyncio.create_task(_run_background())
+
+    return {
+        "message": "Agent started",
+        "agent_id": agent_id,
+        "target": request.target,
+        "objective": request.objective,
+    }
+
+
+@router.post("/agents/{agent_id}/stop")
+async def stop_agent(
+    agent_id: int,
+    current_user: User = Depends(require_analyst),
+    db: AsyncSession = Depends(get_db),
+):
+    """Stop a running agent."""
+    if agent_id not in _active_runners:
+        raise HTTPException(status_code=404, detail="No active runner for this agent")
+
+    runner = _active_runners[agent_id]
+    runner.stop()
+
+    return {"message": "Agent stop requested", "agent_id": agent_id}
+
+
+@router.post("/agents/{agent_id}/step")
+async def step_agent(
+    agent_id: int,
+    request: StepAgentRequest,
+    current_user: User = Depends(require_analyst),
+    db: AsyncSession = Depends(get_db),
+):
+    """Execute a single agent step (interactive mode)."""
+    from nova_arsenal.agent_runner import create_runner
+
+    if agent_id not in _active_runners:
+        # Create a new runner
+        result = await db.execute(select(Agent).where(Agent.id == agent_id))
+        agent = result.scalar_one_or_none()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+
+        runner = create_runner(
+            target=agent.target,
+            objective=agent.objective or "Find vulnerabilities",
+            max_steps=agent.max_steps,
+            on_event=lambda et, data: _event_bridge(agent_id, et, data),
+        )
+        _active_runners[agent_id] = runner
+
+    runner = _active_runners[agent_id]
+    action = await runner.step_once(request.instruction)
+
+    return {
+        "step": action.step,
+        "command": action.command,
+        "output": action.result.stdout if action.result else "",
+        "exit_code": action.result.exit_code if action.result else None,
+        "analysis": action.analysis,
+    }
+
+
+@router.get("/agents/{agent_id}/status")
+async def agent_status(
+    agent_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Get real-time agent status."""
+    if agent_id in _active_runners:
+        runner = _active_runners[agent_id]
+        state = runner.get_state()
+        state["findings"] = [f.to_dict() for f in runner._findings]
+        return state
+
+    # Check for completed results
+    if agent_id in _runner_results:
+        return {"status": "completed", "result": _runner_results[agent_id]}
+
+    return {"status": "idle"}
+
+
+@router.get("/agents/{agent_id}/findings")
+async def agent_findings(
+    agent_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Get findings from the agent."""
+    if agent_id in _active_runners:
+        runner = _active_runners[agent_id]
+        return {"findings": [f.to_dict() for f in runner._findings]}
+    return {"findings": []}
+
+
+@router.get("/agents/{agent_id}/actions")
+async def agent_actions(
+    agent_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Get action history from the agent."""
+    if agent_id in _active_runners:
+        runner = _active_runners[agent_id]
+        return {"actions": [a.to_dict() for a in runner._actions]}
+    return {"actions": []}
+
+
+@router.get("/kali/tools")
+async def kali_tools(
+    current_user: User = Depends(get_current_user),
+):
+    """List all Kali Linux tools known to the blueprint."""
+    from nova_arsenal.kali_blueprint import KaliBlueprint
+
+    bp = KaliBlueprint()
+    return {
+        "categories": bp.get_all_categories(),
+        "tools": {
+            name: {
+                "name": t.name,
+                "category": t.category,
+                "description": t.description,
+                "usage": t.usage,
+                "examples": t.examples[:2],
+            }
+            for name, t in bp.tools.items()
+        },
+        "total": len(bp.tools),
+    }
+
+
+@router.get("/kali/context")
+async def kali_context(
+    current_user: User = Depends(get_current_user),
+):
+    """Get the full Kali Linux knowledge base context."""
+    from nova_arsenal.kali_blueprint import KaliBlueprint
+
+    bp = KaliBlueprint()
+    return {"context": bp.get_full_context()}
+
+
+@router.post("/code/generate")
+async def generate_code(
+    task: str,
+    language: str = "python",
+    target: str = "",
+    current_user: User = Depends(require_analyst),
+):
+    """Generate code for a security task."""
+    from nova_arsenal.code_generator import CodeGenerator, CodeLanguage
+
+    gen = CodeGenerator()
+    lang = CodeLanguage.PYTHON if language == "python" else CodeLanguage.BASH
+    code = gen.generate(task=task, language=lang, target=target)
+
+    return {
+        "code": code.code,
+        "language": code.language.value,
+        "filename": code.filename,
+        "description": code.description,
+        "dependencies": code.dependencies,
+    }

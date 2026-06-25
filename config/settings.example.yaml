@@ -31,11 +31,51 @@ llm:
       model: "gemini-2.5-flash"
       api_key: "${GOOGLE_API_KEY}"
       timeout: 60
+    - provider: "deepseek"
+      model: "deepseek-chat"
+      api_key: "${DEEPSEEK_API_KEY}"
+      timeout: 60
+    - provider: "qwen"
+      model: "qwen-max"
+      api_key: "${DASHSCOPE_API_KEY}"
+      timeout: 60
+    - provider: "openrouter"
+      model: "openrouter/google-gemini-2.5-flash"
+      api_key: "${OPENROUTER_API_KEY}"
+      timeout: 60
+    - provider: "huggingface"
+      model: "meta-llama/Llama-3.3-70B-Instruct"
+      api_key: "${HUGGINGFACE_API_KEY}"
+      timeout: 60
       
   routing:
-    strategy: "cost-optimized"  # cost-optimized, latency-optimized, balanced
+    strategy: "balanced"  # balanced, quality, speed, cost
     fallback_threshold: 3
     max_retries: 3
+    # Fugu-style orchestration settings
+    orchestration:
+      enabled: true
+      # Provider preference per task type
+      task_preferences:
+        code_generation: "quality"
+        security_analysis: "quality"
+        reasoning: "quality"
+        creative: "balanced"
+        conversation: "speed"
+        cost_sensitive: "cost"
+
+  # Provider-specific settings
+  providers:
+    ollama:
+      base_url: "http://llm:11434"
+    openrouter:
+      base_url: "https://openrouter.ai/api/v1"
+    huggingface:
+      base_url: "https://api-inference.huggingface.co"
+    qwen:
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    deepseek:
+      base_url: "https://api.deepseek.com/v1"
 
 security:
   permission_profile: "scoped"  # read_only, scoped, full
