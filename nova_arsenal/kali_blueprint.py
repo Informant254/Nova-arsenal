@@ -128,18 +128,30 @@ class KaliBlueprint:
     # ── Load tools from external data ─────────────────────────────────────
 
     def _register_tools_from_data(self) -> None:
-        """Import and register all tools from kali_tools_data."""
+        """Import and register all tools from kali_tools_data and kali_tools_extended."""
         from nova_arsenal.kali_tools_data import (
             RECON_TOOLS, WEB_TOOLS, NETWORK_TOOLS, EXPLOITATION_TOOLS,
             PASSWORD_TOOLS, FORENSICS_TOOLS, WIRELESS_TOOLS,
             REVERSE_ENGINEERING_TOOLS, SNIFFING_SPOOFING_TOOLS,
             POST_EXPLOIT_TOOLS, STEGANOGRAPHY_TOOLS, TOOL_COMBINATIONS,
         )
+        from nova_arsenal.kali_tools_extended import (
+            MOBILE_TOOLS, CLOUD_TOOLS, AD_TOOLS, C2_TOOLS, API_FUZZING_TOOLS,
+            CODE_ANALYSIS_TOOLS, CONTAINER_TOOLS, SOCIAL_ENGINEERING_TOOLS,
+            FUZZING_TOOLS, IOT_SCADA_TOOLS, BLUETOOTH_TOOLS,
+            REVERSE_ENGINEERING_EXTRA, LOG_FORENSICS_TOOLS, ANONYMITY_TOOLS,
+            EXPLOIT_DEV_TOOLS,
+        )
         all_tools = (
             RECON_TOOLS + WEB_TOOLS + NETWORK_TOOLS + EXPLOITATION_TOOLS +
             PASSWORD_TOOLS + FORENSICS_TOOLS + WIRELESS_TOOLS +
             REVERSE_ENGINEERING_TOOLS + SNIFFING_SPOOFING_TOOLS +
-            POST_EXPLOIT_TOOLS + STEGANOGRAPHY_TOOLS
+            POST_EXPLOIT_TOOLS + STEGANOGRAPHY_TOOLS +
+            MOBILE_TOOLS + CLOUD_TOOLS + AD_TOOLS + C2_TOOLS +
+            API_FUZZING_TOOLS + CODE_ANALYSIS_TOOLS + CONTAINER_TOOLS +
+            SOCIAL_ENGINEERING_TOOLS + FUZZING_TOOLS + IOT_SCADA_TOOLS +
+            BLUETOOTH_TOOLS + REVERSE_ENGINEERING_EXTRA + LOG_FORENSICS_TOOLS +
+            ANONYMITY_TOOLS + EXPLOIT_DEV_TOOLS
         )
         self._add_tools(all_tools)
         self._tool_combos_data = TOOL_COMBINATIONS
@@ -302,6 +314,28 @@ class KaliBlueprint:
             "snmp": ["onesixtyone", "snmpwalk", "snmp-check"],
             "ssl": ["sslscan", "testssl"],
             "certificate": ["sslscan", "testssl"],
+            "kerberos": ["kerbrute", "impacket", "hashcat"],
+            "kerberoast": ["kerbrute", "impacket", "hashcat"],
+            "active directory": ["bloodhound", "crackmapexec", "enum4linux-ng"],
+            "docker": ["trivy", "grype", "syft"],
+            "container": ["trivy", "grype", "syft", "kube-hunter"],
+            "kubernetes": ["kube-hunter", "kubeaudit", "trivy"],
+            "android": ["apktool", "jadx", "objection", "frida"],
+            "apk": ["apktool", "jadx", "dex2jar"],
+            "api": ["arjun", "ffuf", "kiterunner"],
+            "cloud": ["cloud_enum", "s3scanner", "pacu"],
+            "s3": ["s3scanner"],
+            "bluetooth": ["bluelog", "bluesnarfer", "btscanner"],
+            "iot": ["binwalk", "firmwalker"],
+            "scada": ["nmap", "mbtget", "s7exploit"],
+            "fuzz": ["ffuf", "wfuzz", "honggfuzz", "afl++"],
+            "anonymity": ["tor", "proxychains"],
+            "vpn": ["openvpn"],
+            "password spray": ["hydra", "crackmapexec"],
+            "hash crack": ["hashcat", "john"],
+            "volatility": ["volatility3"],
+            "yara": ["yara"],
+            "log analysis": ["volatility3", "log-parser"],
         }
         for keyword, tool_list in keyword_map.items():
             if keyword in task_lower:

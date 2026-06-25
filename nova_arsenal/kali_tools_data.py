@@ -1991,4 +1991,70 @@ TOOL_COMBINATIONS = {
         ],
         "tools": ["nmap", "enum4linux-ng", "rpcclient", "crackmapexec"],
     },
+    "cloud_recon": {
+        "description": "Cloud infrastructure reconnaissance",
+        "steps": [
+            "cloud_enum -k {company}",
+            "s3scanner scan -f buckets.txt",
+            "pacu --module-name iam__enum_users_roles_policies_groups",
+        ],
+        "tools": ["cloud_enum", "s3scanner", "pacu"],
+    },
+    "kubernetes_attack": {
+        "description": "Kubernetes cluster attack chain",
+        "steps": [
+            "kube-hunter --remote {target}",
+            "kubeaudit all",
+            "trivy image {image}",
+            "kubectl get pods --all-namespaces",
+            "kubectl exec -it {pod} -- /bin/sh",
+        ],
+        "tools": ["kube-hunter", "kubeaudit", "trivy"],
+    },
+    "mobile_analysis": {
+        "description": "Android app security analysis",
+        "steps": [
+            "apktool d app.apk -o app_decoded",
+            "jadx app.apk -o jadx_output",
+            "grep -r 'api_key\\|secret\\|password' jadx_output/",
+            "objection -g {package} explore",
+            "frida -U -g {package} -l hook.js",
+        ],
+        "tools": ["apktool", "jadx", "objection", "frida"],
+    },
+    "active_directory_full": {
+        "description": "Full Active Directory compromise chain",
+        "steps": [
+            "nmap -sV -p 88,135,139,389,445,636 {target}",
+            "crackmapexec ldap {target} -u {user} -p {pass} --users --groups",
+            "bloodhound-python -u {user} -p {pass} -d {domain} -c All -ns {dc_ip}",
+            "kerbrute userenum --dc {dc} -d {domain} users.txt",
+            "impacket-GetUserSPNs {domain}/{user}:{pass} -request -outputfile hashes.txt",
+            "hashcat -m 13100 hashes.txt rockyou.txt",
+            "impacket-secretsdump {domain}/{user}:{pass}@{target}",
+        ],
+        "tools": ["nmap", "crackmapexec", "bloodhound", "kerbrute", "impacket", "hashcat"],
+    },
+    "api_penetration": {
+        "description": "REST API penetration testing",
+        "steps": [
+            "arjun -u https://{target}/api/v1/endpoint",
+            "ffuf -u https://{target}/api/FUZZ -w api-routes.txt -mc 200",
+            "kiterunner scan https://{target}/api -w routes-large.kite",
+            "curl -X POST https://{target}/api/data -d '{\"test\":\"payload\"}' -H 'Content-Type: application/json'",
+        ],
+        "tools": ["arjun", "ffuf", "kiterunner", "curl"],
+    },
+    "firmware_analysis": {
+        "description": "IoT firmware analysis workflow",
+        "steps": [
+            "binwalk firmware.bin",
+            "binwalk -e firmware.bin",
+            "unsquashfs squashfs-root.img",
+            "find . -name '*.conf' -o -name '*.key' -o -name '*.pem'",
+            "strings busybox | grep -i pass",
+            "firmwalker.sh squashfs-root/",
+        ],
+        "tools": ["binwalk", "unsquashfs", "strings", "firmwalker"],
+    },
 }

@@ -5,7 +5,7 @@ SQLAlchemy models for storing agents, findings, users, and scope.
 """
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -57,8 +57,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.ANALYST)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     agents = relationship("Agent", back_populates="owner")
@@ -82,10 +82,10 @@ class Agent(Base):
     config = Column(Text)  # JSON string
     max_steps = Column(Integer, default=40)
     current_step = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     owner = relationship("User", back_populates="agents")
@@ -113,7 +113,7 @@ class Finding(Base):
     false_positive = Column(Boolean, default=False)
     remediation = Column(Text)
     references = Column(Text)  # JSON string
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     verified_at = Column(DateTime)
     verified_by = Column(Integer, ForeignKey("users.id"))
 
@@ -136,7 +136,7 @@ class Scope(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     is_active = Column(Boolean, default=True)
     is_wildcard = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<Scope {self.target}>"

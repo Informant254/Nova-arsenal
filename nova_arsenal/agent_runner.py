@@ -17,7 +17,7 @@ import asyncio
 import json
 import logging
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional
@@ -66,7 +66,7 @@ class AgentAction:
     command: str = ""
     result: Optional[ExecResult] = None
     analysis: str = ""
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     duration_ms: float = 0
 
     def to_dict(self) -> Dict[str, Any]:
@@ -167,7 +167,7 @@ class AgentRunner:
     async def run(self) -> Dict[str, Any]:
         """Execute the full autonomous agent loop."""
         self._running = True
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             await self._emit("agent_started", {
@@ -202,7 +202,7 @@ class AgentRunner:
             report = await self._generate_report()
 
             await self._set_phase(AgentPhase.COMPLETED)
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
 
             await self._emit("agent_completed", {
                 "steps": self._step,
@@ -263,9 +263,9 @@ class AgentRunner:
                 return action
 
             # Execute
-            start = datetime.utcnow()
+            start = datetime.now(timezone.utc)
             action.result = await self.executor.execute(action.command)
-            action.duration_ms = (datetime.utcnow() - start).total_seconds() * 1000
+            action.duration_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
             # Analyze result
             action.analysis = await self._analyze_result(action)
@@ -421,9 +421,9 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
             command=command,
         )
 
-        start = datetime.utcnow()
+        start = datetime.now(timezone.utc)
         action.result = await self.executor.execute(command)
-        action.duration_ms = (datetime.utcnow() - start).total_seconds() * 1000
+        action.duration_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
         # Analyze with LLM
         action.analysis = await self._analyze_result(action)

@@ -261,7 +261,7 @@ async def verify_finding(
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a finding as verified."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     result = await db.execute(
         select(Finding).where(Finding.id == finding_id)
@@ -275,7 +275,7 @@ async def verify_finding(
         )
     
     finding.verified = True
-    finding.verified_at = datetime.utcnow()
+    finding.verified_at = datetime.now(timezone.utc)
     finding.verified_by = current_user.id
     
     return {"message": "Finding verified"}
@@ -389,7 +389,7 @@ async def run_agent(
 
     # Update agent status
     agent.status = AgentStatus.RUNNING
-    agent.started_at = __import__("datetime").datetime.utcnow()
+    agent.started_at = datetime.now(timezone.utc)
     await db.commit()
 
     # Run in background
@@ -398,7 +398,7 @@ async def run_agent(
             result = await runner.run()
             _runner_results[agent_id] = result
             agent.status = AgentStatus.COMPLETED if result["status"] == "completed" else AgentStatus.FAILED
-            agent.completed_at = __import__("datetime").datetime.utcnow()
+            agent.completed_at = datetime.now(timezone.utc)
             agent.current_step = result.get("steps_taken", 0)
             await db.commit()
         except Exception as e:
