@@ -305,7 +305,7 @@ OBJECTIVE: {self.objective}
 SCOPE: {', '.join(self.scope)}
 
 KALI TOOLS AVAILABLE:
-{self.blueprint.get_full_context()[:3000]}
+{self.blueprint.get_context_for_task(self.objective)}
 
 Create a detailed step-by-step attack plan. Be specific about which tools to use and in what order.
 Return the plan as a numbered list. Focus on the most impactful approach.
@@ -469,7 +469,7 @@ TARGET: {self.target}
 SCOPE: {', '.join(self.scope)}
 
 KALI LINUX KNOWLEDGE:
-{self.blueprint.get_full_context()[:4000]}
+{self.blueprint.get_full_context()}
 
 RULES:
 1. Always validate commands before execution
