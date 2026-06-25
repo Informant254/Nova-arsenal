@@ -4,10 +4,14 @@
 [![Security](https://github.com/Informant254/Nova-arsenal/actions/workflows/security.yml/badge.svg)](https://github.com/Informant254/Nova-arsenal/actions/workflows/security.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Kubernetes](https://img.shields.io/badge/kubernetes-ready-326CE5?logo=kubernetes&logoColor=white)](k8s/)
 
 **Autonomous Security Research Platform**
 
 Nova-Arsenal is an autonomous security agent platform with 70+ modules covering reconnaissance, exploitation, and analysis. Features a full-featured web dashboard, multi-LLM support, and Docker-based deployment.
+
+> ⚠️ **Ethical Use Only** — Nova-Arsenal is built for authorized security research and bug bounty engagements. Only run against targets you have explicit written permission to test. See [SECURITY.md](SECURITY.md) for responsible disclosure policy.
 
 ---
 
@@ -52,8 +56,8 @@ cd clients/web && npm install && cd ../..
 # Start services
 docker compose up -d llm sandbox
 
-# Run the agent
-nova-agent --target example.com
+# Run the agent (use scanme.nmap.org for authorized demo testing)
+nova-agent --target scanme.nmap.org
 
 # Start the web UI
 cd clients/web && npm run dev
@@ -88,7 +92,6 @@ cd clients/web && npm run dev
 - [Configuration](docs/configuration.md)
 - [API Reference](docs/api-reference.md)
 - [Deployment](docs/deployment.md)
-- [Kubernetes](docs/kubernetes.md)
 
 ## Configuration
 
@@ -108,7 +111,9 @@ llm:
       model: "claude-sonnet-4-20250514"
 ```
 
-## Security
+## Security & Responsible Use
+
+Nova-Arsenal is a professional security research tool. You are solely responsible for ensuring you have proper authorization before running any scans or tests. Unauthorized use against systems you do not own or have explicit permission to test is illegal.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting policy.
 
