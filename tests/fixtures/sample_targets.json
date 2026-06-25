@@ -1,0 +1,16 @@
+{
+    "targets": [
+        {
+            "host": "test.example.com",
+            "port": 443,
+            "protocol": "https",
+            "description": "Test target"
+        },
+        {
+            "host": "api.example.com",
+            "port": 443,
+            "protocol": "https",
+            "description": "API endpoint"
+        }
+    ]
+}

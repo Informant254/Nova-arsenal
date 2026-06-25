@@ -1,0 +1,41 @@
+FROM kalilinux/kali-rolling
+
+WORKDIR /workspace
+
+# Update and install common security tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nmap \
+    sqlmap \
+    nikto \
+    dirb \
+    gobuster \
+    hydra \
+    john \
+    hashcat \
+    python3 \
+    python3-pip \
+    git \
+    curl \
+    wget \
+    net-tools \
+    dnsutils \
+    whois \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install additional Python tools
+RUN pip3 install --break-system-packages \
+    subfinder \
+    httpx \
+    nuclei \
+    ffuf
+
+# Create non-root user
+RUN useradd -m -s /bin/bash agent
+USER agent
+WORKDIR /home/agent
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start_period=10s --retries=3 \
+    CMD nmap --version || exit 1
+
+CMD ["/bin/bash"]

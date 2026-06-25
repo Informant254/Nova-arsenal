@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  agent:
+    image: ghcr.io/informant254/nova-agent:latest
+    container_name: nova-agent
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///workspace/nova.db
+      - NOVA_LLM_URL=http://llm:11434
+      - NOVA_WORKSPACE=/workspace
+      - JWT_SECRET=${JWT_SECRET}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - workspace:/workspace
+    ports:
+      - "${AGENT_PORT:-8080}:8080"
+    networks:
+      - agent-net
+    depends_on:
+      sandbox:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import nova_arsenal; print('ok')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+      restart_policy:
+        condition: on-failure
+    restart: always
+
+  sandbox:
+    image: ghcr.io/informant254/nova-web:latest
+    container_name: nova-sandbox
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - SYS_PTRACE
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - agent-net
+      - sandbox-net
+    healthcheck:
+      test: ["CMD", "nmap", "--version"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+      restart_policy:
+        condition: on-failure
+    pid: "4096"
+    restart: always
+
+  llm:
+    image: ollama/ollama:latest
+    container_name: nova-llm
+    ports:
+      - "${LLM_PORT:-11434}:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+      restart_policy:
+        condition: on-failure
+    restart: always
+
+  web:
+    image: ghcr.io/informant254/nova-web:latest
+    container_name: nova-web
+    environment:
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - AGENT_API_URL=http://agent:8080
+      - DATABASE_URL=file:/app/data/nova.db
+    volumes:
+      - web-data:/app/data
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    networks:
+      - agent-net
+    depends_on:
+      agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+    restart: always
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: nova-litellm
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./config/litellm.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml"]
+    networks:
+      - agent-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+    restart: always
+
+volumes:
+  workspace:
+  ollama-data:
+  web-data:
+
+networks:
+  agent-net:
+    driver: bridge
+  sandbox-net:
+    driver: bridge
+    internal: true

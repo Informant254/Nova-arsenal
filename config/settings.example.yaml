@@ -1,0 +1,84 @@
+# Nova-Arsenal Configuration Example
+# Copy to settings.yaml and customize
+
+agent:
+  name: "nova-agent"
+  version: "1.0.0"
+  workspace: "/workspace"
+  max_steps: 40
+  reflect_every: 5
+  auto_plan: true
+  auto_visual: true
+  auto_cve: true
+
+llm:
+  primary:
+    provider: "ollama"
+    model: "deepseek-r1"
+    url: "http://llm:11434"
+    timeout: 120
+    
+  fallbacks:
+    - provider: "openai"
+      model: "gpt-4o"
+      api_key: "${OPENAI_API_KEY}"
+      timeout: 60
+    - provider: "anthropic"
+      model: "claude-sonnet-4-20250514"
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout: 60
+    - provider: "gemini"
+      model: "gemini-2.5-flash"
+      api_key: "${GOOGLE_API_KEY}"
+      timeout: 60
+      
+  routing:
+    strategy: "cost-optimized"  # cost-optimized, latency-optimized, balanced
+    fallback_threshold: 3
+    max_retries: 3
+
+security:
+  permission_profile: "scoped"  # read_only, scoped, full
+  blocked_patterns:
+    - "rm -rf /"
+    - "curl|bash"
+    - "wget|sh"
+    - "DROP TABLE"
+    - "DROP DATABASE"
+  allowed_tools:
+    - "nmap"
+    - "sqlmap"
+    - "nuclei"
+    - "httpx"
+    - "ffuf"
+    - "subfinder"
+  blocked_hosts:
+    - "google.com"
+    - "facebook.com"
+    - "amazon.com"
+    - "microsoft.com"
+    - "github.com"
+
+scope:
+  strict_mode: false
+  targets: []
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"  # json, text
+  file: "/workspace/nova.log"
+  max_size_mb: 100
+  backup_count: 5
+
+telemetry:
+  enabled: false
+  endpoint: ""
+
+database:
+  url: "sqlite+aiosqlite:///workspace/nova.db"
+  echo: false
+
+auth:
+  jwt_secret: "${JWT_SECRET}"
+  access_token_expire_minutes: 15
+  refresh_token_expire_days: 7

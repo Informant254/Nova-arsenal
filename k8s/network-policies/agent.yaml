@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-network-policy
+  namespace: nova-arsenal
+spec:
+  podSelector:
+    matchLabels:
+      app: nova-agent
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nova-web
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nova-sandbox
+      ports:
+        - port: 22
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nova-llm
+      ports:
+        - port: 11434
+          protocol: TCP
+    - to: []  # Allow external access (for LLM providers)
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 80
+          protocol: TCP

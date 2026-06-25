@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nova-web
+  namespace: nova-arsenal
+  labels:
+    app: nova-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nova-web
+  template:
+    metadata:
+      labels:
+        app: nova-web
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/informant254/nova-web:latest
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nova-secrets
+                  key: nextauth-secret
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: nova-config
+                  key: nextauth-url
+            - name: AGENT_API_URL
+              value: "http://nova-agent:8080"
+            - name: DATABASE_URL
+              value: "file:/app/data/nova.db"
+          volumeMounts:
+            - name: web-data
+              mountPath: /app/data
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+            requests:
+              memory: "256Mi"
+              cpu: "0.5"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: web-data
+          persistentVolumeClaim:
+            claimName: nova-web-data

@@ -1,0 +1,61 @@
+# LiteLLM Configuration for Nova-Arsenal
+# Docs: https://docs.litellm.ai/docs/proxy/configs
+
+model_list:
+  # Ollama models (local)
+  - model_name: "nova-local"
+    litellm_params:
+      model: "ollama/deepseek-r1"
+      api_base: "http://llm:11434"
+      
+  - model_name: "nova-local-fast"
+    litellm_params:
+      model: "ollama/qwen2.5-coder"
+      api_base: "http://llm:11434"
+      
+  # OpenAI models
+  - model_name: "nova-openai"
+    litellm_params:
+      model: "gpt-4o"
+      api_key: os.environ/OPENAI_API_KEY
+      
+  - model_name: "nova-openai-fast"
+    litellm_params:
+      model: "gpt-4o-mini"
+      api_key: os.environ/OPENAI_API_KEY
+      
+  # Anthropic models
+  - model_name: "nova-anthropic"
+    litellm_params:
+      model: "claude-sonnet-4-20250514"
+      api_key: os.environ/ANTHROPIC_API_KEY
+      
+  - model_name: "nova-anthropic-fast"
+    litellm_params:
+      model: "claude-3-5-haiku-20241022"
+      api_key: os.environ/ANTHROPIC_API_KEY
+      
+  # Google Gemini models
+  - model_name: "nova-gemini"
+    litellm_params:
+      model: "gemini-2.5-pro"
+      api_key: os.environ/GOOGLE_API_KEY
+      
+  - model_name: "nova-gemini-fast"
+    litellm_params:
+      model: "gemini-2.5-flash"
+      api_key: os.environ/GOOGLE_API_KEY
+
+litellm_settings:
+  num_retries: 3
+  request_timeout: 120
+  drop_params: true
+  set_verbose: false
+  
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 3
+  timeout: 120
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

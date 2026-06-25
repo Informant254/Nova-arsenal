@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nova-config
+  namespace: nova-arsenal
+data:
+  nextauth-url: "http://nova.yourdomain.com"  # Change to your domain
+  log-level: "INFO"

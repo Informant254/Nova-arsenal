@@ -1,0 +1,21 @@
+# Nova-Arsenal Code Owners
+
+# Default owner for everything
+* @Informant254
+
+# Core agent system
+/nova_arsenal/ @Informant254
+
+# Web client
+/clients/web/ @Informant254
+
+# Infrastructure
+/containers/ @Informant254
+/k8s/ @Informant254
+/.github/ @Informant254
+
+# Configuration
+/config/ @Informant254
+
+# Documentation
+/docs/ @Informant254
