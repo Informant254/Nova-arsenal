@@ -18,6 +18,7 @@ from nova_arsenal.api.routes import router as api_router
 from nova_arsenal.api.routes_chat import router as chat_router
 from nova_arsenal.api.routes_chat import set_router as set_chat_router
 from nova_arsenal.api.websocket.events import router as ws_router
+from nova_arsenal.auth.rate_limit import RateLimitConfig, RateLimitMiddleware
 from nova_arsenal.auth.routes import router as auth_router
 from nova_arsenal.llm.multi_router import MultiProviderRouter
 from nova_arsenal.llm.opencode import OpencodeProvider
@@ -45,6 +46,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # ── Rate Limiting ───────────────────────────────────────────────────────
+    app.add_middleware(
+        RateLimitMiddleware,
+        config=RateLimitConfig(
+            global_per_second=50.0,
+            global_burst=100,
+            auth_per_second=5.0,
+            auth_burst=10,
+        ),
+    )
+
     # ── Startup ──────────────────────────────────────────────────────────────
     @app.on_event("startup")
     async def startup():
@@ -55,6 +67,15 @@ def create_app() -> FastAPI:
             logger.info("Database tables created / verified")
         except Exception as e:
             logger.warning(f"Database initialization skipped (non-fatal): {e}")
+
+        # Start API key cleanup task
+        try:
+            import asyncio
+            from nova_arsenal.auth.cleanup import start_cleanup_task
+            asyncio.create_task(start_cleanup_task(interval_seconds=3600))
+            logger.info("API key cleanup task started (hourly)")
+        except Exception as e:
+            logger.warning(f"API key cleanup task skipped: {e}")
 
         # Initialize LLM router and wire into chat
         llm_router = get_llm_router()

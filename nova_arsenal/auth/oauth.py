@@ -1,14 +1,15 @@
 """
 Nova-Arsenal OAuth Provider Handlers
 
-Handles OAuth2 authorization code flow for GitHub, Google, and GitLab.
+Handles OAuth2 authorization code flow with PKCE for GitHub and Google.
 """
 
 import hashlib
 import hmac
 import secrets
+import base64
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -28,11 +29,29 @@ class OAuthUserInfo:
     expires_at: Optional[datetime] = None
 
 
-def generate_oauth_state(provider: str, redirect: str = "") -> str:
-    """Generate a signed state token for OAuth flow."""
+@dataclass
+class PKCEChallenge:
+    code_verifier: str
+    code_challenge: str
+
+    @classmethod
+    def generate(cls) -> "PKCEChallenge":
+        """Generate a new PKCE code verifier and challenge (S256)."""
+        code_verifier = secrets.token_urlsafe(64)[:128]
+        digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+        code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+        return cls(code_verifier=code_verifier, code_challenge=code_challenge)
+
+
+def generate_oauth_state(provider: str, redirect: str = "", pkce: Optional[PKCEChallenge] = None) -> str:
+    """Generate a signed state token for OAuth flow.
+
+    State format: provider:random:redirect:pkce_verifier:signature
+    """
     config = get_config()
     secret = config.auth.oauth.state_secret or config.auth.jwt_secret
-    raw = f"{provider}:{secrets.token_hex(16)}:{redirect}"
+    verifier = pkce.code_verifier if pkce else ""
+    raw = f"{provider}:{secrets.token_hex(16)}:{redirect}:{verifier}"
     sig = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()[:16]
     return f"{raw}:{sig}"
 
@@ -56,13 +75,21 @@ def extract_redirect(state: str) -> str:
     return parts[2] if len(parts) >= 4 else ""
 
 
+def extract_pkce_verifier(state: str) -> Optional[str]:
+    """Extract PKCE code_verifier from state token."""
+    parts = state.split(":")
+    if len(parts) >= 5 and parts[3]:
+        return parts[3]
+    return None
+
+
 class BaseOAuthProvider(ABC):
     @abstractmethod
-    def get_authorize_url(self, state: str) -> str:
+    def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
         ...
 
     @abstractmethod
-    async def exchange_code(self, code: str) -> OAuthUserInfo:
+    async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
         ...
 
     @abstractmethod
@@ -86,23 +113,30 @@ class GitHubOAuthProvider(BaseOAuthProvider):
     def provider_name(self) -> str:
         return "github"
 
-    def get_authorize_url(self, state: str) -> str:
-        return (
+    def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
+        url = (
             f"{self.AUTHORIZE_URL}?client_id={self.client_id}"
             f"&redirect_uri={self.redirect_uri}"
             f"&scope={self.SCOPES}&state={state}"
         )
+        if code_challenge:
+            url += f"&code_challenge={code_challenge}&code_challenge_method=S256"
+        return url
 
-    async def exchange_code(self, code: str) -> OAuthUserInfo:
+    async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
+        data = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": code,
+            "redirect_uri": self.redirect_uri,
+        }
+        if code_verifier:
+            data["code_verifier"] = code_verifier
+
         async with httpx.AsyncClient() as client:
             token_resp = await client.post(
                 self.TOKEN_URL,
-                json={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "code": code,
-                    "redirect_uri": self.redirect_uri,
-                },
+                json=data,
                 headers={"Accept": "application/json"},
             )
             token_data = token_resp.json()
@@ -156,25 +190,32 @@ class GoogleOAuthProvider(BaseOAuthProvider):
     def provider_name(self) -> str:
         return "google"
 
-    def get_authorize_url(self, state: str) -> str:
-        return (
+    def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
+        url = (
             f"{self.AUTHORIZE_URL}?client_id={self.client_id}"
             f"&redirect_uri={self.redirect_uri}"
             f"&scope={self.SCOPES}&response_type=code"
             f"&state={state}&access_type=offline"
         )
+        if code_challenge:
+            url += f"&code_challenge={code_challenge}&code_challenge_method=S256"
+        return url
 
-    async def exchange_code(self, code: str) -> OAuthUserInfo:
+    async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
+        data = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": code,
+            "redirect_uri": self.redirect_uri,
+            "grant_type": "authorization_code",
+        }
+        if code_verifier:
+            data["code_verifier"] = code_verifier
+
         async with httpx.AsyncClient() as client:
             token_resp = await client.post(
                 self.TOKEN_URL,
-                data={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "code": code,
-                    "redirect_uri": self.redirect_uri,
-                    "grant_type": "authorization_code",
-                },
+                data=data,
                 headers={"Accept": "application/json"},
             )
             token_data = token_resp.json()
@@ -184,7 +225,6 @@ class GoogleOAuthProvider(BaseOAuthProvider):
 
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")
-            expires_in = token_data.get("expires_in", 3600)
 
             user_resp = await client.get(
                 self.USERINFO_URL,

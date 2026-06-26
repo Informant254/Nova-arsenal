@@ -8,7 +8,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -16,6 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import secrets
 
+from nova_arsenal.auth.audit import (
+    audit_api_key_created,
+    audit_api_key_revoked,
+    audit_login_failure,
+    audit_login_success,
+    audit_oauth_login,
+    audit_subscription_upgraded,
+)
 from nova_arsenal.auth.middleware import get_current_user
 from nova_arsenal.auth.models import (
     ApiKeyCreateRequest,
@@ -32,9 +40,11 @@ from nova_arsenal.auth.models import (
     UserResponse,
 )
 from nova_arsenal.auth.oauth import (
+    extract_pkce_verifier,
     extract_redirect,
     generate_oauth_state,
     get_oauth_provider,
+    PKCEChallenge,
     verify_oauth_state,
 )
 from nova_arsenal.config import get_config
@@ -126,22 +136,31 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(
+    credentials: UserLogin,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """Login and get JWT tokens."""
+    client_ip = request.client.host if request.client else "unknown"
     result = await db.execute(select(User).where(User.email == credentials.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(credentials.password, user.hashed_password):
+        audit_login_failure(credentials.email, client_ip, "invalid_credentials")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
     if not user.is_active:
+        audit_login_failure(credentials.email, client_ip, "account_disabled")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is disabled",
         )
+
+    audit_login_success(user.id, user.email, client_ip)
 
     # Create tokens
     token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
@@ -213,15 +232,20 @@ async def get_current_user(
 
 @router.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, redirect: str = ""):
-    """Redirect to OAuth provider for authentication."""
+    """Redirect to OAuth provider for authentication.
+
+    Returns authorize_url with PKCE code_challenge embedded in state.
+    Client should redirect browser to authorize_url.
+    """
     if provider not in ("github", "google"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported provider: {provider}",
         )
     oauth = get_oauth_provider(provider)
-    state = generate_oauth_state(provider, redirect)
-    authorize_url = oauth.get_authorize_url(state)
+    pkce = PKCEChallenge.generate()
+    state = generate_oauth_state(provider, redirect, pkce)
+    authorize_url = oauth.get_authorize_url(state, pkce.code_challenge)
     return {"authorize_url": authorize_url, "state": state}
 
 
@@ -230,9 +254,11 @@ async def oauth_callback(
     provider: str,
     code: str,
     state: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Handle OAuth provider callback."""
+    client_ip = request.client.host if request.client else "unknown"
     if not verify_oauth_state(state, provider):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -240,8 +266,9 @@ async def oauth_callback(
         )
 
     oauth = get_oauth_provider(provider)
+    code_verifier = extract_pkce_verifier(state)
     try:
-        user_info = await oauth.exchange_code(code)
+        user_info = await oauth.exchange_code(code, code_verifier)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -310,6 +337,8 @@ async def oauth_callback(
         db.add(oauth_account)
 
     await db.commit()
+
+    audit_oauth_login(provider, user.id, user.email, client_ip, is_new_user)
 
     # Create JWT tokens
     token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
@@ -447,15 +476,20 @@ async def upgrade_subscription(
         db.add(sub)
 
     await db.commit()
+    audit_subscription_upgraded(current_user.id, new_tier.value)
     return {"message": f"Subscription upgraded to {new_tier.value}"}
 
 
 # ── API Key Routes ───────────────────────────────────────────────────────────
 
 def generate_api_key() -> tuple[str, str, str]:
-    """Generate a new API key. Returns (full_key, key_prefix, key_hash)."""
+    """Generate a new API key. Returns (full_key, key_prefix, key_hash).
+
+    Format: na_<64 hex chars>  (total 67 chars)
+    Prefix: first 19 chars (na_ + 16 hex) for safe identification.
+    """
     full_key = f"na_{secrets.token_hex(32)}"
-    key_prefix = full_key[:10]
+    key_prefix = full_key[:19]
     key_hash = hashlib.sha256(full_key.encode()).hexdigest()
     return full_key, key_prefix, key_hash
 
@@ -488,6 +522,8 @@ async def create_api_key(
     db.add(api_key)
     await db.commit()
     await db.refresh(api_key)
+
+    audit_api_key_created(current_user.id, key_prefix)
 
     return ApiKeyResponse(
         id=api_key.id,
@@ -547,6 +583,7 @@ async def revoke_api_key(
         )
     key.is_active = False
     await db.commit()
+    audit_api_key_revoked(current_user.id, key.key_prefix)
     return {"message": "API key revoked"}
 
 

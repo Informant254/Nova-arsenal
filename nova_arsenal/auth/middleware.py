@@ -6,6 +6,7 @@ Supports JWT tokens, OAuth tokens, subscription API keys, and PAT tokens.
 """
 
 import hashlib
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -16,44 +17,19 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nova_arsenal.auth.audit import audit_api_key_used, audit_quota_exceeded, audit_unauthorized
 from nova_arsenal.config import get_config
 from nova_arsenal.db import get_db
 from nova_arsenal.db.models import ApiKey, Subscription, SubscriptionTier, User, UserRole
 
 security = HTTPBearer()
+logger = logging.getLogger(__name__)
 
 SUBSCRIPTION_CALL_LIMITS = {
     SubscriptionTier.FREE: 100,
     SubscriptionTier.PRO: 10000,
     SubscriptionTier.ENTERPRISE: 100000,
 }
-
-
-def _check_subscription_quota(user: User, db: AsyncSession) -> None:
-    """Check and increment subscription API call quota."""
-    import asyncio
-
-    async def _do_check():
-        result = await db.execute(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
-        sub = result.scalar_one_or_none()
-        if not sub:
-            return
-        limit = SUBSCRIPTION_CALL_LIMITS.get(sub.tier, 100)
-        if sub.api_calls_used >= limit:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"API call limit reached for {sub.tier.value} tier ({limit}/day). Upgrade to increase limit.",
-            )
-        sub.api_calls_used = Subscription.api_calls_used + 1
-
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_do_check())
-    except RuntimeError:
-        pass
 
 
 async def get_current_user(
@@ -92,11 +68,15 @@ async def get_current_user(
         )
         api_key = result.scalar_one_or_none()
         if not api_key:
+            client_ip = request.client.host if request.client else "unknown"
+            audit_unauthorized(client_ip, "invalid_api_key")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid API key",
             )
         if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
+            client_ip = request.client.host if request.client else "unknown"
+            audit_unauthorized(client_ip, f"expired_key:{api_key.key_prefix}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="API key has expired",
@@ -112,12 +92,14 @@ async def get_current_user(
         if sub:
             limit = SUBSCRIPTION_CALL_LIMITS.get(sub.tier, 100)
             if sub.api_calls_used >= limit:
+                audit_quota_exceeded(api_key.user_id, sub.tier.value)
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"API call limit reached for {sub.tier.value} tier ({limit}/day). Upgrade subscription.",
                 )
             sub.api_calls_used += 1
 
+        audit_api_key_used(api_key.user_id, api_key.key_prefix)
         await db.commit()
 
         user_result = await db.execute(select(User).where(User.id == api_key.user_id))
