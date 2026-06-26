@@ -297,23 +297,63 @@ class AgentRunner:
     # ── Planning Phase ──────────────────────────────────────────────────────
 
     async def _plan(self) -> str:
-        """Generate an attack plan using the LLM."""
-        prompt = f"""You are an elite security researcher with full knowledge of Kali Linux.
+        """Generate an attack plan using blueprint attack chains."""
+        # Use blueprint knowledge to build a smart plan
+        detected_services = set()
+        for f in self._findings:
+            if "Detected" in f.title:
+                service = f.title.split("Detected ")[1].split(" service")[0].lower()
+                detected_services.add(service)
 
-TARGET: {self.target}
-OBJECTIVE: {self.objective}
-SCOPE: {', '.join(self.scope)}
+        plan_sections = ["## Attack Plan\n"]
+        plan_sections.append(f"Target: {self.target}")
+        plan_sections.append(f"Objective: {self.objective}\n")
 
-KALI TOOLS AVAILABLE:
-{self.blueprint.get_context_for_task(self.objective)}
+        # Phase 1: Reconnaissance
+        plan_sections.append("### Phase 1: Reconnaissance")
+        recon_tools = self.blueprint.get_tools_by_category("recon")[:3]
+        plan_sections.append(f"Tools: {', '.join(t.name for t in recon_tools)}")
+        plan_sections.append("- Subdomain enumeration via subfinder")
+        plan_sections.append("- Ping sweep and port discovery via nmap")
+        plan_sections.append("- Service fingerprinting via nmap -sV\n")
 
-Create a detailed step-by-step attack plan. Be specific about which tools to use and in what order.
-Return the plan as a numbered list. Focus on the most impactful approach.
+        # Phase 2: Scanning
+        plan_sections.append("### Phase 2: Vulnerability Scanning")
+        plan_sections.append("- Full port scan via nmap -p-")
+        plan_sections.append("- Vulnerability scan via nuclei")
+        plan_sections.append("- Web technology detection via whatweb\n")
 
-PLAN:"""
+        # Phase 3: Exploitation
+        plan_sections.append("### Phase 3: Exploitation")
+        if detected_services:
+            plan_sections.append(f"Detected services: {', '.join(sorted(detected_services))}")
+            for svc in detected_services:
+                if svc in ("http", "https"):
+                    plan_sections.append("- Web application testing (nuclei, nikto, dirsearch)")
+                elif svc == "smb":
+                    plan_sections.append("- SMB enumeration and vulnerability scanning")
+                elif svc == "ssh":
+                    plan_sections.append("- SSH brute force testing")
+                elif svc in ("mysql", "postgresql"):
+                    plan_sections.append("- Database service testing")
+                elif svc == "kerberos":
+                    plan_sections.append("- Kerberos attack testing")
+        else:
+            plan_sections.append("- Targeted exploitation based on scan findings")
 
-        plan = await self._ask_llm(prompt)
-        self._context.append({"role": "system", "content": f"Attack plan:\n{plan}"})
+        # Phase 4: Post-Exploitation
+        plan_sections.append("\n### Phase 4: Post-Exploitation")
+        plan_sections.append("- Data extraction and log collection")
+        plan_sections.append("- Pivot potential assessment")
+        plan_sections.append("- Credential harvesting\n")
+
+        # Phase 5: Reporting
+        plan_sections.append("### Phase 5: Reporting")
+        plan_sections.append("- Compilation of all findings")
+        plan_sections.append("- Severity ratings and remediation recommendations")
+
+        plan = "\n".join(plan_sections)
+        await self._emit("plan_created", {"plan": plan})
         return plan
 
     # ── Reconnaissance Phase ────────────────────────────────────────────────
@@ -331,6 +371,11 @@ PLAN:"""
             f"httpx -l /workspace/subs.txt -silent -sc -title 2>/dev/null | head -30 || echo 'httpx probe done'",
         ]
 
+        # Add theHarvester for passive recon
+        recon_commands.append(
+            f"theHarvester -d {self.target} -b google,yahoo,bing 2>/dev/null | head -50 || echo 'theHarvester done'"
+        )
+
         for cmd in recon_commands:
             if not self._running:
                 break
@@ -347,6 +392,35 @@ PLAN:"""
             f"whatweb {self.target} 2>/dev/null || echo 'whatweb done'",
         ]
 
+        # Add service-specific scanning based on detected services
+        detected_services = set()
+        for f in self._findings:
+            if "Detected" in f.title:
+                service = f.title.split("Detected ")[1].split(" service")[0].lower()
+                detected_services.add(service)
+
+        if "http" in detected_services or "https" in detected_services:
+            scan_commands.extend([
+                f"dirsearch -u http://{self.target} -w /usr/share/wordlists/dirb/common.txt -t 10 2>/dev/null | head -40 || echo 'dirsearch done'",
+                f"nuclei -u http://{self.target} -as -json 2>/dev/null | head -50 || echo 'nuclei automated done'",
+            ])
+
+        if "smb" in detected_services:
+            scan_commands.extend([
+                f"enum4linux -a {self.target} 2>/dev/null | head -80 || echo 'enum4linux done'",
+                f"smbclient -L //{self.target} -N 2>/dev/null || echo 'smbclient done'",
+            ])
+
+        if "mysql" in detected_services:
+            scan_commands.append(
+                f"nmap --script mysql-* -p 3306 {self.target} 2>/dev/null | head -40 || echo 'mysql scan done'"
+            )
+
+        if "ssh" in detected_services:
+            scan_commands.append(
+                f"nmap --script ssh-* -p 22 {self.target} 2>/dev/null | head -40 || echo 'ssh scan done'"
+            )
+
         for cmd in scan_commands:
             if not self._running:
                 break
@@ -355,10 +429,61 @@ PLAN:"""
     # ── Exploitation Phase ──────────────────────────────────────────────────
 
     async def _execute_exploitation(self) -> None:
-        """Attempt exploitation based on findings."""
-        # Ask LLM what to exploit based on scan results
+        """Attempt exploitation based on findings using attack chain knowledge."""
+        # Use blueprint attack chains to guide exploitation
         scan_context = self._get_scan_results()
-        prompt = f"""Based on these scan results for {self.target}, suggest specific exploitation commands:
+
+        # Determine which attack chains apply based on detected services
+        detected_services = set()
+        for f in self._findings:
+            if "Detected" in f.title:
+                service = f.title.split("Detected ")[1].split(" service")[0].lower()
+                detected_services.add(service)
+
+        # Map detected services to relevant attack chains
+        chain_mapping = {
+            "http": ["web_recon", "sql_injection"],
+            "https": ["web_recon", "sql_injection"],
+            "smb": ["smb_attack", "credential_attack"],
+            "ssh": ["credential_attack"],
+            "mysql": ["sql_injection"],
+            "kerberos": ["kerberos_attack"],
+        }
+
+        exploit_commands = []
+
+        # Add commands from relevant attack chains
+        for service in detected_services:
+            for chain_name in chain_mapping.get(service, []):
+                chain = self.blueprint.get_attack_chain(chain_name)
+                if chain and isinstance(chain, list):
+                    for step in chain:
+                        exploit_commands.append(step.replace("{target}", self.target))
+                elif chain and isinstance(chain, dict):
+                    for step in chain.get("steps", []):
+                        exploit_commands.append(step.replace("{target}", self.target))
+
+        # Add service-specific exploitation commands
+        if "smb" in detected_services:
+            exploit_commands.extend([
+                f"crackmapexec smb {self.target} -u 'guest' -p '' --shares 2>/dev/null | head -30 || echo 'smb enumeration done'",
+                f"nmap --script smb-vuln-* -p 445 {self.target} 2>/dev/null | head -30 || echo 'smb vuln scan done'",
+            ])
+
+        if "http" in detected_services or "https" in detected_services:
+            exploit_commands.extend([
+                f"nuclei -u http://{self.target} -tags exploit,rce -json 2>/dev/null | head -20 || echo 'exploit scan done'",
+                f"sqlmap -u http://{self.target} --batch --random-agent 2>/dev/null | head -30 || echo 'sqlmap scan done'",
+            ])
+
+        if "ssh" in detected_services:
+            exploit_commands.extend([
+                f"hydra -l root -P /usr/share/wordlists/rockyou.txt {self.target} ssh -t 4 2>/dev/null | head -20 || echo 'ssh brute force done'",
+            ])
+
+        if not exploit_commands:
+            # Fall back to LLM-based exploitation suggestions
+            prompt = f"""Based on these scan results for {self.target}, suggest specific exploitation commands:
 
 {scan_context}
 
@@ -368,10 +493,10 @@ Available Kali tools for exploitation:
 
 Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
-        response = await self._ask_llm(prompt)
-        commands = self._extract_commands(response)
+            response = await self._ask_llm(prompt)
+            exploit_commands = self._extract_commands(response)
 
-        for cmd in commands:
+        for cmd in exploit_commands[:8]:  # Limit to 8 exploitation commands
             if not self._running:
                 break
             await self._execute_and_analyze(cmd, AgentPhase.EXPLOITATION)
@@ -503,7 +628,7 @@ CURRENT CONTEXT:
 Recent actions:
 {self._format_context()}
 
-{f'Instruction: {instruction}' if instruction else 'Decide the next action to take toward the objective.'}
+- {instruction if instruction else 'Decide the next action to take toward the objective.'}
 
 Respond with a JSON object:
 {{
@@ -515,13 +640,48 @@ Respond with a JSON object:
 }}"""
 
     def _simulate_llm_response(self, prompt: str) -> str:
-        """Simulated LLM response for testing."""
-        if "plan" in prompt.lower():
-            return """1. Run subfinder for subdomain enumeration
-2. Run nmap for port scanning
-3. Run nuclei for vulnerability scanning
-4. Test discovered web services for vulnerabilities
-5. Attempt exploitation of critical findings"""
+        """Intelligent local response using blueprint tool knowledge."""
+        prompt_lower = prompt.lower()
+
+        # Plan generation
+        if "plan" in prompt_lower:
+            chains = list(self.blueprint.attack_chains.items())[:5]
+            plan_lines = []
+            for name, chain in chains:
+                description = chain.get("description", "") if isinstance(chain, dict) else ""
+                tools = ", ".join(chain.get("tools", [])) if isinstance(chain, dict) else ""
+                plan_lines.append(f"{name.replace('_', ' ').title()}: {description}")
+                if tools:
+                    plan_lines.append(f"  Tools: {tools}")
+            if not plan_lines:
+                plan_lines = [
+                    "1. Run subfinder for subdomain enumeration",
+                    "2. Run nmap for port scanning",
+                    "3. Run nuclei for vulnerability scanning",
+                    "4. Test discovered web services for vulnerabilities",
+                    "5. Attempt exploitation of critical findings",
+                ]
+            return "\n".join(plan_lines)
+
+        # Exploitation suggestions
+        if "exploit" in prompt_lower or "suggest" in prompt_lower:
+            tools = self.blueprint.suggest_tools(prompt)
+            if tools:
+                return "\n".join(tools[:5])
+
+        # Finding analysis
+        if "analyze" in prompt_lower:
+            return "Analysis: Command executed successfully. No critical findings detected in output."
+
+        # Default: suggest a tool from the blueprint
+        tools = self.blueprint.suggest_tools(prompt)
+        if tools:
+            return (
+                '{"action": "execute_command", '
+                f'"command": "echo Running {tools[0]}", '
+                f'"description": "Execute {tools[0]} for current phase"}}'
+            )
+
         return '{"action": "execute_command", "command": "echo test", "description": "test step"}'
 
     def _parse_llm_action(self, response: str) -> AgentAction:

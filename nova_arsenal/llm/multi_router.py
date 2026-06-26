@@ -176,6 +176,23 @@ PROVIDER_PROFILES: List[ProviderProfile] = [
         max_context=32000,
         supports_tools=False,
     ),
+    ProviderProfile(
+        name="opencode",
+        models=["opencode-qwen-72b"],
+        strengths=[
+            TaskCategory.CONVERSATION,
+            TaskCategory.CODE_GENERATION,
+            TaskCategory.REASONING,
+            TaskCategory.ANALYSIS,
+            TaskCategory.SECURITY_ANALYSIS,
+            TaskCategory.CREATIVE,
+        ],
+        cost_per_1k_input=0.0,  # Free access
+        cost_per_1k_output=0.0,  # Free access
+        latency_ms=1500,
+        max_context=128000,
+        supports_tools=True,
+    ),
 ]
 
 

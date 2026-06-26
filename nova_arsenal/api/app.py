@@ -15,8 +15,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from nova_arsenal.api.routes import router as api_router
-from nova_arsenal.api.routes_chat import router as chat_router
+from nova_arsenal.api.routes_chat import router as chat_router, set_router as set_chat_router
 from nova_arsenal.api.websocket.events import router as ws_router
+from nova_arsenal.llm.router import get_llm_router
+from nova_arsenal.llm.multi_router import MultiProviderRouter
+from nova_arsenal.llm.opencode import OpencodeProvider
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,30 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ── Startup ──────────────────────────────────────────────────────────────
+    @app.on_event("startup")
+    async def startup():
+        # Initialize LLM router and wire into chat
+        llm_router = get_llm_router()
+        multi = llm_router.multi_router
+
+        # If multi-router is available, wire it to chat
+        if multi:
+            set_chat_router(multi)
+            logger.info(f"Chat wired to multi-router with providers: {multi.list_providers()}")
+        else:
+            # Create a basic multi-router even without config
+            basic = MultiProviderRouter()
+            opencode_key = os.getenv("OPCODE_API_KEY", "")
+            if opencode_key:
+                try:
+                    op = OpencodeProvider(api_key=opencode_key)
+                    basic.register_provider("opencode", op)
+                    set_chat_router(basic)
+                    logger.info("Chat wired to Opencode provider from environment")
+                except Exception as e:
+                    logger.warning(f"Failed to init Opencode: {e}")
 
     # ── Routers ──────────────────────────────────────────────────────────────
     app.include_router(api_router)

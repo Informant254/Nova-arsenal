@@ -18,6 +18,7 @@ from nova_arsenal.llm.openrouter import OpenRouterProvider
 from nova_arsenal.llm.huggingface import HuggingFaceProvider
 from nova_arsenal.llm.qwen import QwenProvider
 from nova_arsenal.llm.deepseek import DeepSeekProvider
+from nova_arsenal.llm.opencode import OpencodeProvider
 from nova_arsenal.llm.multi_router import MultiProviderRouter
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ class LLMRouter:
             "huggingface": HuggingFaceProvider,
             "qwen": QwenProvider,
             "deepseek": DeepSeekProvider,
+            "opencode": OpencodeProvider,
         }
 
         # Register primary
@@ -119,6 +121,7 @@ class LLMRouter:
             "HUGGINGFACE_API_KEY": ("huggingface", HuggingFaceProvider, "meta-llama/Llama-3.3-70B-Instruct"),
             "DASHSCOPE_API_KEY": ("qwen", QwenProvider, "qwen-max"),
             "DEEPSEEK_API_KEY": ("deepseek", DeepSeekProvider, "deepseek-chat"),
+            "OPCODE_API_KEY": ("opencode", OpencodeProvider, "opencode-qwen-72b"),
         }
 
         for env_key, (name, provider_cls, model) in env_providers.items():
@@ -178,6 +181,11 @@ class LLMRouter:
                     logger.warning("DeepSeek API key not provided, skipping")
                     return None
                 return DeepSeekProvider(model=model, api_key=api_key)
+            elif provider == "opencode":
+                if not api_key:
+                    logger.warning("Opencode API key not provided, skipping")
+                    return None
+                return OpencodeProvider(model=model, api_key=api_key)
             else:
                 logger.warning(f"Unknown provider: {provider}")
                 return None

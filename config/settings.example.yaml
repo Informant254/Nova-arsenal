@@ -47,6 +47,10 @@ llm:
       model: "meta-llama/Llama-3.3-70B-Instruct"
       api_key: "${HUGGINGFACE_API_KEY}"
       timeout: 60
+    - provider: "opencode"
+      model: "opencode-qwen-72b"
+      api_key: "${OPCODE_API_KEY}"
+      timeout: 120
       
   routing:
     strategy: "balanced"  # balanced, quality, speed, cost
