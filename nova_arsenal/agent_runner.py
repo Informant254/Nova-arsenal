@@ -29,8 +29,20 @@ from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy, Validat
 
 # API integrations (lazy-imported to avoid hard deps)
 from nova_arsenal.integrations import MetasploitRPC, BurpAPI, NmapParser, SQLmapAPI
-from nova_arsenal.intelligence import ToolSelector
+from nova_arsenal.intelligence import ToolSelector, CveResearch
 from nova_arsenal.correlation import Correlator
+from nova_arsenal.persona_manager import PersonaManager
+from nova_arsenal.payload_generator import PayloadGenerator, PayloadType, PayloadLanguage
+from nova_arsenal.scheduler import NovaScheduler, ScheduleEntry, CronExpression
+from nova_arsenal.ctf_solver import CtfSolver, ChallengeType
+from nova_arsenal.crypto import KeyManager, Cipher
+from nova_arsenal.prompt_builder import (
+    PromptBuilder, Scope, Text, system_message, user_message,
+    RenderResult, adaptive_thinking_block, ThinkingProfile,
+)
+from nova_arsenal.tool_definitions import (
+    ToolSchema, NOVA_SECURITY_TOOLS, tools_to_openai_format,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +57,8 @@ class AgentPhase(Enum):
     POST_EXPLOITATION = "post_exploitation"
     INTEGRATION = "integration"       # API-driven tool integrations (MSF, Burp, SQLmap)
     CORRELATION = "correlation"       # Cross-tool result correlation
+    COMPLIANCE = "compliance"         # Compliance mapping (PCI DSS, SOC 2, etc.)
+    CTF_SOLVING = "ctf_solving"       # CTF challenge solving mode
     REPORTING = "reporting"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -167,6 +181,37 @@ class AgentRunner:
         # Result correlation
         self.correlator = Correlator()
 
+        # Persona Manager (phase-specific system prompts)
+        self.persona_manager = PersonaManager()
+
+        # Payload Generator (reverse shells, webshells, etc.)
+        self.payload_generator = PayloadGenerator()
+
+        # CVE Research (live exploit lookups for detected services)
+        self.cve_research = CveResearch()
+
+        # CTF Solver (automated CTF challenge solving)
+        self.ctf_solver = CtfSolver()
+
+        # Compliance Mapper (lazy import to avoid circular dep with swarm.py)
+        self._compliance_mapper = None
+
+        # Swarm Orchestrator (lazy import to avoid circular dep with swarm.py)
+        self._swarm = None
+
+        # Crypto (E2E encryption for agent communications)
+        self.key_manager = KeyManager()
+        self.cipher = Cipher(self.key_manager)
+
+        # Cursor-inspired priority prompt builder
+        self._prompt_builder = PromptBuilder(token_limit=8000)
+        self._read_first_enabled = True
+        self._thinking_profile = ThinkingProfile.DEFAULT
+        self._thinking_enabled: Optional[bool] = None
+
+        # Scheduler (cron-based recurring scans)
+        self.scheduler = NovaScheduler()
+
         # API-driven integrations (configured via integrations dict)
         integrations = integrations or {}
         self.msf_rpc: Optional[MetasploitRPC] = None
@@ -221,6 +266,31 @@ class AgentRunner:
         self._running = True
         start_time = datetime.now(timezone.utc)
 
+        # Register scheduler callback if scheduler has entries
+        if self.scheduler.list_entries():
+            async def scheduler_callback(entry: ScheduleEntry) -> Any:
+                logger.info(f"Scheduler triggered: {entry.name} -> {entry.target}")
+                runner = AgentRunner(
+                    target=entry.target,
+                    objective=entry.objective,
+                    max_steps=entry.max_steps,
+                    executor=self.executor,
+                    llm_complete=self._llm_complete,
+                    on_event=self._on_event,
+                )
+                result = await runner.run()
+                from nova_arsenal.scheduler import ScheduleRunResult
+                return ScheduleRunResult(
+                    entry_name=entry.name,
+                    start_time=start_time,
+                    end_time=datetime.now(timezone.utc),
+                    success=result["status"] == "completed",
+                    findings_count=result["findings_count"],
+                    summary=f"{result['findings_count']} findings in {result['steps_taken']} steps",
+                )
+            self.scheduler.add_callback(scheduler_callback)
+            await self.scheduler.start()
+
         try:
             await self._emit("agent_started", {
                 "target": self.target,
@@ -257,7 +327,15 @@ class AgentRunner:
             await self._set_phase(AgentPhase.CORRELATION)
             await self._run_correlation()
 
-            # Phase 8: Reporting
+            # Phase 8: Compliance Mapping
+            await self._set_phase(AgentPhase.COMPLIANCE)
+            await self._run_compliance()
+
+            # Phase 9: CTF Solving (if target is a CTF challenge)
+            await self._set_phase(AgentPhase.CTF_SOLVING)
+            await self._run_ctf_solving()
+
+            # Phase 10: Reporting
             await self._set_phase(AgentPhase.REPORTING)
             report = await self._generate_report()
 
@@ -296,6 +374,8 @@ class AgentRunner:
             }
         finally:
             self._running = False
+            if self.scheduler.list_entries():
+                await self.scheduler.stop()
 
     async def step_once(self, instruction: str = "") -> AgentAction:
         """Execute a single agent step (for interactive mode)."""
@@ -370,7 +450,8 @@ class AgentRunner:
         plan_sections.append(f"Tools: {', '.join(t.name for t in recon_tools)}")
         plan_sections.append("- Subdomain enumeration via subfinder")
         plan_sections.append("- Ping sweep and port discovery via nmap")
-        plan_sections.append("- Service fingerprinting via nmap -sV\n")
+        plan_sections.append("- Service fingerprinting via nmap -sV")
+        plan_sections.append("- CVE research on all detected services automatically\n")
 
         # Phase 2: Scanning
         plan_sections.append("### Phase 2: Vulnerability Scanning")
@@ -418,7 +499,8 @@ class AgentRunner:
         plan_sections.append("\n### Phase 5: Post-Exploitation")
         plan_sections.append("- Data extraction and log collection")
         plan_sections.append("- Pivot potential assessment")
-        plan_sections.append("- Credential harvesting\n")
+        plan_sections.append("- Credential harvesting")
+        plan_sections.append("- Payload generation (reverse shells, webshells, bind shells)\n")
 
         # Phase 6: Cross-Tool Correlation
         plan_sections.append("### Phase 6: Cross-Tool Correlation")
@@ -591,6 +673,15 @@ class AgentRunner:
                 f"hydra -l root -P /usr/share/wordlists/rockyou.txt {self.target} ssh -t 4 2>/dev/null | head -20 || echo 'ssh brute force done'",
             ])
 
+        # Generate payloads for potential exploitation
+        payloads = self.payload_generator.generate_chain("LHOST", 4444)
+        if payloads:
+            logger.info(f"Generated {len(payloads)} payloads for exploitation phase")
+            await self._emit("payloads_generated", {
+                "count": len(payloads),
+                "payloads": [p.to_dict() for p in payloads[:3]],
+            })
+
         if not exploit_commands:
             # Fall back to LLM-based exploitation suggestions
             prompt = f"""Based on these scan results for {self.target}, suggest specific exploitation commands:
@@ -699,31 +790,82 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
         return self._simulate_llm_response(prompt)
 
     def _get_system_prompt(self) -> str:
-        return f"""You are Nova, an elite autonomous security researcher operating in Kali Linux.
+        """Build system prompt using priority-based prompt assembly."""
+        result = self._build_priority_prompt()
+        return result.text or ""
 
-PERSONALITY:
-- Methodical and thorough
-- Follows the MITRE ATT&CK framework
-- Always documents findings
-- Respects scope boundaries
-- Uses the right tool for each job
+    def _build_priority_prompt(self) -> RenderResult:
+        """Build a priority-scoped system prompt (Cursor-inspired).
+        
+        High-priority sections (always included):
+        - Role and identity
+        - Target and scope
+        - Core rules (including Read-First enforcement)
+        
+        Medium-priority (included if space allows):
+        - Phase persona augmentation
+        - Tool knowledge
+        
+        Low-priority (trimmed first when over token limit):
+        - Extended context
+        - Action history
+        - Detailed tool descriptions
+        """
+        persona_aug = self.persona_manager.get_system_prompt_augmentation(self._phase.value)
 
-TARGET: {self.target}
-SCOPE: {', '.join(self.scope)}
+        read_first_rule = (
+            "BEFORE making any edit, ALWAYS read the relevant file first. "
+            "Never edit a file you haven't read."
+        ) if self._read_first_enabled else ""
 
-KALI LINUX KNOWLEDGE:
-{self.blueprint.get_full_context()}
+        # Tool definitions as prompt context
+        tool_descriptions = "\n".join(
+            f"- {t.name}: {t.description}" for t in NOVA_SECURITY_TOOLS
+        )
 
-RULES:
+        # Adaptive Thinking block (Nex-N2 style)
+        thinking_block = adaptive_thinking_block(
+            enable_thinking=self._thinking_enabled,
+            profile=self._thinking_profile,
+        )
+
+        tree = [
+            Scope(absolute_priority=0, name="identity", children=[
+                Text(f"You are Nova, an elite autonomous security researcher operating in Kali Linux.\n\n"),
+            ]),
+            Scope(absolute_priority=0, name="adaptive_thinking", children=[
+                thinking_block,
+            ]),
+            Scope(absolute_priority=0, name="target", children=[
+                Text(f"TARGET: {self.target}\nSCOPE: {', '.join(self.scope)}\n\n"),
+            ]),
+            Scope(absolute_priority=-100, name="rules", children=[
+                Text(f"""RULES:
 1. Always validate commands before execution
 2. Stay within the defined scope
 3. Document all findings with evidence
 4. Use native Kali tools when possible
 5. Write custom code only when needed
 6. Reflect on progress every {self.reflect_every} steps
+{read_first_rule}
 
-CURRENT CONTEXT:
-{self._format_context()}"""
+"""),
+            ]),
+            Scope(absolute_priority=-500, name="persona", children=[
+                Text(f"{persona_aug}\n\n"),
+            ]),
+            Scope(absolute_priority=-1000, name="tool_knowledge", children=[
+                Text(f"AVAILABLE NOVA TOOLS:\n{tool_descriptions}\n\n"),
+            ]),
+            Scope(absolute_priority=-2000, name="kali_knowledge", children=[
+                Text(f"KALI LINUX KNOWLEDGE:\n{self.blueprint.get_full_context()}\n\n"),
+            ]),
+            Scope(absolute_priority=-5000, name="context", children=[
+                Text(f"CURRENT CONTEXT:\n{self._format_context()}"),
+            ]),
+        ]
+
+        return self._prompt_builder.render(tree)
 
     def _format_context(self) -> str:
         """Format recent context for the LLM."""
@@ -926,6 +1068,46 @@ Analysis:"""
 
         if self._detected_services:
             logger.info(f"Detected services: {self._detected_services}")
+            asyncio.ensure_future(self._research_cves())
+
+    async def _research_cves(self) -> None:
+        """Look up CVEs and exploits for all detected services."""
+        for service, ports in self._detected_services.items():
+            if not ports:
+                continue
+            port = ports[0]
+            version = await self._get_service_version(service, port)
+            result = await self.cve_research.research(service, version, port)
+            if result.cves:
+                logger.info(f"CVE research for {service} ({version}): {len(result.cves)} matches, exploit={'yes' if result.has_exploit else 'no'}")
+                await self._emit("cve_research", result.to_dict())
+                for cve in result.cves:
+                    severity = cve.severity if cve.severity in ("critical", "high", "medium", "low") else "medium"
+                    self._findings.append(Finding(
+                        title=f"[CVE] {cve.cve_id}: {cve.description[:100]}",
+                        severity=severity,
+                        description=cve.description,
+                        evidence=f"Exploit available: {cve.exploit_source}" if cve.exploit_available else "No public exploit",
+                        remediation=cve.remediation or f"Upgrade {service} to patched version",
+                        tool_used="cve_research",
+                    ))
+
+    async def _get_service_version(self, service: str, port: int) -> str:
+        """Extract version string for a detected service from action results."""
+        import re
+        service_lower = service.lower()
+        for action in self._actions:
+            if not action.result or not action.result.output:
+                continue
+            output = action.result.output.lower()
+            if service_lower in output:
+                version_match = re.search(rf'{re.escape(service_lower)}\s+(\d+[\d.\w]+)', output)
+                if version_match:
+                    return version_match.group(1)
+                port_match = re.search(rf'{port}/tcp\s+open\s+\S+\s+(.+?)$', output, re.MULTILINE)
+                if port_match:
+                    return port_match.group(1).strip()
+        return f"{service} (version unknown)"
 
     # ── API-Driven Integrations ────────────────────────────────────────────
 
@@ -1206,6 +1388,99 @@ Analysis:"""
 
         await self._emit("correlation_complete", self._correlation_result.to_dict())
 
+    # ── Compliance Mapping Phase ─────────────────────────────────────────────
+
+    async def _run_compliance(self) -> None:
+        """Map all findings to compliance frameworks (PCI DSS, SOC 2, ISO 27001, NIST)."""
+        if not self._findings:
+            logger.info("[Compliance] No findings to map")
+            return
+
+        if self._compliance_mapper is None:
+            from nova_arsenal.compliance import ComplianceMapper
+            self._compliance_mapper = ComplianceMapper()
+
+        mapped_count = 0
+        framework_hits = {}
+        for finding in self._findings:
+            ftype = self._infer_finding_type(finding)
+            if not ftype:
+                continue
+            result = self._compliance_mapper.map_finding(ftype, finding.description)
+            if result.controls:
+                mapped_count += 1
+                for framework in result.frameworks_affected:
+                    framework_hits[framework] = framework_hits.get(framework, 0) + 1
+                finding.description += f"\n[Compliance] {', '.join(f.c.id for f in result.controls[:3])}"
+
+            stats = self._compliance_mapper.get_summary_stats() if mapped_count else None
+        await self._emit("compliance_complete", {
+            "mapped_findings": mapped_count,
+            "total_findings": len(self._findings),
+            "framework_hits": framework_hits,
+            "stats": stats,
+        })
+        logger.info(f"[Compliance] Mapped {mapped_count}/{len(self._findings)} findings")
+
+    def _infer_finding_type(self, finding: Finding) -> str:
+        """Infer finding type from title and description."""
+        text = f"{finding.title} {finding.description}".lower()
+        patterns = {
+            "sql_injection": ["sql", "sqlmap", "sqli", "injection"],
+            "xss": ["xss", "cross.site", "script"],
+            "rce": ["rce", "remote code", "command injection", "code exec"],
+            "lfi": ["lfi", "local file", "path traversal"],
+            "info_disclosure": ["info", "disclosure", "stack trace", "version"],
+            "default_creds": ["default", "credential", "password"],
+            "open_port": ["open port", "exposed"],
+            "outdated_software": ["outdated", "old version", "cve-"],
+            "weak_ssl": ["ssl", "tls", "certificate"],
+            "insecure_headers": ["header", "x-frame", "xss protection"],
+            "authentication_bypass": ["bypass", "auth", "unauthorized"],
+        }
+        for ftype, keywords in patterns.items():
+            if any(k in text for k in keywords):
+                return ftype
+        return ""
+
+    # ── CTF Solving Phase ────────────────────────────────────────────────────
+
+    async def _run_ctf_solving(self) -> None:
+        """Automatically solve CTF challenges if the target is a CTF."""
+        if self.objective and "ctf" not in self.objective.lower():
+            logger.debug("[CTF] Not a CTF target, skipping")
+            return
+
+        logger.info(f"[CTF] Starting CTF solving mode for {self.target}")
+        challenge = self.ctf_solver.add_challenge(
+            name=self.target,
+            description=self.objective,
+            url=f"http://{self.target}" if not self.target.startswith("http") else self.target,
+        )
+        await self._emit("ctf_started", {
+            "challenge": challenge.name,
+            "type": challenge.challenge_type.value,
+        })
+
+        flag = await self.ctf_solver.solve_challenge(challenge)
+        if flag:
+            await self._emit("ctf_solved", {
+                "flag": flag.flag,
+                "type": flag.challenge_type.value,
+                "method": flag.method,
+                "confidence": flag.confidence,
+            })
+            self._findings.append(Finding(
+                title=f"CTF Flag: {challenge.name}",
+                severity="critical",
+                description=f"CTF challenge solved. Flag: {flag.flag}",
+                evidence=f"Method: {flag.method}, Type: {flag.challenge_type.value}",
+                tool_used="ctf_solver",
+            ))
+            logger.info(f"[CTF] SOLVED: {challenge.name} -> {flag.flag}")
+        else:
+            logger.info(f"[CTF] Not solved: {challenge.name}")
+
     # ── Finding Detection ───────────────────────────────────────────────────
 
     async def _check_for_findings(self, action: AgentAction) -> None:
@@ -1364,12 +1639,30 @@ Report:"""
 
         return commands[:5]  # Limit to 5 commands
 
+    def _update_thinking_profile_for_phase(self) -> None:
+        """Set Adaptive Thinking profile based on current agent phase (Nex-N2 style)."""
+        phase_profile_map = {
+            AgentPhase.PLANNING: ThinkingProfile.FORCE_ON,
+            AgentPhase.RECONNAISSANCE: ThinkingProfile.SEARCH,
+            AgentPhase.SCANNING: ThinkingProfile.SEARCH,
+            AgentPhase.EXPLOITATION: ThinkingProfile.SWE,
+            AgentPhase.POST_EXPLOITATION: ThinkingProfile.SWE,
+            AgentPhase.INTEGRATION: ThinkingProfile.SEARCH,
+            AgentPhase.CORRELATION: ThinkingProfile.FORCE_ON,
+            AgentPhase.COMPLIANCE: ThinkingProfile.DEFAULT,
+            AgentPhase.CTF_SOLVING: ThinkingProfile.SWE,
+            AgentPhase.REPORTING: ThinkingProfile.DEFAULT,
+        }
+        self._thinking_profile = phase_profile_map.get(self._phase, ThinkingProfile.DEFAULT)
+
     async def _set_phase(self, phase: AgentPhase) -> None:
         """Update the current phase."""
         if self._phase != phase:
             old = self._phase
             self._phase = phase
-            await self._emit("phase_changed", {"from": old.value, "to": phase.value})
+            self._update_thinking_profile_for_phase()
+            await self._emit("phase_changed", {"from": old.value, "to": phase.value,
+                                                "thinking_profile": self._thinking_profile.value})
 
     async def _emit(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit an event to the callback."""

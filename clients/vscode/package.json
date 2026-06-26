@@ -1,0 +1,111 @@
+{
+  "name": "nova-arsenal",
+  "displayName": "Nova Arsenal",
+  "description": "Autonomous security research agent - chat, scan, exploit, and analyze from your editor",
+  "version": "1.0.0",
+  "publisher": "informant254",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Informant254/Nova-arsenal"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Security",
+    "Development",
+    "Other"
+  ],
+  "keywords": [
+    "security",
+    "pentesting",
+    "nmap",
+    "metasploit",
+    "burp",
+    "sqlmap",
+    "osint",
+    "ctf"
+  ],
+  "activationEvents": [
+    "onCommand:nova-arsenal.openChat",
+    "onCommand:nova-arsenal.quickScan",
+    "onCommand:nova-arsenal.runNmap",
+    "onCommand:nova-arsenal.runPayloadGen",
+    "onCommand:nova-arsenal.runOsint",
+    "onCommand:nova-arsenal.ctfSolver"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nova-arsenal.openChat",
+        "title": "Nova: Open Chat"
+      },
+      {
+        "command": "nova-arsenal.quickScan",
+        "title": "Nova: Quick Security Scan",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.runNmap",
+        "title": "Nova: Run Nmap Scan",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.runPayloadGen",
+        "title": "Nova: Generate Payload",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.runOsint",
+        "title": "Nova: OSINT Investigation",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.ctfSolver",
+        "title": "Nova: CTF Solver",
+        "category": "Nova"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "nova-arsenal.openChat",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n"
+      }
+    ],
+    "configuration": {
+      "title": "Nova Arsenal",
+      "properties": {
+        "nova-arsenal.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Nova-Arsenal API server URL"
+        },
+        "nova-arsenal.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for authenticated requests"
+        },
+        "nova-arsenal.defaultTarget": {
+          "type": "string",
+          "default": "",
+          "description": "Default target for quick scans"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {}
+}

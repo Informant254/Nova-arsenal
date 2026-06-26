@@ -67,10 +67,26 @@ class DatabaseConfig:
 
 
 @dataclass
+class OAuthConfig:
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_redirect_uri: str = "http://localhost:8000/api/auth/oauth/github/callback"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/auth/oauth/google/callback"
+    state_secret: str = ""
+    default_tier: str = "free"
+    free_api_calls_per_day: int = 100
+    pro_api_calls_per_day: int = 10000
+    enterprise_api_calls_per_day: int = 100000
+
+
+@dataclass
 class AuthConfig:
     jwt_secret: str = ""
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    oauth: OAuthConfig = field(default_factory=OAuthConfig)
 
 
 @dataclass
@@ -138,7 +154,10 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
             security=SecurityConfig(**data.get("security", {})),
             logging=LoggingConfig(**data.get("logging", {})),
             database=DatabaseConfig(**data.get("database", {})),
-            auth=AuthConfig(**data.get("auth", {})),
+            auth=AuthConfig(
+                **{k: v for k, v in data.get("auth", {}).items() if k != "oauth"},
+                oauth=OAuthConfig(**data.get("auth", {}).get("oauth", {})),
+            ),
             scope=data.get("scope", {}).get("targets", []),
         )
     

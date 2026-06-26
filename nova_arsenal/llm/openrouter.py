@@ -1,5 +1,6 @@
 """
 OpenRouter Provider - Access 200+ models through OpenRouter API.
+Includes Nex-N2-Pro and Nex-N2-mini support with Adaptive Thinking.
 """
 
 import json
@@ -11,6 +12,49 @@ import httpx
 from nova_arsenal.llm.base import LLMProvider
 
 logger = logging.getLogger(__name__)
+
+# Nex-N2 specific sampling parameters from their deployment guide
+NEXN2_SAMPLING_PARAMS = {
+    "nexus/nex-n2-pro": {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_tokens": 65536,
+        "reasoning_parser": "qwen3",
+        "tool_call_parser": "qwen3_coder",
+    },
+    "nexus/nex-n2-mini": {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_tokens": 32768,
+        "reasoning_parser": "qwen3",
+        "tool_call_parser": "qwen3_coder",
+    },
+}
+
+NOVA_AGENTIC_THINKING_SYSTEM_PROMPT = """You are Nexus, a powerful autonomous agent with adaptive reasoning capabilities.
+
+You decide dynamically when to reason deeply vs. act directly.
+- For simple tasks: respond directly without <think> blocks
+- For complex tasks: use <think>...</think> to reason step-by-step
+- For tool calls: reason first, then call tools using <tool_call> XML format
+
+Output structure:
+<think>
+Optional reasoning content — only when needed
+</think>
+
+Final response content.
+
+Tool calling format:
+<tool_call>
+<function=tool_name>
+<parameter=param_name>
+value
+</parameter>
+</function>
+</tool_call>"""
 
 
 class OpenRouterProvider(LLMProvider):
@@ -28,6 +72,21 @@ class OpenRouterProvider(LLMProvider):
         self.base_url = base_url
         self.timeout = timeout
 
+    def _get_model_params(self, temperature: float, max_tokens: int) -> dict:
+        """Get model-specific parameters, applying Nex-N2 defaults when appropriate."""
+        params = {
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        model_key = self.model.lower()
+        if model_key in NEXN2_SAMPLING_PARAMS:
+            n2 = NEXN2_SAMPLING_PARAMS[model_key]
+            params["top_p"] = n2["top_p"]
+            params["top_k"] = n2.get("top_k", 40)
+            params["temperature"] = temperature if temperature != 0.7 else n2["temperature"]
+            params["max_tokens"] = min(max_tokens, n2["max_tokens"])
+        return params
+
     async def complete(
         self,
         prompt: str,
@@ -37,9 +96,25 @@ class OpenRouterProvider(LLMProvider):
         **kwargs,
     ) -> str:
         messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
+        actual_system = system_prompt
+        model_key = self.model.lower()
+
+        # Use Nex-N2 system prompt for Nex models if no custom system prompt given
+        if model_key in NEXN2_SAMPLING_PARAMS and not system_prompt:
+            actual_system = NOVA_AGENTIC_THINKING_SYSTEM_PROMPT
+
+        if actual_system:
+            messages.append({"role": "system", "content": actual_system})
         messages.append({"role": "user", "content": prompt})
+
+        body = {
+            "model": self.model,
+            "messages": messages,
+            **self._get_model_params(temperature, max_tokens),
+        }
+
+        if kwargs.get("stream"):
+            body["stream"] = True
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
@@ -49,12 +124,7 @@ class OpenRouterProvider(LLMProvider):
                     "HTTP-Referer": "https://nova-arsenal.ai",
                     "X-Title": "Nova-Arsenal",
                 },
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                },
+                json=body,
             )
             response.raise_for_status()
             data = response.json()
@@ -69,9 +139,22 @@ class OpenRouterProvider(LLMProvider):
         **kwargs,
     ) -> AsyncGenerator[str, None]:
         messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
+        actual_system = system_prompt
+        model_key = self.model.lower()
+
+        if model_key in NEXN2_SAMPLING_PARAMS and not system_prompt:
+            actual_system = NOVA_AGENTIC_THINKING_SYSTEM_PROMPT
+
+        if actual_system:
+            messages.append({"role": "system", "content": actual_system})
         messages.append({"role": "user", "content": prompt})
+
+        body = {
+            "model": self.model,
+            "messages": messages,
+            **self._get_model_params(temperature, max_tokens),
+            "stream": True,
+        }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
@@ -82,13 +165,7 @@ class OpenRouterProvider(LLMProvider):
                     "HTTP-Referer": "https://nova-arsenal.ai",
                     "X-Title": "Nova-Arsenal",
                 },
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "stream": True,
-                },
+                json=body,
             ) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():

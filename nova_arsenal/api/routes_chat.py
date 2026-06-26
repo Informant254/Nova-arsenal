@@ -9,15 +9,24 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import AsyncGenerator, Dict, List, Optional
+from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from nova_arsenal.db import get_db
+from nova_arsenal.db.crud import (
+    add_chat_message,
+    delete_chat_session,
+    get_chat_messages,
+    get_or_create_chat_session,
+    list_chat_sessions,
+)
+from nova_arsenal.db.session import get_session_factory
 from nova_arsenal.kali_blueprint import KaliBlueprint
-from nova_arsenal.llm.multi_router import MultiProviderRouter, TaskCategory
+from nova_arsenal.llm.multi_router import MultiProviderRouter
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +34,8 @@ router = APIRouter(prefix="/api/chat")
 
 # ── Global state ─────────────────────────────────────────────────────────────
 
-_blueprint: Optional[KaliBlueprint] = None
-_router: Optional[MultiProviderRouter] = None
-_sessions: Dict[str, List[Dict]] = {}  # session_id -> messages
+_blueprint: KaliBlueprint | None = None
+_router: MultiProviderRouter | None = None
 
 
 def get_blueprint() -> KaliBlueprint:
@@ -37,7 +45,7 @@ def get_blueprint() -> KaliBlueprint:
     return _blueprint
 
 
-def get_router() -> Optional[MultiProviderRouter]:
+def get_router() -> MultiProviderRouter | None:
     global _router
     return _router
 
@@ -52,14 +60,14 @@ def set_router(router: MultiProviderRouter):
 class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
-    timestamp: Optional[str] = None
-    metadata: Optional[Dict] = None
+    timestamp: str | None = None
+    metadata: dict | None = None
 
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: Optional[str] = None
-    target: Optional[str] = None  # If the user mentions a target
+    session_id: str | None = None
+    target: str | None = None  # If the user mentions a target
     stream: bool = True
 
 
@@ -67,7 +75,7 @@ class ChatResponse(BaseModel):
     reply: str
     session_id: str
     intent: str
-    metadata: Optional[Dict] = None
+    metadata: dict | None = None
 
 
 # ── Intent Classification ───────────────────────────────────────────────────
@@ -185,13 +193,12 @@ If it's outside scope, explain why.
 
 # ── LLM Integration ──────────────────────────────────────────────────────────
 
-async def _llm_chat(messages: List[Dict], system_prompt: str) -> str:
+async def _llm_chat(messages: list[dict], system_prompt: str) -> str:
     """Send messages to the LLM and get a response."""
     router = get_router()
 
     if router and router.active_providers:
         try:
-            full_messages = [{"role": "system", "content": system_prompt}] + messages
             response = await router.complete(
                 prompt=messages[-1]["content"],
                 system_prompt=system_prompt,
@@ -229,7 +236,7 @@ def _local_respond(message: str, system_prompt: str) -> str:
                 lines.append(f"\n**Key flags:** {', '.join(list(tool.flags.keys())[:10])}")
             if tool.notes:
                 lines.append(f"\n_Note: {tool.notes}_")
-            return "\n".join(l for l in lines if l)
+            return "\n".join(line for line in lines if line)
 
     # Category suggestions
     if "what tools" in msg_lower or "recommend" in msg_lower or "suggest" in msg_lower:
@@ -280,101 +287,118 @@ def _local_respond(message: str, system_prompt: str) -> str:
 async def _stream_response(
     message: str,
     session_id: str,
-    target: Optional[str] = None,
+    target: str | None = None,
 ) -> AsyncGenerator[str, None]:
-    """Generate a streaming SSE response."""
-    session = _sessions.setdefault(session_id, [])
-    session.append({"role": "user", "content": message, "timestamp": datetime.now(timezone.utc).isoformat()})
-
-    # Classify intent
-    intent = classify_intent(message)
-    yield f"data: {json.dumps({'type': 'intent', 'intent': intent})}\n\n"
-
-    # Route based on intent
-    if intent in ("security_task", "code_request"):
-        system_prompt = NOVA_TASK_SYSTEM_PROMPT
-    else:
-        system_prompt = NOVA_CONVERSATION_SYSTEM_PROMPT
-
-    # Get LLM response
-    router = get_router()
-    if router and router.active_providers:
+    """Generate a streaming SSE response with DB persistence."""
+    async with get_session_factory()() as db:
         try:
-            full_messages = [{"role": "system", "content": system_prompt}] + [
-                {"role": m["role"], "content": m["content"]} for m in session
+            # Ensure session exists in DB
+            session = await get_or_create_chat_session(db, session_id)
+            session_id = session.session_id
+
+            # Persist user message
+            await add_chat_message(db, session_id, "user", message)
+            await db.commit()
+
+            # Classify intent
+            intent = classify_intent(message)
+            yield f"data: {json.dumps({'type': 'intent', 'intent': intent})}\n\n"
+
+            # Route based on intent
+            if intent in ("security_task", "code_request"):
+                system_prompt = NOVA_TASK_SYSTEM_PROMPT
+            else:
+                system_prompt = NOVA_CONVERSATION_SYSTEM_PROMPT
+
+            # Load conversation history from DB
+            history = await get_chat_messages(db, session_id, limit=50)
+            session_history = [
+                {"role": m.role, "content": m.content}
+                for m in history
             ]
 
-            # Try streaming
-            provider_name = router.route(message)
-            provider = router.active_providers.get(provider_name)
+            # Get LLM response
+            router = get_router()
+            response = ""
+            if router and router.active_providers:
+                try:
+                    provider_name = router.route(message)
+                    provider = router.active_providers.get(provider_name)
 
-            if provider and hasattr(provider, 'stream'):
-                async for chunk in provider.stream(
-                    prompt=message,
-                    system_prompt=system_prompt,
-                    temperature=0.7,
-                    max_tokens=2048,
-                ):
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                    if provider and hasattr(provider, 'stream'):
+                        async for chunk in provider.stream(
+                            prompt=message,
+                            system_prompt=system_prompt,
+                            temperature=0.7,
+                            max_tokens=2048,
+                        ):
+                            response += chunk
+                            yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                    else:
+                        response = await _llm_chat(session_history, system_prompt)
+                        for i in range(0, len(response), 40):
+                            chunk = response[i:i+40]
+                            yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                            await asyncio.sleep(0.02)
+
+                except Exception as e:
+                    error_msg = f"Error: {e}"
+                    response = error_msg
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': error_msg})}\n\n"
             else:
-                # Fallback to non-streaming
-                response = await _llm_chat(
-                    [{"role": m["role"], "content": m["content"]} for m in session],
-                    system_prompt,
-                )
-                # Simulate streaming by chunking
-                for i in range(0, len(response), 40):
-                    chunk = response[i:i+40]
+                response = _local_respond(message, system_prompt)
+                for i in range(0, len(response), 30):
+                    chunk = response[i:i+30]
                     yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-                    await asyncio.sleep(0.02)
+                    await asyncio.sleep(0.015)
+
+            # Build metadata
+            metadata = {
+                "intent": intent,
+                "tools_mentioned": [],
+                "suggestions": [],
+            }
+
+            bp = get_blueprint()
+            suggestions = bp.suggest_tools(message)
+            if suggestions:
+                metadata["suggestions"] = suggestions[:5]
+
+            for tool_name in bp.tools:
+                if tool_name.lower() in message.lower():
+                    metadata["tools_mentioned"].append(tool_name)
+
+            # Persist assistant response
+            await add_chat_message(db, session_id, "assistant", response, metadata)
+            await db.commit()
+
+            # Send done event
+            yield f"data: {json.dumps({'type': 'done', 'metadata': metadata})}\n\n"
 
         except Exception as e:
-            error_msg = f"Error: {e}"
-            yield f"data: {json.dumps({'type': 'chunk', 'content': error_msg})}\n\n"
-    else:
-        # Local fallback
-        response = _local_respond(message, system_prompt)
-        for i in range(0, len(response), 30):
-            chunk = response[i:i+30]
-            yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-            await asyncio.sleep(0.015)
-
-    # Build metadata
-    metadata = {
-        "intent": intent,
-        "tools_mentioned": [],
-        "suggestions": [],
-    }
-
-    bp = get_blueprint()
-    suggestions = bp.suggest_tools(message)
-    if suggestions:
-        metadata["suggestions"] = suggestions[:5]
-
-    # Detect mentioned tools
-    for tool_name in bp.tools:
-        if tool_name.lower() in message.lower():
-            metadata["tools_mentioned"].append(tool_name)
-
-    # Store assistant response
-    assistant_msg = {
-        "role": "assistant",
-        "content": response if 'response' in dir() else "",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "metadata": metadata,
-    }
-    session.append(assistant_msg)
-
-    # Send done event
-    yield f"data: {json.dumps({'type': 'done', 'metadata': metadata})}\n\n"
+            await db.rollback()
+            logger.error(f"Stream error: {e}")
+            yield f"data: {json.dumps({'type': 'chunk', 'content': f'Error: {e}'})}\n\n"
+        finally:
+            await db.close()
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/send", response_model=ChatResponse)
-async def chat_send(request: ChatRequest):
+async def chat_send(
+    request: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+):
     """Send a message and get a non-streaming response."""
     session_id = request.session_id or str(uuid.uuid4())
+
+    # Ensure session exists
+    session = await get_or_create_chat_session(db, session_id)
+    session_id = session.session_id
+
+    # Persist user message
+    await add_chat_message(db, session_id, "user", request.message)
 
     # Classify intent
     intent = classify_intent(request.message)
@@ -386,21 +410,22 @@ async def chat_send(request: ChatRequest):
     if intent in ("security_task", "code_request"):
         system_prompt = NOVA_TASK_SYSTEM_PROMPT
 
-    # Get response
-    session = _sessions.setdefault(session_id, [])
-    session.append({"role": "user", "content": request.message})
+    # Load history from DB
+    history = await get_chat_messages(db, session_id, limit=50)
+    session_history = [
+        {"role": m.role, "content": m.content}
+        for m in history
+    ]
 
-    response = await _llm_chat(
-        [{"role": m["role"], "content": m["content"]} for m in session],
-        system_prompt,
-    )
+    response = await _llm_chat(session_history, system_prompt)
 
-    session.append({"role": "assistant", "content": response})
-
+    # Persist assistant response
     metadata = {"intent": intent}
     suggestions = bp.suggest_tools(request.message)
     if suggestions:
         metadata["suggestions"] = suggestions[:5]
+
+    await add_chat_message(db, session_id, "assistant", response, metadata)
 
     return ChatResponse(
         reply=response,
@@ -427,17 +452,45 @@ async def chat_stream(request: ChatRequest):
 
 
 @router.get("/sessions/{session_id}/history")
-async def chat_history(session_id: str):
+async def chat_history(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
     """Get chat history for a session."""
-    session = _sessions.get(session_id, [])
-    return {"session_id": session_id, "messages": session}
+    messages = await get_chat_messages(db, session_id)
+    return {
+        "session_id": session_id,
+        "messages": [
+            {
+                "role": m.role,
+                "content": m.content,
+                "timestamp": m.timestamp.isoformat(),
+                "metadata": json.loads(m.metadata_json) if m.metadata_json else None,
+            }
+            for m in messages
+        ],
+    }
 
 
 @router.delete("/sessions/{session_id}")
-async def chat_clear(session_id: str):
+async def chat_clear(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
     """Clear a chat session."""
-    _sessions.pop(session_id, None)
+    deleted = await delete_chat_session(db, session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "cleared", "session_id": session_id}
+
+
+@router.get("/sessions")
+async def list_sessions(
+    db: AsyncSession = Depends(get_db),
+):
+    """List all chat sessions."""
+    sessions = await list_chat_sessions(db)
+    return {"sessions": sessions}
 
 
 @router.get("/tools/suggest")

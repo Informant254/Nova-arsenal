@@ -58,3 +58,79 @@ class PasswordChange(BaseModel):
     """Password change model."""
     current_password: str
     new_password: str = Field(..., min_length=8)
+
+
+# ── OAuth Models ─────────────────────────────────────────────────────────────
+
+class OAuthAccountResponse(BaseModel):
+    """OAuth account response model."""
+    id: int
+    provider: str
+    provider_email: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class OAuthLoginResponse(BaseModel):
+    """Response after OAuth login."""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    is_new_user: bool = False
+
+
+# ── Subscription Models ──────────────────────────────────────────────────────
+
+class SubscriptionResponse(BaseModel):
+    """Subscription details response."""
+    tier: str
+    api_calls_limit: int
+    api_calls_used: int
+    api_calls_remaining: int
+    is_active: bool
+    started_at: datetime
+    expires_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SubscriptionUpgradeRequest(BaseModel):
+    """Subscription upgrade request."""
+    tier: str = Field(..., pattern=r"^(pro|enterprise)$")
+
+
+# ── API Key Models ───────────────────────────────────────────────────────────
+
+class ApiKeyCreateRequest(BaseModel):
+    """API key creation request."""
+    name: str = Field(default="default", max_length=100)
+
+
+class ApiKeyResponse(BaseModel):
+    """API key response (shows full key only once)."""
+    id: int
+    key_prefix: str
+    name: str
+    is_active: bool
+    full_key: Optional[str] = None
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ApiKeyListResponse(BaseModel):
+    """API key list response (never shows full key)."""
+    id: int
+    key_prefix: str
+    name: str
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

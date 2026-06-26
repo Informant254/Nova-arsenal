@@ -11,15 +11,17 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from nova_arsenal.api.routes import router as api_router
-from nova_arsenal.api.routes_chat import router as chat_router, set_router as set_chat_router
+from nova_arsenal.api.routes_chat import router as chat_router
+from nova_arsenal.api.routes_chat import set_router as set_chat_router
 from nova_arsenal.api.websocket.events import router as ws_router
-from nova_arsenal.llm.router import get_llm_router
+from nova_arsenal.auth.routes import router as auth_router
 from nova_arsenal.llm.multi_router import MultiProviderRouter
 from nova_arsenal.llm.opencode import OpencodeProvider
+from nova_arsenal.llm.router import get_llm_router
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,14 @@ def create_app() -> FastAPI:
     # ── Startup ──────────────────────────────────────────────────────────────
     @app.on_event("startup")
     async def startup():
+        # Initialize database tables
+        try:
+            from nova_arsenal.db.session import create_tables
+            await create_tables()
+            logger.info("Database tables created / verified")
+        except Exception as e:
+            logger.warning(f"Database initialization skipped (non-fatal): {e}")
+
         # Initialize LLM router and wire into chat
         llm_router = get_llm_router()
         multi = llm_router.multi_router
@@ -71,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(chat_router)
     app.include_router(ws_router)
+    app.include_router(auth_router)
 
     # ── Static files (web dashboard) ─────────────────────────────────────────
     static_dir = Path(__file__).parent / "static"
