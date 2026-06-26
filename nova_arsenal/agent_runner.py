@@ -27,6 +27,11 @@ from nova_arsenal.kali_blueprint import KaliBlueprint
 from nova_arsenal.sandbox_executor import ExecResult, SandboxExecutor, create_executor
 from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy, ValidationResult
 
+# API integrations (lazy-imported to avoid hard deps)
+from nova_arsenal.integrations import MetasploitRPC, BurpAPI, NmapParser, SQLmapAPI
+from nova_arsenal.intelligence import ToolSelector
+from nova_arsenal.correlation import Correlator
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +43,8 @@ class AgentPhase(Enum):
     SCANNING = "scanning"
     EXPLOITATION = "exploitation"
     POST_EXPLOITATION = "post_exploitation"
+    INTEGRATION = "integration"       # API-driven tool integrations (MSF, Burp, SQLmap)
+    CORRELATION = "correlation"       # Cross-tool result correlation
     REPORTING = "reporting"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -134,6 +141,7 @@ class AgentRunner:
         executor: Optional[SandboxExecutor] = None,
         llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
         on_event: Optional[EventCallback] = None,
+        integrations: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> None:
         self.target = target
         self.objective = objective
@@ -153,6 +161,39 @@ class AgentRunner:
         # Event system
         self._on_event = on_event
 
+        # Tool selection intelligence
+        self.tool_selector = ToolSelector()
+
+        # Result correlation
+        self.correlator = Correlator()
+
+        # API-driven integrations (configured via integrations dict)
+        integrations = integrations or {}
+        self.msf_rpc: Optional[MetasploitRPC] = None
+        self.burp_api: Optional[BurpAPI] = None
+        self.sqlmap_api: Optional[SQLmapAPI] = None
+        self.nmap_parser = NmapParser()
+
+        msf_config = integrations.get("metasploit", {})
+        if msf_config.get("enabled", False):
+            self.msf_rpc = MetasploitRPC(
+                host=msf_config.get("host", "https://127.0.0.1:55553"),
+                password=msf_config.get("password", ""),
+            )
+
+        burp_config = integrations.get("burp", {})
+        if burp_config.get("enabled", False):
+            self.burp_api = BurpAPI(
+                base_url=burp_config.get("url", "http://127.0.0.1:1337"),
+                api_key=burp_config.get("api_key", ""),
+            )
+
+        sqlmap_config = integrations.get("sqlmap", {})
+        if sqlmap_config.get("enabled", False):
+            self.sqlmap_api = SQLmapAPI(
+                server_url=sqlmap_config.get("url", "http://127.0.0.1:8775"),
+            )
+
         # State
         self._step = 0
         self._phase = AgentPhase.INIT
@@ -161,6 +202,17 @@ class AgentRunner:
         self._context: List[Dict[str, str]] = []
         self._running = False
         self._error: Optional[str] = None
+
+        # Detected services (populated during scanning)
+        self._detected_services: Dict[str, List[int]] = {}
+
+        # Integration artifacts
+        self._burp_issues: List[Dict[str, Any]] = []
+        self._msf_results: List[Dict[str, Any]] = []
+        self._sqlmap_results: List[Dict[str, Any]] = []
+
+        # Correlation result
+        self._correlation_result: Optional[Any] = None
 
     # ── Public API ──────────────────────────────────────────────────────────
 
@@ -189,15 +241,23 @@ class AgentRunner:
             await self._set_phase(AgentPhase.SCANNING)
             await self._execute_scanning()
 
-            # Phase 4: Exploitation
+            # Phase 4: API-Driven Integrations (Metasploit, Burp, SQLmap)
+            await self._set_phase(AgentPhase.INTEGRATION)
+            await self._run_integrations()
+
+            # Phase 5: Exploitation
             await self._set_phase(AgentPhase.EXPLOITATION)
             await self._execute_exploitation()
 
-            # Phase 5: Post-exploitation
+            # Phase 6: Post-exploitation
             await self._set_phase(AgentPhase.POST_EXPLOITATION)
             await self._execute_post_exploitation()
 
-            # Phase 6: Reporting
+            # Phase 7: Cross-Tool Correlation
+            await self._set_phase(AgentPhase.CORRELATION)
+            await self._run_correlation()
+
+            # Phase 8: Reporting
             await self._set_phase(AgentPhase.REPORTING)
             report = await self._generate_report()
 
@@ -297,13 +357,8 @@ class AgentRunner:
     # ── Planning Phase ──────────────────────────────────────────────────────
 
     async def _plan(self) -> str:
-        """Generate an attack plan using blueprint attack chains."""
-        # Use blueprint knowledge to build a smart plan
-        detected_services = set()
-        for f in self._findings:
-            if "Detected" in f.title:
-                service = f.title.split("Detected ")[1].split(" service")[0].lower()
-                detected_services.add(service)
+        """Generate an attack plan using blueprint attack chains + integration intelligence."""
+        detected_services = self._detected_services or {}
 
         plan_sections = ["## Attack Plan\n"]
         plan_sections.append(f"Target: {self.target}")
@@ -319,38 +374,63 @@ class AgentRunner:
 
         # Phase 2: Scanning
         plan_sections.append("### Phase 2: Vulnerability Scanning")
-        plan_sections.append("- Full port scan via nmap -p-")
+        plan_sections.append("- Full port scan via nmap -p- with XML output")
         plan_sections.append("- Vulnerability scan via nuclei")
         plan_sections.append("- Web technology detection via whatweb\n")
 
-        # Phase 3: Exploitation
-        plan_sections.append("### Phase 3: Exploitation")
+        # Phase 3: API-Driven Integrations
+        plan_sections.append("### Phase 3: API-Driven Integrations")
+        has_msf = self.msf_rpc is not None
+        has_burp = self.burp_api is not None
+        has_sqlmap = self.sqlmap_api is not None
+        if has_msf or has_burp or has_sqlmap:
+            if has_msf:
+                plan_sections.append("- Metasploit RPC: module execution based on detected services")
+            if has_burp:
+                plan_sections.append("- Burp Suite REST: active scanning + issue collection")
+            if has_sqlmap:
+                plan_sections.append("- SQLmap API: automated SQL injection testing")
+        else:
+            plan_sections.append("- No API integrations configured (use Nmap/Burp/SQLmap as CLI)")
+        plan_sections.append("")
+
+        # Phase 4: Exploitation
+        plan_sections.append("### Phase 4: Exploitation")
         if detected_services:
-            plan_sections.append(f"Detected services: {', '.join(sorted(detected_services))}")
+            svcs = [f"{svc}:{','.join(map(str, ports))}" for svc, ports in detected_services.items()]
+            plan_sections.append(f"Detected services: {', '.join(svcs)}")
+            plan_sections.append("- Tool-selection intelligence picks optimal exploit tools")
             for svc in detected_services:
                 if svc in ("http", "https"):
-                    plan_sections.append("- Web application testing (nuclei, nikto, dirsearch)")
+                    plan_sections.append(f"  - {svc}: nuclei (exploit/rce), sqlmap, hydra")
                 elif svc == "smb":
-                    plan_sections.append("- SMB enumeration and vulnerability scanning")
+                    plan_sections.append("  - SMB: Metasploit MS17-010, enum4linux, crackmapexec")
                 elif svc == "ssh":
-                    plan_sections.append("- SSH brute force testing")
-                elif svc in ("mysql", "postgresql"):
-                    plan_sections.append("- Database service testing")
-                elif svc == "kerberos":
-                    plan_sections.append("- Kerberos attack testing")
+                    plan_sections.append("  - SSH: hydra brute force, key-based auth testing")
+                elif svc in ("mysql", "postgresql", "mssql"):
+                    plan_sections.append(f"  - {svc}: sqlmap, hydra, nmap NSE scripts")
+                else:
+                    plan_sections.append(f"  - {svc}: targeted exploitation")
         else:
             plan_sections.append("- Targeted exploitation based on scan findings")
 
-        # Phase 4: Post-Exploitation
-        plan_sections.append("\n### Phase 4: Post-Exploitation")
+        # Phase 5: Post-Exploitation
+        plan_sections.append("\n### Phase 5: Post-Exploitation")
         plan_sections.append("- Data extraction and log collection")
         plan_sections.append("- Pivot potential assessment")
         plan_sections.append("- Credential harvesting\n")
 
-        # Phase 5: Reporting
-        plan_sections.append("### Phase 5: Reporting")
-        plan_sections.append("- Compilation of all findings")
+        # Phase 6: Cross-Tool Correlation
+        plan_sections.append("### Phase 6: Cross-Tool Correlation")
+        plan_sections.append("- Correlate Nmap + Burp + Metasploit + SQLmap findings")
+        plan_sections.append("- Boost severity for multi-source confirmed vulnerabilities")
+        plan_sections.append("- Generate cross-tool insights\n")
+
+        # Phase 7: Reporting
+        plan_sections.append("### Phase 7: Reporting")
+        plan_sections.append("- Compilation of all findings with correlation data")
         plan_sections.append("- Severity ratings and remediation recommendations")
+        plan_sections.append("- Cross-tool confidence scoring")
 
         plan = "\n".join(plan_sections)
         await self._emit("plan_created", {"plan": plan})
@@ -384,44 +464,65 @@ class AgentRunner:
     # ── Scanning Phase ──────────────────────────────────────────────────────
 
     async def _execute_scanning(self) -> None:
-        """Execute vulnerability scanning."""
+        """Execute vulnerability scanning with proper structured output."""
         scan_commands = [
-            f"nmap -sV -sC -p- {self.target} -oN /workspace/nmap_full.txt 2>/dev/null || echo 'full scan done'",
+            f"nmap -sV -sC -p- {self.target} -oX /workspace/nmap_full.xml -oN /workspace/nmap_full.txt 2>/dev/null || echo 'full scan done'",
             f"nuclei -u https://{self.target} -severity critical,high,medium -json 2>/dev/null | head -50 || echo 'nuclei scan done'",
             f"nikto -h {self.target} -o /workspace/nikto.txt 2>/dev/null || echo 'nikto scan done",
-            f"whatweb {self.target} 2>/dev/null || echo 'whatweb done'",
+            f"whatweb {self.target} -v 2>/dev/null | head -30 || echo 'whatweb done'",
         ]
 
-        # Add service-specific scanning based on detected services
-        detected_services = set()
-        for f in self._findings:
-            if "Detected" in f.title:
-                service = f.title.split("Detected ")[1].split(" service")[0].lower()
-                detected_services.add(service)
+        # Run initial scans and detect services
+        for cmd in scan_commands:
+            if not self._running:
+                break
+            await self._execute_and_analyze(cmd, AgentPhase.SCANNING)
 
-        if "http" in detected_services or "https" in detected_services:
+        # Detect services from scan results
+        self._detect_services()
+
+        # Add service-specific scanning based on detected services
+        if "http" in self._detected_services or "https" in self._detected_services:
             scan_commands.extend([
                 f"dirsearch -u http://{self.target} -w /usr/share/wordlists/dirb/common.txt -t 10 2>/dev/null | head -40 || echo 'dirsearch done'",
                 f"nuclei -u http://{self.target} -as -json 2>/dev/null | head -50 || echo 'nuclei automated done'",
             ])
 
-        if "smb" in detected_services:
+        if "smb" in self._detected_services:
             scan_commands.extend([
                 f"enum4linux -a {self.target} 2>/dev/null | head -80 || echo 'enum4linux done'",
                 f"smbclient -L //{self.target} -N 2>/dev/null || echo 'smbclient done'",
             ])
 
-        if "mysql" in detected_services:
+        if "mysql" in self._detected_services:
             scan_commands.append(
                 f"nmap --script mysql-* -p 3306 {self.target} 2>/dev/null | head -40 || echo 'mysql scan done'"
             )
 
-        if "ssh" in detected_services:
+        if "ssh" in self._detected_services:
             scan_commands.append(
                 f"nmap --script ssh-* -p 22 {self.target} 2>/dev/null | head -40 || echo 'ssh scan done'"
             )
 
-        for cmd in scan_commands:
+        # Parse nmap XML output for structured data
+        if "nmap" in scan_commands[0]:
+            try:
+                parsed = self.nmap_parser.parse_file("/workspace/nmap_full.xml")
+                if parsed.hosts:
+                    nmap_findings = self.nmap_parser.extract_findings(parsed)
+                    for nf in nmap_findings:
+                        finding = Finding(
+                            title=nf["title"],
+                            severity=nf["severity"],
+                            description=nf["description"],
+                            tool_used="nmap",
+                        )
+                        self._findings.append(finding)
+                        await self._emit("finding_discovered", finding.to_dict())
+            except Exception as e:
+                logger.warning(f"Failed to parse nmap XML: {e}")
+
+        for cmd in scan_commands[4:]:  # Run additional scans
             if not self._running:
                 break
             await self._execute_and_analyze(cmd, AgentPhase.SCANNING)
@@ -429,16 +530,12 @@ class AgentRunner:
     # ── Exploitation Phase ──────────────────────────────────────────────────
 
     async def _execute_exploitation(self) -> None:
-        """Attempt exploitation based on findings using attack chain knowledge."""
-        # Use blueprint attack chains to guide exploitation
+        """Attempt exploitation using tool-selection intelligence + attack chains."""
         scan_context = self._get_scan_results()
 
-        # Determine which attack chains apply based on detected services
-        detected_services = set()
-        for f in self._findings:
-            if "Detected" in f.title:
-                service = f.title.split("Detected ")[1].split(" service")[0].lower()
-                detected_services.add(service)
+        # Use tool selection intelligence to decide strategy
+        strategy = await self._generate_strategy()
+        detected_services = set(self._detected_services.keys())
 
         # Map detected services to relevant attack chains
         chain_mapping = {
@@ -452,18 +549,31 @@ class AgentRunner:
 
         exploit_commands = []
 
-        # Add commands from relevant attack chains
+        # Phase 1: Commands from tool selection (priority-based)
+        for suggestion in self.tool_selector.suggest(
+            services=self._detected_services,
+            findings=[f.to_dict() for f in self._findings],
+            target=self.target,
+        ):
+            if suggestion.tool_type == "kali" and suggestion.command:
+                exploit_commands.append(suggestion.command)
+
+        # Phase 2: Commands from relevant attack chains
         for service in detected_services:
             for chain_name in chain_mapping.get(service, []):
                 chain = self.blueprint.get_attack_chain(chain_name)
                 if chain and isinstance(chain, list):
                     for step in chain:
-                        exploit_commands.append(step.replace("{target}", self.target))
+                        cmd = step.replace("{target}", self.target)
+                        if cmd not in exploit_commands:
+                            exploit_commands.append(cmd)
                 elif chain and isinstance(chain, dict):
                     for step in chain.get("steps", []):
-                        exploit_commands.append(step.replace("{target}", self.target))
+                        cmd = step.replace("{target}", self.target)
+                        if cmd not in exploit_commands:
+                            exploit_commands.append(cmd)
 
-        # Add service-specific exploitation commands
+        # Phase 3: Service-specific exploitation commands
         if "smb" in detected_services:
             exploit_commands.extend([
                 f"crackmapexec smb {self.target} -u 'guest' -p '' --shares 2>/dev/null | head -30 || echo 'smb enumeration done'",
@@ -496,7 +606,15 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
             response = await self._ask_llm(prompt)
             exploit_commands = self._extract_commands(response)
 
-        for cmd in exploit_commands[:8]:  # Limit to 8 exploitation commands
+        # Deduplicate and limit
+        seen: set = set()
+        unique_commands = []
+        for cmd in exploit_commands:
+            if cmd not in seen:
+                seen.add(cmd)
+                unique_commands.append(cmd)
+
+        for cmd in unique_commands[:10]:
             if not self._running:
                 break
             await self._execute_and_analyze(cmd, AgentPhase.EXPLOITATION)
@@ -746,6 +864,348 @@ Analysis:"""
 
         return await self._ask_llm(prompt)
 
+    # ── Service Detection ──────────────────────────────────────────────────
+
+    def _detect_services(self) -> None:
+        """Parse findings to detect running services and populate _detected_services."""
+        self._detected_services = {}
+
+        for action in self._actions:
+            if not action.result or not action.result.output:
+                continue
+
+            output = action.result.output.lower()
+
+            # Parse nmap-style output for open ports
+            import re
+
+            # Match patterns like "80/tcp open http" or "445/tcp open microsoft-ds"
+            port_pattern = r'(\d+)/(tcp|udp)\s+open\s+(\S+)'
+            for match in re.finditer(port_pattern, output):
+                port = int(match.group(1))
+                proto = match.group(2)
+                service = match.group(3).lower()
+
+                # Normalize service names
+                svc_map = {
+                    "http": "http", "https": "https", "http-proxy": "http",
+                    "microsoft-ds": "smb", "netbios-ssn": "smb", "smb": "smb",
+                    "ms-wbt-server": "rdp", "rdp": "rdp",
+                    "kerberos-sec": "kerberos", "kpasswd": "kerberos",
+                    "postgresql": "postgresql", "ms-sql-s": "mssql",
+                }
+                normalized = svc_map.get(service, service)
+
+                if normalized not in self._detected_services:
+                    self._detected_services[normalized] = []
+                if port not in self._detected_services[normalized]:
+                    self._detected_services[normalized].append(port)
+
+            # Parse nuclei/nmap JSON output for additional services
+            json_pattern = r'"port":\s*(\d+),\s*"protocol":\s*"([^"]+)"'
+            for match in re.finditer(json_pattern, output):
+                port = int(match.group(1))
+                proto = match.group(2)
+                normalized = proto.lower()
+                if normalized not in self._detected_services:
+                    self._detected_services[normalized] = []
+                if port not in self._detected_services[normalized]:
+                    self._detected_services[normalized].append(port)
+
+        # Also check existing findings for service indicators
+        for finding in self._findings:
+            if "Detected" in finding.title:
+                service = finding.title.split("Detected ")[1].split(" service")[0].lower()
+                if service not in self._detected_services:
+                    self._detected_services[service] = []
+                if finding.endpoint:
+                    try:
+                        self._detected_services[service].append(int(finding.endpoint))
+                    except ValueError:
+                        pass
+
+        if self._detected_services:
+            logger.info(f"Detected services: {self._detected_services}")
+
+    # ── API-Driven Integrations ────────────────────────────────────────────
+
+    async def _run_integrations(self) -> None:
+        """
+        Run API-driven tool integrations (Metasploit, Burp, SQLmap).
+        Uses tool selection intelligence to decide which integrations to fire.
+        """
+        # Detect services first
+        self._detect_services()
+
+        if not self._detected_services:
+            logger.info("No services detected; skipping API integrations")
+            return
+
+        # Get tool suggestions from intelligence engine
+        findings_dicts = [f.to_dict() for f in self._findings]
+        suggestions = self.tool_selector.suggest(
+            services=self._detected_services,
+            findings=findings_dicts,
+            target=self.target,
+        )
+
+        await self._emit("tool_suggestions", {
+            "suggestions": [s.to_dict() for s in suggestions[:10]],
+            "detected_services": self._detected_services,
+        })
+
+        # Execute integration in priority order
+        for suggestion in suggestions:
+            if not self._running:
+                break
+
+            tool_type = suggestion.tool_type
+
+            if tool_type == "metasploit" and self.msf_rpc:
+                await self._run_msf_integration(suggestion)
+            elif tool_type == "burp" and self.burp_api:
+                await self._run_burp_integration(suggestion)
+            elif tool_type == "sqlmap" and self.sqlmap_api:
+                await self._run_sqlmap_integration(suggestion)
+
+    async def _run_msf_integration(self, suggestion: Any) -> None:
+        """Run Metasploit integration based on tool suggestion."""
+        if not self.msf_rpc:
+            return
+
+        await self._emit("integration_started", {
+            "tool": "metasploit",
+            "reasoning": suggestion.reasoning,
+        })
+
+        # Authenticate
+        authed = await self.msf_rpc.login()
+        if not authed:
+            logger.warning("Metasploit RPC login failed; skipping MSF integration")
+            return
+
+        target = suggestion.params.get("target", self.target)
+
+        # Determine which MSF modules to run based on detected services
+        msf_tasks = []
+
+        if "smb" in self._detected_services:
+            msf_tasks = [
+                ("auxiliary/scanner/smb/smb_version", {"RHOSTS": target}),
+                ("auxiliary/scanner/smb/smb_ms17_010", {"RHOSTS": target}),
+                ("auxiliary/scanner/smb/pipe_auditor", {"RHOSTS": target}),
+            ]
+        elif "http" in self._detected_services or "https" in self._detected_services:
+            msf_tasks = [
+                ("auxiliary/scanner/http/http_version", {"RHOSTS": target}),
+                ("auxiliary/scanner/http/title", {"RHOSTS": target}),
+            ]
+        elif "ssh" in self._detected_services:
+            msf_tasks = [
+                ("auxiliary/scanner/ssh/ssh_version", {"RHOSTS": target}),
+            ]
+
+        for module, options in msf_tasks:
+            if not self._running:
+                break
+            result = await self.msf_rpc.execute_module(
+                module=module,
+                options=options,
+                timeout=60,
+            )
+            self._msf_results.append(result.to_dict())
+            await self._emit("integration_result", {
+                "tool": "metasploit",
+                "module": module,
+                "status": result.status,
+                "findings": result.findings,
+            })
+
+        if self._msf_results:
+            logger.info(f"MSF integration: {len(self._msf_results)} module results")
+
+    async def _run_burp_integration(self, suggestion: Any) -> None:
+        """Run Burp Suite integration based on tool suggestion."""
+        if not self.burp_api:
+            return
+
+        await self._emit("integration_started", {
+            "tool": "burp",
+            "reasoning": suggestion.reasoning,
+        })
+
+        health = await self.burp_api.check_health()
+        if not health:
+            logger.warning("Burp API not accessible; skipping Burp integration")
+            return
+
+        # Determine target URLs
+        urls = []
+        if "http" in self._detected_services or "https" in self._detected_services:
+            scheme = "https" if "https" in self._detected_services else "http"
+            for port in self._detected_services.get("http", []) + self._detected_services.get("https", []):
+                urls.append(f"{scheme}://{self.target}:{port}")
+        if not urls:
+            urls = [f"http://{self.target}"]
+        if not urls:
+            urls = [f"http://{self.target}"]
+
+        # Start scans
+        for url in urls[:2]:  # Limit to 2 URLs
+            if not self._running:
+                break
+            job = await self.burp_api.start_scan(url)
+            if job.status != "failed":
+                await self._emit("integration_result", {
+                    "tool": "burp",
+                    "scan_id": job.scan_id,
+                    "url": url,
+                    "status": job.status,
+                })
+
+        # Collect existing issues
+        self._burp_issues = await self.burp_api.get_issues()
+        if self._burp_issues:
+            logger.info(f"Burp integration: {len(self._burp_issues)} issues collected")
+
+            # Create findings from Burp issues
+            for issue in self._burp_issues[:10]:
+                finding = Finding(
+                    title=f"Burp: {issue.name}",
+                    severity=issue.severity,
+                    description=issue.description[:500],
+                    evidence=issue.evidence[:500],
+                    endpoint=issue.url,
+                    remediation=issue.remediation[:500],
+                    tool_used="burp",
+                )
+                self._findings.append(finding)
+
+    async def _run_sqlmap_integration(self, suggestion: Any) -> None:
+        """Run SQLmap integration based on tool suggestion."""
+        if not self.sqlmap_api:
+            return
+
+        await self._emit("integration_started", {
+            "tool": "sqlmap",
+            "reasoning": suggestion.reasoning,
+        })
+
+        # Determine target URL
+        url = suggestion.params.get("url", f"http://{self.target}")
+
+        # Create and start SQLmap task
+        task = await self.sqlmap_api.new_task(url)
+        if task.status == "failed":
+            logger.warning("SQLmap task creation failed")
+            return
+
+        # Wait for completion (with timeout)
+        task = await self.sqlmap_api.wait_for_completion(
+            task.task_id, max_time=120
+        )
+
+        if task.is_complete:
+            self._sqlmap_results.append(task.to_dict())
+
+            # Create findings from SQLmap results
+            for finding in task.findings:
+                f = Finding(
+                    title=f"SQL Injection: {finding.title}",
+                    severity="high",
+                    description=f"Parameter '{finding.parameter}' is injectable via {finding.technique}",
+                    evidence=f"Payload: {finding.payload[:300]}",
+                    endpoint=url,
+                    remediation="Use parameterized queries and input validation",
+                    tool_used="sqlmap",
+                )
+                self._findings.append(f)
+
+            await self._emit("integration_result", {
+                "tool": "sqlmap",
+                "task_id": task.task_id,
+                "status": task.status,
+                "findings_count": len(task.findings),
+                "dbms": task.dbms,
+            })
+
+            logger.info(f"SQLmap integration: {len(task.findings)} injection points found")
+
+    # ── Tool Selection Intelligence ────────────────────────────────────────
+
+    async def _generate_strategy(self) -> Dict[str, Any]:
+        """Generate exploitation strategy using tool-selection intelligence."""
+        if not self._detected_services:
+            self._detect_services()
+
+        findings_dicts = [f.to_dict() for f in self._findings]
+        strategy = self.tool_selector.decide_exploit_strategy(
+            services=self._detected_services,
+            findings=findings_dicts,
+        )
+
+        await self._emit("strategy_updated", strategy)
+        return strategy
+
+    # ── Cross-Tool Correlation ─────────────────────────────────────────────
+
+    async def _run_correlation(self) -> None:
+        """
+        Correlate findings across all tool sources.
+
+        Combines results from:
+        - Nmap (from action results via NmapParser)
+        - Burp Suite (from integration phase)
+        - Metasploit (from integration phase)
+        - SQLmap (from integration phase)
+        - Built-in findings (heuristic/LM-based)
+        """
+        # Parse nmap XML output from action results
+        nmap_data = None
+        for action in self._actions:
+            if action.command and "nmap" in action.command.lower() and action.result:
+                if "-oX" in action.command or "-oA" in action.command:
+                    # Try to parse as XML
+                    parsed = self.nmap_parser.parse(action.result.output)
+                    if parsed.hosts:
+                        nmap_data = parsed.to_dict()
+                        break
+                else:
+                    # Try parsing output directly
+                    parsed = self.nmap_parser.parse(action.result.output)
+                    if parsed.hosts:
+                        nmap_data = parsed.to_dict()
+                        break
+
+        # Run correlation
+        findings_dicts = [f.to_dict() for f in self._findings]
+
+        self._correlation_result = await self.correlator.correlate(
+            nmap_data=nmap_data,
+            burp_issues=self._burp_issues,
+            msf_results=self._msf_results,
+            sqlmap_tasks=self._sqlmap_results,
+            findings=findings_dicts,
+        )
+
+        # Boost findings that were correlated
+        for cf in self._correlation_result.correlated_findings:
+            if cf.source_count >= 2:
+                # Only create high/critical correlated findings
+                if cf.severity in ("critical", "high"):
+                    finding = Finding(
+                        title=cf.title,
+                        severity=cf.severity,
+                        description=cf.description[:500],
+                        evidence=cf.evidence[:500],
+                        endpoint=cf.endpoint,
+                        remediation=cf.remediation,
+                        tool_used="+".join(cf.source_tools),
+                    )
+                    self._findings.append(finding)
+
+        await self._emit("correlation_complete", self._correlation_result.to_dict())
+
     # ── Finding Detection ───────────────────────────────────────────────────
 
     async def _check_for_findings(self, action: AgentAction) -> None:
@@ -813,13 +1273,46 @@ Reflection:"""
     # ── Reporting ───────────────────────────────────────────────────────────
 
     async def _generate_report(self) -> str:
-        """Generate a final report."""
+        """Generate a final report with correlation data."""
+        correlation_section = ""
+        if self._correlation_result:
+            cr = self._correlation_result
+            correlation_section = f"""
+Cross-Tool Correlation:
+- Correlated findings: {cr.total_correlated}
+- Critical: {len(cr.critical_findings)}
+- High: {len(cr.high_findings)}
+- Tools used: {', '.join(f'{k}({v})' for k, v in cr.tool_coverage.items()) if cr.tool_coverage else 'None'}
+- Confidence score: {cr.to_dict().get('confidence_score', 0)}
+
+Top Correlated Findings:
+{chr(10).join(f'  [{f.severity.upper()}] {f.title} (sources: {", ".join(f.source_tools)})' for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}
+
+Insights:
+{chr(10).join(f'  - {i}' for i in cr.cross_tool_insights) if cr.cross_tool_insights else '  No insights generated'}
+"""
+
+        integration_section = ""
+        if self._msf_results or self._burp_issues or self._sqlmap_results:
+            integration_section = """
+API Integration Results:
+"""
+            if self._msf_results:
+                integration_section += f"- Metasploit: {len(self._msf_results)} modules executed\n"
+            if self._burp_issues:
+                integration_section += f"- Burp Suite: {len(self._burp_issues)} issues found\n"
+            if self._sqlmap_results:
+                injection_count = sum(len(r.get("findings", [])) for r in self._sqlmap_results)
+                integration_section += f"- SQLmap: {injection_count} injection points found\n"
+
         prompt = f"""Generate a professional security assessment report for {self.target}.
 
 Objective: {self.objective}
 Steps taken: {self._step}
 Findings: {len(self._findings)}
-
+Detected services: {json.dumps(self._detected_services) if self._detected_services else 'None detected'}
+{integration_section}
+{correlation_section}
 Findings detail:
 {json.dumps([f.to_dict() for f in self._findings], indent=2) if self._findings else 'No findings discovered'}
 
@@ -830,7 +1323,8 @@ Generate a report with:
 1. Executive Summary
 2. Methodology
 3. Findings (with severity and recommendations)
-4. Conclusion
+4. Correlation Summary (cross-tool findings)
+5. Conclusion
 
 Report:"""
 
