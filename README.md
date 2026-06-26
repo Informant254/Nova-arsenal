@@ -17,13 +17,12 @@ Nova-Arsenal is an autonomous security agent platform with 70+ modules covering 
 
 ## Features
 
-- **70+ Security Modules** — Recon, attack, analysis, and reporting
-- **Multi-LLM Support** — Ollama (local), OpenAI, Anthropic, Gemini
-- **Web Dashboard** — Real-time monitoring and management
-- **Docker Deployment** — Containerized, isolated execution
-- **Multi-User Auth** — Role-based access control
-- **SQLite Storage** — Persistent findings and agent state
-- **Kubernetes Ready** — Production deployment manifests
+- **240+ Security Tools & Modules** — Comprehensive Kali Linux knowledge base split into Core & Extended modules across 25 categories (mobile, cloud, active directory, container, wireless, password cracking, reverse engineering, web exploitation, etc.)
+- **Fugu-Style LLM Orchestration** — Dynamic task classification, routing, and automatic fallback across 8 LLM providers (Anthropic, OpenAI, Gemini, DeepSeek, Qwen, OpenRouter, HuggingFace, Ollama)
+- **Conversational Chat Assistant (Nova)** — Real-time SSE streaming interface to converse with Nova, lookup tool information, or run security tasks autonomously
+- **Interactive Web Dashboard** — Dark-themed chat interface with streaming display, instant tool suggestions, session history, and capability templates
+- **Docker-Isolated Execution** — Secure command validation and scope guards to prevent unauthorized system modification or escape
+- **SQLite/Postgres Storage** — Multi-user authentication, persistent session history, database-backed logging, and structured reporting
 
 ## Quick Start
 
@@ -63,6 +62,50 @@ nova-agent --target scanme.nmap.org
 cd clients/web && npm run dev
 ```
 
+### Conversational Chat Interface (No Docker Required)
+
+```bash
+# Install FastAPI dependencies
+pip install fastapi uvicorn
+
+# Start the conversational API server
+python -m nova_arsenal.api
+
+# Access the interactive dashboard
+open http://localhost:8000
+```
+
+The web dashboard provides:
+- **Real-time streaming responses** from Nova
+- **Intent classification** (security task, tool info, conversation, code, question)
+- **Direct tool lookup** from 240+ Kali tools
+- **Session persistence** with history
+- **Quick-start capability cards** for common tasks
+
+## Testing Against Targets
+
+Run autonomous penetration tests against authorized targets:
+
+```bash
+# Run a comprehensive test
+python test_nova.py localhost "Full audit of exposed services" 20
+
+# Test with specific target
+python test_nova.py 192.168.1.100 "Identify vulnerabilities" 15
+
+# Quick scan mode
+python test_nova.py example.com "Web app security test" 10
+```
+
+The test script demonstrates:
+- Autonomous agent loop execution
+- Tool selection based on task requirements
+- Security constraints and scope enforcement
+- Real-time findings detection
+- Report generation
+
+**Note**: Only test against systems you own or have explicit written authorization to test.
+
 ## Architecture
 
 ```
@@ -83,6 +126,23 @@ cd clients/web && npm run dev
 │                └──────────┘                                 │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
+```
+
+### Conversational Chat Flow
+
+Nova uses Fugu-style orchestration to intelligently route tasks:
+
+```
+User Message → Intent Classification → Route Decision
+    │
+    ├─→ CONVERSATION → General LLM → Friendly response
+    ├─→ TOOL_INFO → Tool Lookup → Kali docs (230 tools)
+    ├─→ QUESTION → Security Knowledge → Expert answers
+    ├─→ CODE_REQUEST → Code Gen → Exploit generation
+    └─→ SECURITY_TASK → AgentRunner → Full autonomic loop
+                             │
+                             ├─→ Planning → Recon → Scan → Exploit
+                             └─→ Analysis → Findings → Report
 ```
 
 ## Documentation

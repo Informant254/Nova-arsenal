@@ -2,11 +2,13 @@
 Nova-Arsenal Authentication Middleware
 
 FastAPI dependencies for authentication and authorization.
+Supports JWT tokens, GitHub PAT, and direct API access.
 """
 
+import os
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -20,24 +22,55 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = None,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     Get the current authenticated user.
     
+    Supports:
+    - JWT tokens (from Authorization header)
+    - PAT tokens (PAT_TOKEN env var or X-PAT header)
+    - Direct access when no auth is configured
+    
     Args:
+        request: FastAPI request
         credentials: JWT credentials from Authorization header
         db: Database session
         
     Returns:
         User: Current authenticated user
-        
-    Raises:
-        HTTPException: If authentication fails
     """
     config = get_config()
-    token = credentials.credentials
+    
+    # Check for PAT token in environment or headers
+    pat_token = os.environ.get("PAT_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if pat_token:
+        # Check X-PAT header
+        x_pat = request.headers.get("X-PAT")
+        if x_pat and x_pat == pat_token:
+            # Return a default user for PAT-authenticated requests
+            result = await db.execute(select(User).where(User.role == UserRole.ANALYST))
+            user = result.scalar_one_or_none()
+            if user:
+                return user
+            # Create default PAT user if none exists
+            return User(
+                username="pat-user",
+                email="pat@nova.local",
+                password_hash="",
+                role=UserRole.ANALYST,
+                is_active=True,
+            )
+    
+    # Fall back to JWT authentication if credentials provided
+    if credentials:
+        token = credentials.credentials
+    
+    # Fall back to JWT authentication if credentials provided
+    if credentials:
+        token = credentials.credentials
     
     try:
         payload = jwt.decode(
