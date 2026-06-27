@@ -45,6 +45,17 @@ Nova-Arsenal is an autonomous security agent platform with **native API integrat
 - **DeepSeek Sparse Attention (DSA) Compressor** — Content compression for long security tool outputs (nmap, burp, sqlmap) using compressed latent projection, deterministic top-k segment selection (k=2048), and HCA-style windowing
 - **Muon Optimizer** — Newton-Schulz matrix orthogonalization for 2D weight matrices with automatic AdamW fallback for biases/norms/embeddings; drop-in `torch.optim.Optimizer` for fine-tuning
 - **mHC Architecture Reference** — Manifold-Constrained Hyper-Connections (nhc=4, Sinkhorn-Knopp tmax=20) and Anticipatory Routing for MoE load balancing, extracted from DeepSeek V4 Pro
+- **Safe Exploitation Engine** — Pentera-inspired controlled exploitation with guardrails (damage limits, blocked targets, stealth modes, rollback support, emergency stop). Every action validated, logged, and reversible before execution
+- **Autonomous Attack Chaining** — NodeZero-inspired attack graph builder with BFS path discovery, prerequisite resolution, autonomous execution with timeout, credential harvesting per chain, and pivot detection
+- **Multi-Agent Coordinator** — XBOW-inspired architecture: thousands of parallel agents (Scout, Exploiter, Validator, Chainer, Reporter) with semaphore-bounded concurrency, structured reasoning traces, and real-time global state view
+- **Deterministic Validation Engine** — XBOW-inspired zero-false-positive validation: every finding must be proven exploitable via 9 validation methods (exploit confirmed, response analyzed, vuln exists, credential validated, privilege escalated, persistence verified, etc.)
+- **Emergency Stop & Safety Controls** — Pentera-inspired safety controller with risk-level gating, target blocklists, approval workflows for high-risk operations, concurrent operation limits, and full audit trail
+- **MITRE ATT&CK Mapping** — 30+ technique database with automatic behavior-to-technique mapping, kill chain construction, coverage analysis, and compliance reporting
+- **Advanced Credential Harvesting** — NodeZero-inspired credential access: SAM dumps, Kerberoasting, AS-REP Roasting, DPAPI extraction, GPP passwords, unattended install files, memory dumps. LLM-powered risk analysis and password complexity assessment
+- **Safe Ransomware Emulation** — Full ransomware kill chain simulation (reconnaissance → encryption → ransom note) without actual destruction. Hash-based encryption simulation, shadow copy enumeration, backup discovery
+- **Fix Verification & Retesting** — NodeZero-inspired 1-click retesting: replay original exploit steps to confirm remediation, track fix confidence, detect regressions across verification history
+- **Incremental Testing Engine** — XBOW-inspired delta-only testing: compare versions, detect changes, generate focused test plans covering only modified components. Impact scoring, technique inference, priority matrix
+- **Real-time Finding Streaming** — XBOW-inspired live updates: stream findings, agent reasoning traces, chain progress, and status updates to connected clients via WebSocket/SSE with filtering and heartbeat
 
 ## Quick Start
 
