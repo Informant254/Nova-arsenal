@@ -1,7 +1,5 @@
 {
   "name": "Ollama Dev",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-  "features": {
-    "ghcr.io/prulloac/devcontainer-features/ollama:1": {}
-  }
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "postCreateCommand": "curl -fsSL https://ollama.com/install.sh | sh"
 }
