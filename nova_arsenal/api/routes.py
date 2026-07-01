@@ -27,8 +27,13 @@ from nova_arsenal.db.models import Agent, AgentStatus, Finding, Scope, User
 
 router = APIRouter(prefix="/api")
 
+# Skills marketplace — platform connectors (HackerOne, HackTheBox, ...)
+# and Nova's target-recommendation reasoning endpoint.
+from nova_arsenal.skills.api_routes import router as skills_router  # noqa: E402
+router.include_router(skills_router)
 
-# ── Request/Response Models ────────────────────────────────────────────────
+
+# ââ Request/Response Models ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 class RunAgentRequest(BaseModel):
     target: str
@@ -42,7 +47,7 @@ class StepAgentRequest(BaseModel):
     instruction: str = ""
 
 
-# ── Active agent runner instances (live objects not persisted) ────────────
+# ââ Active agent runner instances (live objects not persisted) ââââââââââââ
 
 _active_runners: dict = {}  # agent_id -> AgentRunner instance (lazy import)
 
@@ -360,7 +365,7 @@ async def remove_scope(
     return {"message": "Target removed from scope"}
 
 
-# ── Autonomous Agent Runner Endpoints ──────────────────────────────────────
+# ââ Autonomous Agent Runner Endpoints ââââââââââââââââââââââââââââââââââââââ
 
 @router.post("/agents/{agent_id}/run", status_code=status.HTTP_202_ACCEPTED)
 async def run_agent(
@@ -675,7 +680,7 @@ async def generate_code(
     }
 
 
-# ── MCP Server Routes ──────────────────────────────────────────────────────
+# ââ MCP Server Routes ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.get("/mcp/tools")
 async def mcp_tools():
@@ -708,7 +713,7 @@ async def mcp_call_tool(
     return {"result": result}
 
 
-# ── E2E Encryption Routes ──────────────────────────────────────────────────
+# ââ E2E Encryption Routes ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.post("/crypto/keypair")
 async def generate_keypair(
@@ -767,7 +772,7 @@ async def decrypt_message(
     return {"plaintext": plaintext}
 
 
-# ── CTF Solver Routes ──────────────────────────────────────────────────────
+# ââ CTF Solver Routes ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.post("/ctf/solve")
 async def ctf_solve(
