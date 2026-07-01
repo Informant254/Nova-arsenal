@@ -1,0 +1,13 @@
+{
+  "name": "hackerone-connector",
+  "version": "1.0.0",
+  "author": "Informant254",
+  "description": "Pulls public bug bounty programs and scope from HackerOne for Nova to reason about.",
+  "type": "platform_connector",
+  "entry": "connector.py",
+  "entry_class": "HackerOneConnector",
+  "requires_credentials": ["api_username", "api_token"],
+  "python_requires": ["httpx>=0.27"],
+  "tags": ["bug-bounty", "hackerone"],
+  "nova_min_version": "1.0.0"
+}
