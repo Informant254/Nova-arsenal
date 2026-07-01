@@ -12,9 +12,9 @@ Exposes the skills marketplace through Nova's existing FastAPI app:
 This is the piece that answers: "ask Nova to look up the most
 interesting domain to handle and she reasons her way around it."
 
-Wire this into nova_arsenal/api/routes.py with:
-    from nova_arsenal.skills.api_routes import router as skills_router
-    app.include_router(skills_router)
+Mounted from nova_arsenal/api/routes.py, whose top-level router already
+carries prefix="/api" — so this router intentionally has NO prefix of its
+own to avoid a doubled /api/api/... path.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from .skill_manifest import SkillRegistry
 from .platform_connector import PlatformConnector, Target, TargetReasoner
 
 
-router = APIRouter(prefix="/api", tags=["skills"])
+router = APIRouter(tags=["skills"])
 
 # Single process-wide registry — discovered once at startup, credentials
 # can be supplied later via the /skills/{name}/credentials endpoint.
