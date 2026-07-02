@@ -32,6 +32,11 @@ router = APIRouter(prefix="/api")
 from nova_arsenal.skills.api_routes import router as skills_router  # noqa: E402
 router.include_router(skills_router)
 
+# Persistent per-user memory (recap, target history, preferences) and
+# the self-authoring skill review workflow (approve/reject).
+from nova_arsenal.skills.memory_api_routes import router as memory_router  # noqa: E402
+router.include_router(memory_router)
+
 
 # ââ Request/Response Models ââââââââââââââââââââââââââââââââââââââââââââââââ
 
