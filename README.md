@@ -9,33 +9,82 @@
 
 **Autonomous Security Research Platform**
 
-Nova-Arsenal is an autonomous security agent platform with 240+ modules covering reconnaissance, exploitation, analysis, and reporting. Features a multi-agent swarm architecture, self-training RL pipeline, native Burp Suite + Metasploit RPC integration, a skills marketplace with platform connectors for HackerOne, Bugcrowd, HackTheBox, and TryHackMe, and persistent per-user memory so you never lose track of what you were working on.
+Nova-Arsenal is an autonomous security agent platform with 240+ modules covering reconnaissance, exploitation, analysis, and reporting. Features a multi-agent swarm architecture, self-training RL pipeline, and built-in resilience patterns for production-grade autonomous operation.
 
-> â ï¸ **Ethical Use Only** â Nova-Arsenal is built for authorized security research and bug bounty engagements. Only run against targets you have explicit written permission to test. See [SECURITY.md](SECURITY.md) for responsible disclosure policy.
+> ⚠️ **Ethical Use Only** – Nova-Arsenal is built for authorized security research and bug bounty engagements. Only run against targets you have explicit written permission to test.
 
 ---
 
 ## Features
 
-- **240+ Security Modules** â Kali Linux knowledge base across 25 categories (recon, exploitation, cloud, AD, wireless, mobile, web, OSINT, etc.)
-- **Multi-Agent Swarm** â Parallel Scout, Exploiter, Validator, and Reporter agents with weighted consensus findings
-- **Fugu-Style LLM Orchestration** â Dynamic routing across 10 providers (Anthropic, OpenAI, Gemini, DeepSeek, Qwen, OpenRouter, Ollama, HuggingFace, Opencode) with automatic fallback
-- **Native Tool Integrations** â Programmatic control of Metasploit (msfrpcd REST), Burp Suite (REST API + GraphQL), SQLmap (API mode), and Nmap (XML parsing)
-- **Skills Marketplace** â Installable platform connectors; Nova can also self-author new skills after novel tasks, pending human review before they go live
-- **Platform Connectors** â HackerOne, Bugcrowd, HackTheBox, TryHackMe; Nova reasons across all connected platforms to recommend which target is worth her time
-- **Persistent Memory** â Per-user SQLite memory: task log, target history, findings, preferences â the "what were we working on?" answer at the start of every session
-- **Self-Training RL Pipeline** â GRPO-based training on Nova's own pentest trajectories; Muon optimizer; cross-stage knowledge distillation
-- **Tool-Selection Intelligence** â Rule engine maps discovered services to optimal tools automatically (Port 445 â Metasploit SMB modules, web app â Burp + nuclei, etc.)
-- **Cross-Tool Result Correlation** â Findings from Nmap + Burp + Metasploit + SQLmap are correlated; multi-source confirmed vulnerabilities get boosted confidence scores
-- **Fix Verification** â 1-click retest to confirm a vulnerability was actually remediated
-- **Incremental Testing** â Only retests what changed between versions
-- **CTF Solver Mode** â Automatic challenge classification and solve pipelines (web, crypto, stego, pwn, OSINT, forensics, reversing)
-- **MCP Server Export** â Nova exposes her tools via JSON-RPC so Cursor, Claude, and any MCP-compatible agent can use her as a plugin
-- **VS Code Extension** â 6 commands, webview chat panel, streaming responses, one-click run
-- **Web Dashboard** â Dark-themed Next.js UI with real-time agent chat, target management, findings review, and skills approval queue
-- **E2E Encryption** â RSA-4096 + AES-256-GCM for agent communications
+- **240+ Security Modules** – Kali Linux knowledge base across 25 categories (recon, exploitation, cloud, AD, wireless, mobile, web, OSINT, etc.)
+- **Multi-Agent Swarm** – Parallel Scout, Exploiter, Validator, and Reporter agents with weighted consensus findings
+- **Fugu-Style LLM Orchestration** – Dynamic routing across 10 providers (Anthropic, OpenAI, Gemini, DeepSeek, Qwen, OpenRouter, Ollama, HuggingFace, Opencode) with automatic fallback
+- **Native Tool Integrations** – Programmatic control of Metasploit (msfrpcd REST), Burp Suite (REST API + GraphQL), SQLmap (API mode), and Nmap (XML parsing)
+- **Skills Marketplace** – Installable platform connectors; Nova can also self-author new skills after novel tasks, pending human review before they go live
+- **Platform Connectors** – HackerOne, Bugcrowd, HackTheBox, TryHackMe; Nova reasons across all connected platforms to recommend which target is worth her time
+- **Persistent Memory** – Per-user SQLite memory: task log, target history, findings, preferences – the "what were we working on?" answer at the start of every session
+- **Self-Training RL Pipeline** – GRPO-based training on Nova's own pentest trajectories; Muon optimizer; cross-stage knowledge distillation
+- **Tool-Selection Intelligence** – Rule engine maps discovered services to optimal tools automatically (Port 445 → Metasploit SMB modules, web app → Burp + nuclei, etc.)
+- **Cross-Tool Result Correlation** – Findings from Nmap + Burp + Metasploit + SQLmap are correlated; multi-source confirmed vulnerabilities get boosted confidence scores
+- **Fix Verification** – 1-click retest to confirm a vulnerability was actually remediated
+- **Incremental Testing** – Only retests what changed between versions
+- **CTF Solver Mode** – Automatic challenge classification and solve pipelines (web, crypto, stego, pwn, OSINT, forensics, reversing)
+- **MCP Server Export** – Nova exposes her tools via JSON-RPC so Cursor, Claude, and any MCP-compatible agent can use her as a plugin
+- **VS Code Extension** – 6 commands, webview chat panel, streaming responses, one-click run
+- **Web Dashboard** – Dark-themed Next.js UI with real-time agent chat, target management, findings review, and skills approval queue
+- **E2E Encryption** – RSA-4096 + AES-256-GCM for agent communications
+- **🔄 Production Resilience** – Async timeouts, circuit breakers, retry budgets, and resource limits prevent agent hangs and cascading failures
 
 📖 **[See the full feature reference →](docs/FEATURES.md)** — deep-dive config snippets and internals for every module above.
+
+---
+
+## Resilience & Production Hardening
+
+Nova-Arsenal v1.1+ includes enterprise-grade resilience patterns:
+
+### Async Timeout Guards
+- All async operations protected with configurable timeouts
+- Prevents hung LLM calls or tool invocations from blocking the agent loop
+- Default: 120s per step, 600s total execution
+
+```python
+from nova_arsenal.resilient_agent_core import ResilientNovaAgent, ResilientAgentConfig
+
+config = ResilientAgentConfig(
+    step_timeout=120.0,        # Timeout per action
+    total_timeout=600.0,       # 10-minute maximum execution
+    max_concurrent_tasks=5,    # Prevent task explosion
+    max_tool_calls_per_step=10, # Rate limit tool usage
+)
+
+agent = ResilientNovaAgent(
+    target="example.com",
+    config=config,
+)
+```
+
+### Circuit Breaker
+- Stops cascading failures if external services (LLM, Metasploit, Burp) fail repeatedly
+- Automatic recovery with exponential backoff
+- Rejects requests immediately when circuit is OPEN
+
+### Retry Logic
+- Exponential backoff for transient errors
+- Configurable retry budget (default: 3 retries)
+- Jitter to prevent thundering herd
+
+### Resource Limits
+- Concurrent task limits (prevents task explosion)
+- Tool call budgets (rate limiting)
+- Execution time caps (prevents infinite loops)
+- Bounded error logs (prevents memory leaks)
+
+### Graceful Degradation
+- Partial results returned on timeout
+- Error tracking for debugging
+- Resource usage telemetry in summaries
 
 ---
 
@@ -50,7 +99,7 @@ Nova-Arsenal is an autonomous security agent platform with 240+ modules covering
 | Node.js (web dashboard only) | 20+ |
 | Git | 2.x+ |
 
-### Option 1 â Docker (Recommended)
+### Option 1 – Docker (Recommended)
 
 The fastest path. Spins up the API, web dashboard, Ollama (local LLM), and a Kali sandbox container in one command.
 
@@ -61,7 +110,7 @@ cd Nova-arsenal
 
 # 2. Configure environment
 cp config/.env.example .env
-# Edit .env â set your LLM provider keys, JWT secret, and any platform API tokens
+# Edit .env – set your LLM provider keys, JWT secret, and any platform API tokens
 
 # 3. Start all services
 docker compose up -d
@@ -83,7 +132,7 @@ To run Nova from the CLI inside Docker:
 docker compose exec agent nova-agent --target scanme.nmap.org
 ```
 
-### Option 2 â Local Development
+### Option 2 – Local Development
 
 Use this if you want to edit Nova's code or run the RL training pipeline locally.
 
@@ -109,7 +158,7 @@ cp config/.env.example .env
 # 6. Run database migrations
 alembic upgrade head
 
-# 7. Start Ollama (local LLM â no API key needed)
+# 7. Start Ollama (local LLM – no API key needed)
 ollama pull qwen3:1.7b            # smallest, good for 4GB RAM
 # ollama pull deepseek-r1         # better reasoning, needs 8GB+ RAM
 
@@ -125,7 +174,7 @@ cd clients/web && npm run dev
 # API docs:  http://localhost:8000/docs
 ```
 
-### Option 3 â Kali Linux / NetHunter
+### Option 3 – Kali Linux / NetHunter
 
 Tested on both desktop Kali and Kali NetHunter (Android). The Kali container gives Nova access to the full Kali toolset natively.
 
@@ -146,12 +195,12 @@ export LLM_MODEL=qwen3:1.7b
 python -m nova_arsenal.api
 ```
 
-### Option 4 â GitHub Codespaces
+### Option 4 – GitHub Codespaces
 
 Zero local setup. Works in a browser.
 
 1. Go to `github.com/Informant254/Nova-arsenal`
-2. Click **Code â Codespaces â Create codespace on main**
+2. Click **Code → Codespaces → Create codespace on main**
 3. In the terminal:
 
 ```bash
@@ -172,7 +221,7 @@ All configuration lives in `.env` (copied from `config/.env.example`).
 
 ### LLM Providers
 
-Nova supports 10 LLM providers with automatic fallback. Configure as many or as few as you want â she'll use whatever's available.
+Nova supports 10 LLM providers with automatic fallback. Configure as many or as few as you want – she'll use whatever's available.
 
 ```yaml
 # config/settings.yaml
@@ -224,40 +273,77 @@ curl http://localhost:8000/api/memory/recap?days=7 \
 
 ---
 
+## Testing
+
+Nova-Arsenal includes comprehensive test coverage (80%+) for unit, integration, and stress scenarios:
+
+```bash
+# Run all tests with coverage
+make test
+
+# Run unit tests only
+make test-unit
+
+# Run integration tests
+make test-integration
+
+# Run quality gates (lint + test)
+make quality
+
+# Tests cover:
+# - Agent state management and step tracking
+# - Async timeouts and circuit breaker patterns
+# - Retry logic with exponential backoff
+# - Resource limit enforcement
+# - Swarm coordination under stress
+# - Error accumulation and recovery
+```
+
+---
+
 ## Architecture
 
 ```
-âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-â                        Nova-Arsenal                             â
-ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
-â                                                                 â
-â  âââââââââââââââââââââââââââââââââââââââââ
-â  â   Web    â    â  Agent Core  â    â   LLM Router       â    â
-â  âDashboard âââââ¶â  + Swarm     âââââ¶â (10 providers,     â    â
-â  â (Next.js)â    â  Coordinator â    â  multi + fallback) â    â
-â  âââââââââââââââ    âââââââ¬âââââââââââ    ââââââââââââââââââââââââ    â
-â                         â                                       â
-â              ââââââââââââ¼âââââââââââ                           â
-â              â¼          â¼          â¼                           â
-â         âââââââââââ âââââââââ ââââââââââââ                    â
-â         â  Kali   â â  Tool â â Platform â                    â
-â         â Sandbox â â Intel â â Connectorsâ                   â
-â         â(Docker) â â(Burp/ â â(H1/BC/   â                   â
-â         â         â â MSF)  â â HTB/THM) â                   â
-â         âââââââââââ âââââââââ ââââââââââââ                    â
-â                                                                 â
-â         âââââââââââââââââââââââââââââââââââââââ            â
-â         â  Skills Marketplace                      â            â
-â         â  skills/ (installed) + pending_skills/   â            â
-â         â  (self-authored, awaiting review)         â            â
-â         âââââââââââââââââââââââââââââââââââââââ            â
-â                                                                 â
-â         âââââââââââââââââââââââââââââââââââââââ            â
-â         â  Session Memory (SQLite, per-user)       â            â
-â         â  task_log | target_history | findings    â            â
-â         â  preferences | recap                     â            â
-â         âââââââââââââââââââââââââââââââââââââââ            â
-âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+─────────────────────────────────────────────────────────────
+│                        Nova-Arsenal                       │
+─────────────────────────────────────────────────────────────
+│                                                           │
+│  ───────────────────────────────────────────────────     │
+│  │   Web    │    │  Agent Core  │    │   LLM Router  │    │
+│  │Dashboard │────│  + Swarm     │────│ (10 providers, │    │
+│  │(Next.js) │    │Coordinator  │    │multi + fallback)   │
+│  ────────────    ──────┬──────────    ─────────────────    │
+│                        │                                  │
+│             ──────────┼──────────────                    │
+│             ▼          ▼          ▼                       │
+│        ──────────  ──────────  ──────────                │
+│        │  Kali   │ │  Tool  │ │Platform │               │
+│        │ Sandbox │ │ Intel  │ │Connectors              │
+│        │(Docker) │ │(Burp/  │ │(H1/BC/  │               │
+│        │         │ │ MSF)   │ │ HTB/THM)                │
+│        ──────────  ──────────  ──────────                │
+│                                                           │
+│        ──────────────────────────────────────             │
+│        │  Skills Marketplace                  │          │
+│        │  skills/ (installed) + pending_skills│          │
+│        │  (self-authored, awaiting review)    │          │
+│        ──────────────────────────────────────             │
+│                                                           │
+│        ──────────────────────────────────────             │
+│        │  Session Memory (SQLite, per-user)  │          │
+│        │  task_log | target_history | findings          │
+│        │  preferences | recap                 │          │
+│        ──────────────────────────────────────             │
+│                                                           │
+│        ═══════════════════════════════════════            │
+│        ║  Resilience Layer (NEW)                ║         │
+│        ║  • Async Timeouts (prevent hangs)     ║         │
+│        ║  • Circuit Breaker (fail gracefully)  ║         │
+│        ║  • Retry Logic (exponential backoff)  ║         │
+│        ║  • Resource Limits (prevent explosion)║         │
+│        ═══════════════════════════════════════            │
+│                                                           │
+─────────────────────────────────────────────────────────────
 ```
 
 ---
@@ -273,7 +359,7 @@ Once Nova is running, full interactive docs are at `http://localhost:8000/docs`.
 | `GET /api/targets` | All available targets from connected platform connectors |
 | `GET /api/skills` | List installed skills and their credential status |
 | `POST /api/skills/{name}/credentials` | Connect a platform (HackerOne, HTB, etc.) |
-| `GET /api/memory/recap?days=7` | "What were we working on?" â task + target + findings summary |
+| `GET /api/memory/recap?days=7` | "What were we working on?" – task + target + findings summary |
 | `GET /api/memory/targets` | Full target history for the authenticated user |
 | `GET /api/skills/pending` | Self-authored skills awaiting human review |
 | `POST /api/skills/pending/{name}/approve` | Approve a self-authored skill (analyst+ role) |
@@ -286,7 +372,7 @@ Once Nova is running, full interactive docs are at `http://localhost:8000/docs`.
 
 Anyone can add a new platform connector or tool without touching Nova's core. See [skills/SKILL_AUTHORING_GUIDE.md](skills/SKILL_AUTHORING_GUIDE.md) for the full guide.
 
-Quick version â create `skills/my-connector/skill.json`:
+Quick version – create `skills/my-connector/skill.json`:
 
 ```json
 {
@@ -303,7 +389,7 @@ Quick version â create `skills/my-connector/skill.json`:
 }
 ```
 
-Then implement `connector.py` extending `PlatformConnector` from `nova_arsenal/skills/platform_connector.py`. Open a PR â that's it.
+Then implement `connector.py` extending `PlatformConnector` from `nova_arsenal/skills/platform_connector.py`. Open a PR – that's it.
 
 ---
 
@@ -322,7 +408,7 @@ Then implement `connector.py` extending `PlatformConnector` from `nova_arsenal/s
 
 ## Security & Responsible Use
 
-Nova-Arsenal is a professional security research tool. You are solely responsible for ensuring you have proper authorization before running any scans or tests. Unauthorized use against systems you do not own or have explicit permission to test is illegal.
+Nova-Arsenal is a professional security research tool. You are solely responsible for ensuring you have proper authorization before running any scans or tests. Unauthorized use against systems you do not own or have permission to test is illegal.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
@@ -330,10 +416,10 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The fastest way to contribute is building a new skill connector â see the skill authoring guide above.
+See [CONTRIBUTING.md](CONTRIBUTING.md). The fastest way to contribute is building a new skill connector – see the skill authoring guide above.
 
 ---
 
 ## License
 
-Apache-2.0 â See [LICENSE](LICENSE) for details.
+Apache-2.0 – See [LICENSE](LICENSE) for details.
