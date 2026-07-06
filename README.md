@@ -7,9 +7,9 @@
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-326CE5?logo=kubernetes&logoColor=white)](k8s/)
 
-**Autonomous Security Research Platform**
+**Autonomous Security Research Platform (V2.0 - The Most Powerful Open-Source Tool)**
 
-Nova-Arsenal is an autonomous security agent platform with 240+ modules covering reconnaissance, exploitation, analysis, and reporting. Features a multi-agent swarm architecture, self-training RL pipeline, and built-in resilience patterns for production-grade autonomous operation.
+Nova-Arsenal is the most advanced autonomous security agent platform ever created, with **300+ modules** covering reconnaissance, exploitation, analysis, and reporting. Features a massively parallel **V2.0 multi-agent swarm architecture**, a **Self-Evolution Loop**, a self-training RL pipeline, and enterprise-grade resilience patterns for production-grade autonomous operation.
 
 > ⚠️ **Ethical Use Only** – Nova-Arsenal is built for authorized security research and bug bounty engagements. Only run against targets you have explicit written permission to test.
 
@@ -17,8 +17,9 @@ Nova-Arsenal is an autonomous security agent platform with 240+ modules covering
 
 ## Features
 
-- **240+ Security Modules** – Kali Linux knowledge base across 25 categories (recon, exploitation, cloud, AD, wireless, mobile, web, OSINT, etc.)
-- **Multi-Agent Swarm** – Parallel Scout, Exploiter, Validator, and Reporter agents with weighted consensus findings
+- **300+ Security Modules** – Massive Kali Linux knowledge base across 35 categories, including new Cloud, AD, Mobile, and IoT/SCADA suites.
+- **V2.0 Multi-Agent Swarm** – Massively parallel Recon, Web, Exploit, OSINT, **Validator**, and **Researcher** agents with a weighted, validator-aware consensus engine.
+- **Self-Evolution Loop** – Nova now analyzes her own trajectories in real-time, detecting failures, breaking infinite loops, and self-authoring new skills autonomously.
 - **Fugu-Style LLM Orchestration** – Dynamic routing across 10 providers (Anthropic, OpenAI, Gemini, DeepSeek, Qwen, OpenRouter, Ollama, HuggingFace, Opencode) with automatic fallback
 - **Native Tool Integrations** – Programmatic control of Metasploit (msfrpcd REST), Burp Suite (REST API + GraphQL), SQLmap (API mode), and Nmap (XML parsing)
 - **Skills Marketplace** – Installable platform connectors; Nova can also self-author new skills after novel tasks, pending human review before they go live

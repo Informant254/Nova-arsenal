@@ -72,6 +72,26 @@ class NovaToolbox:
                 "thc-pptp-bruter", "wordlists", "seclists", "rockyou",
                 "cewl", "crunch", "mentalist", "pipal",
             ],
+            "ai_security": [
+                "garak", "inspect", "pyrit", "llm-fuzzer", "vigil",
+                "prompt-injection-bench", "rebuff", "giskard",
+            ],
+            "hardware": [
+                "rtl_433", "hackrf_transfer", "flashrom", "openocd",
+                "sigrok", "pulseview", "ubertooth-btle", "killerbee",
+            ],
+            "vehicle": [
+                "cansniffer", "cansend", "candump", "kayak",
+                "caringcaribou", "uds-scan", "icat",
+            ],
+            "mobile_advanced": [
+                "drozer", "frida", "objection", "apkleaks", "apkx",
+                "mobsf", "apkid", "dex2jar", "qark",
+            ],
+            "cloud_advanced": [
+                "cloud_enum", "pacu", "scoutsuite", "cloudsploit",
+                "s3scanner", "bucket-finder", "prowler", "cloudfox",
+            ],
         }
 
         self.target_mapping: Dict[str, List[str]] = {

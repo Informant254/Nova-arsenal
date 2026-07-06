@@ -31,7 +31,9 @@ class KeyPair:
 
 
 class KeyManager:
-    def __init__(self, storage_dir: str = "/workspace/keys") -> None:
+    def __init__(self, storage_dir: Optional[str] = None) -> None:
+        if storage_dir is None:
+            storage_dir = os.environ.get("NOVA_KEYS_DIR", "keys")
         self.storage_dir = storage_dir
         self._active_key_id: Optional[str] = None
         self._keys: Dict[str, KeyPair] = {}

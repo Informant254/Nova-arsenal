@@ -1767,3 +1767,135 @@ EXPLOIT_DEV_TOOLS = [
         notes="See reverse engineering section.",
     ),
 ]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AI & LLM SECURITY
+# ═══════════════════════════════════════════════════════════════════════════
+
+AI_SECURITY_TOOLS = [
+    ToolInfo(
+        name="garak",
+        category="ai_security",
+        description="LLM vulnerability scanner (hallucination, injection, etc.)",
+        install_path="/usr/bin/garak",
+        binary="garak",
+        usage="garak [options]",
+        examples=["garak --model_type openai --model_name gpt-3.5-turbo"],
+        flags={"--model_type": "Model provider", "--model_name": "Model ID"},
+        notes="The 'nmap' of LLM security.",
+    ),
+    ToolInfo(
+        name="inspect",
+        category="ai_security",
+        description="Framework for evaluating LLM safety and capabilities",
+        install_path="/usr/bin/inspect",
+        binary="inspect",
+        usage="inspect eval [options]",
+        examples=["inspect eval safety.py"],
+        flags={},
+    ),
+    ToolInfo(
+        name="pyrit",
+        category="ai_security",
+        description="Python Risk Identification Tool for LLMs (Microsoft)",
+        install_path="/usr/bin/pyrit",
+        binary="pyrit",
+        usage="pyrit [options]",
+        examples=["pyrit --target azure_openai"],
+        flags={},
+    ),
+    ToolInfo(
+        name="llm-fuzzer",
+        category="ai_security",
+        description="Fuzzing tool for LLM endpoints",
+        install_path="/usr/bin/llm-fuzzer",
+        binary="llm-fuzzer",
+        usage="llm-fuzzer --url <url>",
+        examples=["llm-fuzzer --url http://localhost:8000/v1/chat/completions"],
+        flags={},
+    ),
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HARDWARE & SDR
+# ═══════════════════════════════════════════════════════════════════════════
+
+HARDWARE_TOOLS = [
+    ToolInfo(
+        name="rtl_433",
+        category="hardware",
+        description="Decode radio signals from ISM band (433MHz, etc.)",
+        install_path="/usr/bin/rtl_433",
+        binary="rtl_433",
+        usage="rtl_433 [options]",
+        examples=["rtl_433 -f 433.92M"],
+        flags={"-f": "Frequency", "-F": "Output format"},
+    ),
+    ToolInfo(
+        name="hackrf_transfer",
+        category="hardware",
+        description="HackRF transmit and receive tool",
+        install_path="/usr/bin/hackrf_transfer",
+        binary="hackrf_transfer",
+        usage="hackrf_transfer [options]",
+        examples=["hackrf_transfer -r sample.bin -f 433920000"],
+        flags={"-r": "Receive to file", "-t": "Transmit from file", "-f": "Frequency in Hz"},
+    ),
+    ToolInfo(
+        name="flashrom",
+        category="hardware",
+        description="Identify, read, write, verify and erase flash chips",
+        install_path="/usr/bin/flashrom",
+        binary="flashrom",
+        usage="flashrom [options]",
+        examples=["flashrom -p ch341a_spi -r bios.bin"],
+        flags={"-p": "Programmer type", "-r": "Read", "-w": "Write"},
+    ),
+    ToolInfo(
+        name="openocd",
+        category="hardware",
+        description="Open On-Chip Debugger (JTAG/SWD)",
+        install_path="/usr/bin/openocd",
+        binary="openocd",
+        usage="openocd -f <config>",
+        examples=["openocd -f interface/stlink.cfg -f target/stm32f4x.cfg"],
+        flags={"-f": "Configuration file"},
+    ),
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# VEHICLE HACKING
+# ═══════════════════════════════════════════════════════════════════════════
+
+VEHICLE_TOOLS = [
+    ToolInfo(
+        name="cansniffer",
+        category="vehicle",
+        description="Display CAN traffic differences",
+        install_path="/usr/bin/cansniffer",
+        binary="cansniffer",
+        usage="cansniffer [options] <can-interface>",
+        examples=["cansniffer -c can0"],
+        flags={"-c": "Color output"},
+    ),
+    ToolInfo(
+        name="cansend",
+        category="vehicle",
+        description="Send a single CAN frame",
+        install_path="/usr/bin/cansend",
+        binary="cansend",
+        usage="cansend <can-interface> <can-frame>",
+        examples=["cansend can0 123#DEADBEEF"],
+        flags={},
+    ),
+    ToolInfo(
+        name="candump",
+        category="vehicle",
+        description="Dump CAN traffic",
+        install_path="/usr/bin/candump",
+        binary="candump",
+        usage="candump [options] <can-interface>",
+        examples=["candump -L can0"],
+        flags={"-L": "Log in ASCII format"},
+    ),
+]

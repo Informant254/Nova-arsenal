@@ -23,6 +23,8 @@ class SwarmAgentRole(Enum):
     WEB = "web"
     EXPLOIT = "exploit"
     OSINT = "osint"
+    VALIDATOR = "validator"
+    RESEARCHER = "researcher"
 
 
 @dataclass
@@ -100,6 +102,14 @@ AGENT_ROLE_CONFIGS: Dict[SwarmAgentRole, Dict[str, str]] = {
         "objective": "Gather intelligence from public sources: subdomains, emails, breached credentials",
         "persona": "OSINT Investigator - passive intelligence gathering expert",
     },
+    SwarmAgentRole.VALIDATOR: {
+        "objective": "Independently verify all findings to eliminate false positives",
+        "persona": "Validator - skeptical auditor focused on proof and reliability",
+    },
+    SwarmAgentRole.RESEARCHER: {
+        "objective": "Search for novel exploits and CVE details for specific versions found",
+        "persona": "Security Researcher - deep-diver into documentation and exploit databases",
+    },
 }
 
 
@@ -128,11 +138,13 @@ class SwarmOrchestrator:
             self.agent_configs = configs
         else:
             self.agent_configs = [
-                SwarmAgentConfig(role=role, max_steps=8, weight=w)
+                SwarmAgentConfig(role=role, max_steps=10, weight=w)
                 for role, w in [(SwarmAgentRole.RECON, 1.0),
-                                (SwarmAgentRole.WEB, 1.0),
-                                (SwarmAgentRole.EXPLOIT, 1.2),
-                                (SwarmAgentRole.OSINT, 0.8)]
+                                (SwarmAgentRole.WEB, 1.1),
+                                (SwarmAgentRole.EXPLOIT, 1.3),
+                                (SwarmAgentRole.OSINT, 0.8),
+                                (SwarmAgentRole.VALIDATOR, 1.5),
+                                (SwarmAgentRole.RESEARCHER, 1.2)]
             ]
 
     async def run(self) -> SwarmResult:
@@ -212,7 +224,10 @@ class SwarmOrchestrator:
             if key in merged:
                 existing = merged[key]
                 existing.votes += f.votes
-                existing.confidence = min(1.0, existing.confidence + f.confidence * 0.3)
+
+                # Boost confidence more if the new finding is from a VALIDATOR
+                boost = 0.5 if f.agent_role == SwarmAgentRole.VALIDATOR else 0.3
+                existing.confidence = min(1.0, existing.confidence + f.confidence * boost)
 
                 severity_order = ["low", "medium", "high", "critical"]
                 if severity_order.index(f.severity) > severity_order.index(existing.severity):
@@ -220,8 +235,18 @@ class SwarmOrchestrator:
             else:
                 merged[key] = f
 
-        consensus = [f for f in merged.values() if f.votes >= 2 or f.severity in ("critical", "high")]
-        consensus.sort(key=lambda x: (["low", "medium", "high", "critical"].index(x.severity), x.votes), reverse=True)
+        # Findings validated by a validator or having high confidence/votes are promoted
+        consensus = []
+        for f in merged.values():
+            is_validated = any(
+                orig.agent_role == SwarmAgentRole.VALIDATOR
+                for orig in findings if orig.title.lower().strip() == f.title.lower().strip()
+            )
+
+            if is_validated or f.votes >= 2 or f.severity in ("critical", "high") or f.confidence > 0.8:
+                consensus.append(f)
+
+        consensus.sort(key=lambda x: (["low", "medium", "high", "critical"].index(x.severity), x.confidence, x.votes), reverse=True)
 
         return consensus
 

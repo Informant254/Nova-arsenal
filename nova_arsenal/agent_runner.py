@@ -30,6 +30,7 @@ from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy, Validat
 # API integrations (lazy-imported to avoid hard deps)
 from nova_arsenal.integrations import MetasploitRPC, BurpAPI, NmapParser, SQLmapAPI
 from nova_arsenal.intelligence import ToolSelector, CveResearch
+from nova_arsenal.intelligence.self_optimizer import SelfOptimizer
 from nova_arsenal.correlation import Correlator
 from nova_arsenal.persona_manager import PersonaManager
 from nova_arsenal.payload_generator import PayloadGenerator, PayloadType, PayloadLanguage
@@ -177,6 +178,9 @@ class AgentRunner:
 
         # Tool selection intelligence
         self.tool_selector = ToolSelector()
+
+        # Self-Evolution Loop
+        self.optimizer = SelfOptimizer()
 
         # Result correlation
         self.correlator = Correlator()
@@ -1519,6 +1523,13 @@ Analysis:"""
 
     async def _reflect(self) -> str:
         """Reflect on progress and adjust strategy."""
+        # Run self-evolution loop
+        suggestions = self.optimizer.analyze_trajectory(self._actions)
+        if suggestions:
+            for sug in suggestions:
+                logger.info(f"Self-Evolution Suggestion: {sug.reasoning}")
+                await self._emit("self_evolution", sug.__dict__)
+
         prompt = f"""Reflect on the current progress of the security assessment.
 
 Target: {self.target}
