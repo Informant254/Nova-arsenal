@@ -1,10 +1,16 @@
 import * as vscode from 'vscode';
+import { callNovaApi, getApiBase } from './api';
 
+/**
+ * Chat panel — messages go through the extension host so auth headers
+ * are applied. LLM account tokens live on the Nova server.
+ */
 export class NovaChatPanel {
     public static readonly viewType = 'novaArsenal.chat';
 
     private _panel: vscode.WebviewPanel | undefined;
     private _context: vscode.ExtensionContext;
+    private _disposables: vscode.Disposable[] = [];
 
     constructor(context: vscode.ExtensionContext) {
         this._context = context;
@@ -27,7 +33,44 @@ export class NovaChatPanel {
         );
 
         this._panel.webview.html = this._getHtml();
-        this._panel.onDidDispose(() => { this._panel = undefined; });
+        this._panel.webview.onDidReceiveMessage(
+            async (msg) => {
+                if (!this._panel) {
+                    return;
+                }
+                if (msg?.type === 'chat' && typeof msg.message === 'string') {
+                    const reply = await callNovaApi('/api/chat/send', {
+                        message: msg.message,
+                        stream: false,
+                    });
+                    this._panel.webview.postMessage({
+                        type: 'reply',
+                        ok: Boolean(reply),
+                        text:
+                            reply ||
+                            'No response from Nova API. Is the server running? Use Nova: Sign In or Import sessions.',
+                    });
+                } else if (msg?.type === 'status') {
+                    try {
+                        const r = await fetch(`${getApiBase()}/api/health`);
+                        this._panel.webview.postMessage({
+                            type: 'status',
+                            connected: r.ok,
+                        });
+                    } catch {
+                        this._panel.webview.postMessage({ type: 'status', connected: false });
+                    }
+                } else if (msg?.type === 'signin') {
+                    await vscode.commands.executeCommand('nova-arsenal.signIn');
+                } else if (msg?.type === 'import') {
+                    await vscode.commands.executeCommand('nova-arsenal.importAccounts');
+                }
+            },
+            undefined,
+            this._disposables
+        );
+
+        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     }
 
     public dispose() {
@@ -35,26 +78,30 @@ export class NovaChatPanel {
             this._panel.dispose();
             this._panel = undefined;
         }
+        while (this._disposables.length) {
+            this._disposables.pop()?.dispose();
+        }
     }
 
     private _getHtml(): string {
-        const apiUrl = vscode.workspace.getConfiguration('nova-arsenal').get('apiUrl', 'http://localhost:8000');
+        const apiUrl = getApiBase();
 
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <title>Nova Arsenal</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Consolas', 'Monaco', monospace; background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column; }
+        body { font-family: var(--vscode-font-family, Consolas, monospace); background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column; }
         #header { background: #161b22; padding: 8px 16px; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 12px; }
         #header h1 { font-size: 14px; color: #58a6ff; }
         #header .status { font-size: 11px; color: #8b949e; }
         #header .status.connected { color: #3fb950; }
         #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-        .msg { padding: 8px 12px; border-radius: 6px; max-width: 85%; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
+        .msg { padding: 8px 12px; border-radius: 6px; max-width: 90%; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
         .user { background: #1f6feb; color: #fff; align-self: flex-end; }
         .nova { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; align-self: flex-start; }
         .nova.error { border-color: #f85149; color: #f85149; }
@@ -68,13 +115,19 @@ export class NovaChatPanel {
         .qa-btn { background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 4px 10px; color: #c9d1d9; font-size: 11px; cursor: pointer; }
         .qa-btn:hover { border-color: #58a6ff; color: #58a6ff; }
         .typing { color: #8b949e; font-style: italic; font-size: 12px; padding: 4px 12px; }
+        .hint { font-size: 11px; color: #8b949e; padding: 0 16px 8px; }
+        code { color: #79c0ff; }
     </style>
 </head>
 <body>
     <div id="header">
         <h1>Nova Arsenal</h1>
         <span class="status" id="status">connecting...</span>
+        <span style="flex:1"></span>
+        <button class="qa-btn" onclick="vscode.postMessage({type:'signin'})">Sign in</button>
+        <button class="qa-btn" onclick="vscode.postMessage({type:'import'})">Import sessions</button>
     </div>
+    <div class="hint">API: <code>${apiUrl}</code> · Claude Code / Codex sessions via Sign in or Import</div>
     <div id="chat"></div>
     <div class="quick-actions">
         <button class="qa-btn" onclick="quickAction('nmap scan')">Nmap</button>
@@ -82,28 +135,37 @@ export class NovaChatPanel {
         <button class="qa-btn" onclick="quickAction('osint')">OSINT</button>
         <button class="qa-btn" onclick="quickAction('ctf solve')">CTF</button>
         <button class="qa-btn" onclick="quickAction('swarm scan')">Swarm</button>
-        <button class="qa-btn" onclick="quickAction('compliance')">Compliance</button>
+        <button class="qa-btn" onclick="quickAction('zeroday hunt')">Zero-day</button>
     </div>
     <div id="input-bar">
-        <input type="text" id="input" placeholder="Ask Nova to do something..." onkeydown="if(event.key==='Enter') send()" />
+        <input type="text" id="input" placeholder="Ask Nova…" onkeydown="if(event.key==='Enter') send()" />
         <button id="send" onclick="send()">Send</button>
     </div>
     <script>
-        const apiUrl = '${apiUrl}';
+        const vscode = acquireVsCodeApi();
         const chat = document.getElementById('chat');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('send');
         const status = document.getElementById('status');
 
-        async function checkStatus() {
-            try {
-                const r = await fetch(apiUrl + '/api/health');
-                if (r.ok) { status.textContent = 'connected'; status.className = 'status connected'; }
-                else { status.textContent = 'error'; status.className = 'status'; }
-            } catch { status.textContent = 'offline'; status.className = 'status'; }
+        function setStatus(ok) {
+            status.textContent = ok ? 'connected' : 'offline';
+            status.className = 'status' + (ok ? ' connected' : '');
         }
+        function checkStatus() { vscode.postMessage({ type: 'status' }); }
         setInterval(checkStatus, 10000);
         checkStatus();
+
+        window.addEventListener('message', (event) => {
+            const msg = event.data || {};
+            if (msg.type === 'status') setStatus(!!msg.connected);
+            if (msg.type === 'reply') {
+                const typing = document.querySelector('.typing');
+                if (typing) typing.remove();
+                addMsg(msg.text || '', msg.ok ? 'nova' : 'nova error');
+                sendBtn.disabled = false;
+            }
+        });
 
         function addMsg(text, cls) {
             const div = document.createElement('div');
@@ -114,28 +176,14 @@ export class NovaChatPanel {
             return div;
         }
 
-        async function send() {
+        function send() {
             const msg = input.value.trim();
             if (!msg) return;
             input.value = '';
             addMsg(msg, 'user');
             sendBtn.disabled = true;
-            const typing = addMsg('...', 'typing');
-
-            try {
-                const resp = await fetch(apiUrl + '/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: msg }),
-                });
-                const data = await resp.json();
-                typing.remove();
-                addMsg(data.response || data.message || JSON.stringify(data), 'nova');
-            } catch (err) {
-                typing.remove();
-                addMsg('Connection error: ' + err.message, 'nova error');
-            }
-            sendBtn.disabled = false;
+            addMsg('…', 'typing');
+            vscode.postMessage({ type: 'chat', message: msg });
         }
 
         function quickAction(action) {

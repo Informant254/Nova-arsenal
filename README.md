@@ -336,46 +336,67 @@ python -m nova_arsenal.api
 
 ## Configuration
 
-### Bring your own AI subscription (BYOK)
+### Use your AI accounts (like Codex / Claude Code) — not only API keys
 
-Nova does **not** require a Nova-branded LLM plan. Plug in the API keys from the
-subscriptions you already pay for (ChatGPT/OpenAI, Claude, Gemini, OpenRouter, etc.).
+Nova supports **two** ways to power the agent:
+
+1. **Account / session login** (preferred if you already use Claude Code, Codex, ChatGPT Plus, etc.)
+2. **Classic API keys** in `.env`
+
+```bash
+# A) Import sessions from tools already signed in on this machine
+nova-agent login --import-existing
+
+# B) Paste a Claude Code OAuth token (from `claude setup-token` / CLAUDE_CODE_OAUTH_TOKEN)
+nova-agent login --provider anthropic --token "$CLAUDE_CODE_OAUTH_TOKEN"
+
+# C) Paste a Codex / OpenAI session or API token
+nova-agent login --provider openai --token "<token>"
+
+# D) Google account OAuth for Gemini (needs GOOGLE_OAUTH_CLIENT_ID)
+nova-agent login --provider gemini --oauth
+
+nova-agent accounts          # list signed-in accounts (no secrets)
+nova-agent llm-status        # full wiring status
+```
+
+Tokens are stored in `~/.nova/accounts.json` (mode `0600`) and picked up automatically by the LLM router.
+
+**VS Code:** command palette → `Nova: Sign In (AI Account)` · `Nova: Import Claude Code / Codex Sessions` · `Nova: Show AI Accounts / LLM Status`
+
+### Classic API keys (BYOK) still work
 
 ```bash
 cp config/.env.example .env
-# edit .env — paste your keys
-
-export OPENAI_API_KEY=sk-...              # ChatGPT / OpenAI API
-export ANTHROPIC_API_KEY=sk-ant-...       # Claude
-export GOOGLE_API_KEY=...                 # Gemini
-export OPENROUTER_API_KEY=sk-or-...       # one key → 200+ models
-
-# optional: pick primary
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+export GOOGLE_API_KEY=...
+export OPENROUTER_API_KEY=sk-or-...
 export LLM_PROVIDER=openai
 export LLM_MODEL=gpt-4o
-
 python -m nova_arsenal.api
-# verify (never prints full secrets)
 curl -s http://localhost:8000/api/llm/status | jq .
 ```
 
-| Provider | Env var(s) | Notes |
-|----------|------------|--------|
-| OpenAI | `OPENAI_API_KEY` | GPT-4o, etc. |
-| Anthropic | `ANTHROPIC_API_KEY` | Claude |
-| Gemini | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | Google AI Studio |
-| OpenRouter | `OPENROUTER_API_KEY` | Best “one key, many models” option |
-| DeepSeek | `DEEPSEEK_API_KEY` | |
-| Qwen | `DASHSCOPE_API_KEY` | Alibaba DashScope |
-| Hugging Face | `HUGGINGFACE_API_KEY` or `HF_TOKEN` | |
-| Ollama | none | Local free models via `NOVA_LLM_URL` |
+| Provider | Account login | API key env |
+|----------|---------------|-------------|
+| OpenAI / Codex | `login --provider openai` / import Codex | `OPENAI_API_KEY` |
+| Anthropic / Claude Code | `login --provider anthropic` / `CLAUDE_CODE_OAUTH_TOKEN` | `ANTHROPIC_API_KEY` |
+| Gemini | `login --provider gemini --oauth` | `GOOGLE_API_KEY` |
+| OpenRouter | token login | `OPENROUTER_API_KEY` |
+| Ollama | n/a (local) | none |
 
-After keys are set, **all** of these work with the same agent:
-- Chat UI / API (`/api/chat`)
-- Autonomous agent runs
-- Swarm + zero-day researcher (LLM reasoning steps)
+API: `GET /api/llm/status` · `GET /api/llm/accounts` · `POST /api/llm/accounts/login` · `POST /api/llm/accounts/import` · `POST /api/llm/reload`
 
-Check wiring anytime: `GET /api/llm/status` · reload keys: `POST /api/llm/reload` · dashboard **Settings**.
+### VS Code extension
+
+```bash
+cd clients/vscode && npm install && npm run compile
+# VS Code: Extensions → … → Install from Location → clients/vscode
+```
+
+Commands: Open Chat (`Ctrl+Alt+N`), Sign In, Import sessions, Quick Scan, Nmap, OSINT, CTF, Configure API URL.  
+Chat uses `POST /api/chat/send` through the extension host (auth headers applied).
 
 ### LLM Providers (YAML)
 

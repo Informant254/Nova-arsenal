@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Account-style AI login (Codex / Claude Code)** — `nova-agent login`, import local Claude/Codex sessions, `CLAUDE_CODE_OAUTH_TOKEN`, Google OAuth for Gemini; tokens in `~/.nova/accounts.json`; API `/api/llm/accounts/*`
+- **VS Code extension fixed** — compiles to `out/`, correct chat endpoint, Sign In / Import sessions commands, host-mediated API calls, Output channel (was broken `createOutputPanel`)
 - **BYOK (bring-your-own-key) LLM wiring** — auto-detect OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/Qwen/HF keys from `.env`; honor `LLM_PROVIDER` + `LLM_MODEL`; `GET /api/llm/status` + `POST /api/llm/reload`; Settings UI shows live key status (no secrets leaked)
 - **Zero-Day Candidate Pipeline (`nova_arsenal.zeroday`)** — high-speed research stack:
   - Parallel attack-surface ranking (`AttackSurfaceMapper`)

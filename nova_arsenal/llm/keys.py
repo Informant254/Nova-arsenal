@@ -109,12 +109,28 @@ def normalize_provider(name: str) -> str:
 
 
 def resolve_api_key(provider: str, explicit: str = "") -> str:
-    """Return explicit key or first non-empty env key for the provider."""
+    """
+    Return a usable credential for the provider.
+
+    Priority:
+      1. Explicit argument
+      2. Account login token (Claude Code / Codex / OAuth / pasted session)
+      3. Classic API key environment variables
+    """
     if explicit and not _is_placeholder(explicit):
         return explicit
     prov = normalize_provider(provider)
-    # "google" is a common alias for gemini but also a free-text word —
-    # only treat as gemini when alias map says so (already handled).
+
+    # Account-style sessions (Codex / Claude Code / Google OAuth)
+    try:
+        from nova_arsenal.llm.account_auth import account_token_for
+
+        acct = account_token_for(prov)
+        if acct and not _is_placeholder(acct):
+            return acct
+    except Exception:  # noqa: BLE001
+        pass
+
     spec = PROVIDER_SPECS.get(prov)
     if not spec:
         return explicit or ""

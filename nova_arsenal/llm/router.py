@@ -357,8 +357,16 @@ class LLMRouter:
         return {"total_routes": 0, "registered_providers": []}
 
     def byok_status(self) -> dict:
-        """Public, non-secret status of BYOK configuration."""
+        """Public, non-secret status of BYOK + account logins."""
         config = get_config()
+        accounts: dict = {}
+        try:
+            from nova_arsenal.llm.account_auth import account_status
+
+            accounts = account_status()
+        except Exception:  # noqa: BLE001
+            accounts = {"accounts": [], "how_to": {}}
+
         return {
             "primary": {
                 "provider": config.llm.primary.provider,
@@ -377,10 +385,18 @@ class LLMRouter:
             "active_providers": self.list_providers(),
             "env_keys_detected": env_providers_with_keys(),
             "provider_catalog": provider_status_snapshot(),
+            "accounts": accounts,
             "how_to": {
-                "openai": "export OPENAI_API_KEY=sk-...",
-                "anthropic": "export ANTHROPIC_API_KEY=sk-ant-...",
-                "gemini": "export GOOGLE_API_KEY=...  # or GEMINI_API_KEY",
+                "account_login": (
+                    "nova-agent login --import-existing  "
+                    "# reuse Claude Code / Codex sessions"
+                ),
+                "claude_token": "nova-agent login --provider anthropic --token $CLAUDE_CODE_OAUTH_TOKEN",
+                "codex": "nova-agent login --provider openai --token <codex-or-openai-token>",
+                "google_oauth": "nova-agent login --provider gemini --oauth",
+                "openai_key": "export OPENAI_API_KEY=sk-...",
+                "anthropic_key": "export ANTHROPIC_API_KEY=sk-ant-...",
+                "gemini_key": "export GOOGLE_API_KEY=...",
                 "openrouter": "export OPENROUTER_API_KEY=...  # one key → many models",
                 "prefer": "export LLM_PROVIDER=openai LLM_MODEL=gpt-4o",
                 "env_file": "cp config/.env.example .env  # then fill keys",

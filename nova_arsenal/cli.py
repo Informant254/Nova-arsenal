@@ -2,10 +2,18 @@
 Nova-Arsenal CLI Entry Point
 
 Usage:
+    nova-agent login --import-existing
+    nova-agent login --provider anthropic --token <token>
+    nova-agent login --provider gemini --oauth
+    nova-agent accounts
+    nova-agent llm-status
     nova-agent --target <target> [options]
-    nova-agent --target <target> --auto       # Full autonomous mode
+    nova-agent --target <target> --auto
     nova-agent --target <target> --zeroday --authorized --auth-ref ENG-1
+    nova-agent --target <target> --swarm --authorized
 """
+
+from __future__ import annotations
 
 import argparse
 import asyncio
@@ -14,19 +22,39 @@ import sys
 from pathlib import Path
 
 
-def main():
+def main() -> None:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+    # Account / status commands don't need --target
+    if len(sys.argv) > 1 and sys.argv[1] in {
+        "login",
+        "logout",
+        "accounts",
+        "llm-status",
+        "help-login",
+    }:
+        _account_main(sys.argv[1:])
+        return
+
     parser = argparse.ArgumentParser(
         prog="nova-agent",
         description="Nova-Arsenal Autonomous Security Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Account login (like Codex / Claude Code — no API key required if you have a subscription session)
+  nova-agent login --import-existing
+  nova-agent login --provider anthropic --token "$CLAUDE_CODE_OAUTH_TOKEN"
+  nova-agent login --provider openai --token <codex-or-openai-token>
+  nova-agent login --provider gemini --oauth
+  nova-agent accounts
+  nova-agent llm-status
+
+  # Agent runs
   nova-agent --target example.com
   nova-agent --target example.com --auto
-  nova-agent --target example.com --objective "Find SQL injection"
-  nova-agent --target example.com --scope example.com api.example.com
-  nova-agent --config settings.yaml --target example.com
   nova-agent --target lab.local --zeroday --authorized --auth-ref ENG-42
+  nova-agent --target lab.local --swarm --authorized --auth-ref ENG-42
         """,
     )
     parser.add_argument("--target", required=True, help="Target to scan")
@@ -42,23 +70,15 @@ Examples:
     parser.add_argument(
         "--zeroday",
         action="store_true",
-        help="Run high-speed zero-day candidate pipeline (research leads, not confirmed 0-days)",
+        help="Run high-speed zero-day candidate pipeline",
     )
     parser.add_argument(
         "--authorized",
         action="store_true",
-        help="Confirm written authorization for the target (required for --zeroday)",
+        help="Confirm written authorization for the target",
     )
-    parser.add_argument(
-        "--auth-ref",
-        default="",
-        help="Engagement / RoE / ticket ID for audit trail",
-    )
-    parser.add_argument(
-        "--services-json",
-        default="",
-        help="Optional JSON service map for zeroday hunt",
-    )
+    parser.add_argument("--auth-ref", default="", help="Engagement / RoE / ticket ID")
+    parser.add_argument("--services-json", default="", help="JSON service map for zeroday hunt")
     parser.add_argument(
         "--live-fuzz",
         action="store_true",
@@ -75,10 +95,12 @@ Examples:
 
     args = parser.parse_args()
 
-    # Add parent directory to path for module imports
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-
     try:
+        if args.config:
+            from nova_arsenal.config import reload_config
+
+            reload_config(args.config)
+
         if args.swarm:
             from nova_arsenal.swarm import SwarmOrchestrator
 
@@ -113,7 +135,7 @@ Examples:
             return
 
         if args.zeroday:
-            from nova_arsenal.zeroday import ZeroDayHunter, ZeroDayHuntConfig
+            from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter
 
             services = {}
             if args.services_json:
@@ -126,10 +148,6 @@ Examples:
             print(f"Auth ref: {args.auth_ref or '(none)'}")
             print(f"Live fuzz: {bool(args.live_fuzz and args.authorized)}")
             print("=" * 50)
-            print(
-                "NOTE: This finds ranked *candidates* fast. "
-                "Confirmed zero-days still need human validation."
-            )
 
             hunter = ZeroDayHunter()
             live = bool(args.live_fuzz and args.authorized)
@@ -150,22 +168,8 @@ Examples:
             result = asyncio.run(run_zeroday())
             print(f"\nStatus: {result.status}")
             print(f"Elapsed: {result.elapsed_ms:.1f}ms")
-            if result.warnings:
-                for w in result.warnings:
-                    print(f"  [warn] {w}")
-            if result.fuzz_campaign:
-                print(f"Fuzz jobs planned: {result.fuzz_campaign.get('job_count', 0)}")
-                exec_meta = result.fuzz_campaign.get("execution") or []
-                live_meta = next(
-                    (x for x in exec_meta if isinstance(x, dict) and x.get("_meta") == "live_campaign"),
-                    None,
-                )
-                if live_meta:
-                    print(
-                        f"Live engines: ran={live_meta.get('ran_count')} "
-                        f"skipped={live_meta.get('skipped_count')} "
-                        f"crashes={live_meta.get('crash_count')}"
-                    )
+            for w in result.warnings:
+                print(f"  [warn] {w}")
             print(f"Candidates: {len(result.candidates)}")
             for c in result.candidates[:20]:
                 print(
@@ -180,16 +184,16 @@ Examples:
 
         from nova_agent_core import NovaAgent
 
-        print(f"Nova-Arsenal Agent v1.3.0")
-        print(f"=" * 50)
+        print("Nova-Arsenal Agent v1.3.0")
+        print("=" * 50)
         print(f"Target: {args.target}")
         print(f"Objective: {args.objective}")
         print(f"Max Steps: {args.max_steps}")
         if args.scope:
             print(f"Scope: {', '.join(args.scope)}")
         if args.auto:
-            print(f"Mode: FULLY AUTONOMOUS")
-        print(f"=" * 50)
+            print("Mode: FULLY AUTONOMOUS")
+        print("=" * 50)
 
         agent = NovaAgent(
             target=args.target,
@@ -198,7 +202,7 @@ Examples:
         )
 
         if args.auto:
-            # Full autonomous mode
+
             async def run():
                 async def print_event(event_type, data):
                     if event_type == "step_completed":
@@ -215,18 +219,16 @@ Examples:
                     elif event_type == "agent_completed":
                         findings = data.get("findings", 0)
                         elapsed = data.get("elapsed_seconds", 0)
-                        print(f"\n{'='*50}")
+                        print(f"\n{'=' * 50}")
                         print(f"COMPLETED in {elapsed:.1f}s | Findings: {findings}")
                     elif event_type == "agent_error":
-                        error = data.get("error", "?")
-                        print(f"\n[ERROR] {error}")
+                        print(f"\n[ERROR] {data.get('error', '?')}")
 
                 result = await agent.run_autonomous(
                     scope=args.scope,
                     on_event=print_event,
                     sandbox_mode=args.sandbox,
                 )
-
                 if args.verbose:
                     print(f"\nFull result:")
                     print(f"  Status: {result.get('status')}")
@@ -236,9 +238,9 @@ Examples:
 
             asyncio.run(run())
         else:
-            # Basic mode (backward compatible)
             try:
                 from nova_tool_kit import NovaToolKit, PermissionProfile
+
                 kit = NovaToolKit(
                     profile=PermissionProfile.SCOPED,
                     scope=args.scope or [args.target],
@@ -248,9 +250,10 @@ Examples:
             except ImportError:
                 print("Note: nova_tool_kit not found, running without tool kit")
 
-            print(f"\nAgent initialized.")
-            print(f"Use --auto for fully autonomous mode")
-            print(f"Or start the API server: python -m nova_arsenal.api")
+            print("\nAgent initialized.")
+            print("Use --auto for fully autonomous mode")
+            print("Or start the API server: python -m nova_arsenal.api")
+            print("Sign in with AI account: nova-agent login --import-existing")
 
     except ImportError as e:
         print(f"Error: Missing dependency - {e}")
@@ -258,10 +261,113 @@ Examples:
         sys.exit(1)
     except Exception as e:
         print(f"Error: {e}")
-        if args.verbose:
+        if getattr(args, "verbose", False):
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
+
+
+def _account_main(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="nova-agent",
+        description="AI account login (Codex / Claude Code style)",
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_login = sub.add_parser("login", help="Sign in with AI account or import tool sessions")
+    p_login.add_argument(
+        "--provider",
+        choices=["openai", "anthropic", "gemini", "openrouter", "google"],
+        help="Provider to sign into",
+    )
+    p_login.add_argument("--token", default="", help="Session / OAuth / API token to store")
+    p_login.add_argument(
+        "--oauth",
+        action="store_true",
+        help="Browser OAuth (gemini/google; needs GOOGLE_OAUTH_CLIENT_ID)",
+    )
+    p_login.add_argument(
+        "--import-existing",
+        action="store_true",
+        help="Import from local Claude Code / Codex / Cursor credentials",
+    )
+    p_login.add_argument("--label", default="", help="Friendly label for this account")
+
+    p_logout = sub.add_parser("logout", help="Remove a stored AI account")
+    p_logout.add_argument("--provider", required=True)
+
+    sub.add_parser("accounts", help="List signed-in AI accounts (no secrets)")
+    sub.add_parser("llm-status", help="Show LLM BYOK + account wiring status")
+    sub.add_parser("help-login", help="Print account-login help")
+
+    args = parser.parse_args(argv)
+
+    from nova_arsenal.llm.account_auth import account_status, get_account_store
+    from nova_arsenal.llm.router import get_llm_router, reset_llm_router
+
+    if args.cmd == "help-login":
+        print(json.dumps(account_status()["how_to"], indent=2))
+        return
+
+    if args.cmd == "accounts":
+        print(json.dumps(account_status(), indent=2))
+        return
+
+    if args.cmd == "llm-status":
+        reset_llm_router()
+        print(json.dumps(get_llm_router().byok_status(), indent=2))
+        return
+
+    if args.cmd == "logout":
+        ok = get_account_store().remove(args.provider.lower())
+        reset_llm_router()
+        print(json.dumps({"logged_out": ok, "provider": args.provider}))
+        return
+
+    if args.cmd == "login":
+        store = get_account_store()
+        if args.import_existing:
+            results = store.import_from_tools()
+            reset_llm_router()
+            print(json.dumps({"imported": results, "accounts": [a.to_public_dict() for a in store.list_accounts()]}, indent=2))
+            return
+
+        provider = (args.provider or "").lower()
+        if provider == "google":
+            provider = "gemini"
+
+        if args.oauth:
+            if provider not in {"gemini", ""}:
+                print("Error: --oauth currently supports gemini/google only", file=sys.stderr)
+                sys.exit(2)
+            print("Starting Google OAuth (browser)…")
+            print("Ensure GOOGLE_OAUTH_CLIENT_ID is set.")
+            cred = store.login_google_oauth(open_browser=True)
+            reset_llm_router()
+            print(json.dumps({"status": "ok", "account": cred.to_public_dict()}, indent=2))
+            return
+
+        if not provider or not args.token:
+            print(
+                "Usage:\n"
+                "  nova-agent login --import-existing\n"
+                "  nova-agent login --provider anthropic --token <token>\n"
+                "  nova-agent login --provider openai --token <token>\n"
+                "  nova-agent login --provider gemini --oauth\n",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+        cred = store.login_with_token(
+            provider,
+            args.token,
+            label=args.label or f"{provider} account",
+            source="cli",
+        )
+        reset_llm_router()
+        print(json.dumps({"status": "ok", "account": cred.to_public_dict()}, indent=2))
+        return
 
 
 if __name__ == "__main__":

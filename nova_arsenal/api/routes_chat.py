@@ -197,7 +197,15 @@ async def _llm_chat(messages: list[dict], system_prompt: str) -> str:
     """Send messages to the LLM and get a response."""
     router = get_router()
 
-    if router and router.active_providers:
+    # Prefer multi-router when it has providers; else fall back to global LLMRouter
+    providers = []
+    if router is not None:
+        try:
+            providers = list(router.list_providers()) if hasattr(router, "list_providers") else []
+        except Exception:  # noqa: BLE001
+            providers = []
+
+    if router and providers:
         try:
             response = await router.complete(
                 prompt=messages[-1]["content"],
@@ -210,7 +218,23 @@ async def _llm_chat(messages: list[dict], system_prompt: str) -> str:
             logger.error(f"LLM provider error: {e}")
             return f"I encountered an error connecting to my language model: {e}"
 
-    # Fallback: intelligent local responses
+    # Fallback to global LLMRouter (BYOK + account logins)
+    try:
+        from nova_arsenal.llm.router import get_llm_router
+
+        llm = get_llm_router()
+        if llm.list_providers():
+            return await llm.complete(
+                prompt=messages[-1]["content"],
+                system_prompt=system_prompt,
+                temperature=0.7,
+                max_tokens=2048,
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Global LLM router error: {e}")
+        return f"I encountered an error connecting to my language model: {e}"
+
+    # Local fallback when no LLM is configured
     return _local_respond(messages[-1]["content"], system_prompt)
 
 
@@ -385,6 +409,8 @@ async def _stream_response(
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
+@router.post("", response_model=ChatResponse)
+@router.post("/", response_model=ChatResponse)
 @router.post("/send", response_model=ChatResponse)
 async def chat_send(
     request: ChatRequest,

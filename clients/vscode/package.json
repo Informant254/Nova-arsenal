@@ -1,8 +1,8 @@
 {
   "name": "nova-arsenal",
   "displayName": "Nova Arsenal",
-  "description": "Autonomous security research agent - chat, scan, exploit, and analyze from your editor",
-  "version": "1.0.0",
+  "description": "Autonomous security research agent — chat, scan, and sign in with Claude Code / Codex-style accounts",
+  "version": "1.3.0",
   "publisher": "informant254",
   "license": "Apache-2.0",
   "repository": {
@@ -14,33 +14,43 @@
   },
   "categories": [
     "Security",
-    "Development",
+    "Machine Learning",
     "Other"
   ],
   "keywords": [
     "security",
     "pentesting",
-    "nmap",
-    "metasploit",
-    "burp",
-    "sqlmap",
-    "osint",
-    "ctf"
+    "nova",
+    "ai",
+    "claude",
+    "codex",
+    "openai"
   ],
   "activationEvents": [
-    "onCommand:nova-arsenal.openChat",
-    "onCommand:nova-arsenal.quickScan",
-    "onCommand:nova-arsenal.runNmap",
-    "onCommand:nova-arsenal.runPayloadGen",
-    "onCommand:nova-arsenal.runOsint",
-    "onCommand:nova-arsenal.ctfSolver"
+    "onStartupFinished"
   ],
-  "main": "./src/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "nova-arsenal.openChat",
-        "title": "Nova: Open Chat"
+        "title": "Nova: Open Chat",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.signIn",
+        "title": "Nova: Sign In (AI Account)",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.importAccounts",
+        "title": "Nova: Import Claude Code / Codex Sessions",
+        "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.showAccounts",
+        "title": "Nova: Show AI Accounts / LLM Status",
+        "category": "Nova"
       },
       {
         "command": "nova-arsenal.quickScan",
@@ -66,6 +76,11 @@
         "command": "nova-arsenal.ctfSolver",
         "title": "Nova: CTF Solver",
         "category": "Nova"
+      },
+      {
+        "command": "nova-arsenal.configureApi",
+        "title": "Nova: Configure API URL",
+        "category": "Nova"
       }
     ],
     "keybindings": [
@@ -86,7 +101,7 @@
         "nova-arsenal.apiKey": {
           "type": "string",
           "default": "",
-          "description": "API key for authenticated requests"
+          "description": "Optional Nova platform JWT / API key (X-API-Key). Prefer Sign In for LLM accounts."
         },
         "nova-arsenal.defaultTarget": {
           "type": "string",

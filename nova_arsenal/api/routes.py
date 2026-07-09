@@ -123,6 +123,74 @@ async def llm_reload_config():
     }
 
 
+class LlmAccountLoginRequest(BaseModel):
+    provider: str
+    token: str = ""
+    oauth: bool = False
+    label: str = ""
+
+
+@router.get("/llm/accounts")
+async def llm_list_accounts():
+    """List signed-in AI accounts (Claude Code / Codex / Google) — no secrets."""
+    from nova_arsenal.llm.account_auth import account_status
+
+    return account_status()
+
+
+@router.post("/llm/accounts/login")
+async def llm_account_login(body: LlmAccountLoginRequest):
+    """
+    Sign in with an AI account token (Claude Code / Codex style) or start Google OAuth.
+
+    Prefer importing existing tool sessions: POST /api/llm/accounts/import
+    """
+    from nova_arsenal.llm.account_auth import get_account_store
+    from nova_arsenal.llm.router import reset_llm_router
+
+    store = get_account_store()
+    provider = body.provider.strip().lower()
+    if body.oauth and provider in {"gemini", "google"}:
+        cred = store.login_google_oauth(open_browser=False)
+        reset_llm_router()
+        return {"status": "ok", "account": cred.to_public_dict()}
+    if not body.token:
+        raise HTTPException(status_code=400, detail="token required (or oauth=true for gemini)")
+    cred = store.login_with_token(
+        provider,
+        body.token,
+        label=body.label or f"{provider} account",
+        source="api",
+    )
+    reset_llm_router()
+    return {"status": "ok", "account": cred.to_public_dict()}
+
+
+@router.post("/llm/accounts/import")
+async def llm_account_import():
+    """Import credentials from local Claude Code / Codex / Cursor installs."""
+    from nova_arsenal.llm.account_auth import get_account_store
+    from nova_arsenal.llm.router import reset_llm_router
+
+    store = get_account_store()
+    results = store.import_from_tools()
+    reset_llm_router()
+    return {"status": "ok", "results": results, "accounts": [a.to_public_dict() for a in store.list_accounts()]}
+
+
+@router.delete("/llm/accounts/{provider}")
+async def llm_account_logout(provider: str):
+    """Remove a stored AI account login."""
+    from nova_arsenal.llm.account_auth import get_account_store
+    from nova_arsenal.llm.router import reset_llm_router
+
+    ok = get_account_store().remove(provider.lower())
+    reset_llm_router()
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"No account for {provider}")
+    return {"status": "logged_out", "provider": provider}
+
+
 # Agent routes
 @router.get("/agents")
 async def list_agents(
