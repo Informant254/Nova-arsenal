@@ -243,9 +243,13 @@ class AccountAuthStore:
         if not token:
             raise ValueError("Token is empty")
         # Heuristic: classic API keys still work as auth_type api_key
-        if token.startswith("sk-ant-") or token.startswith("sk-") and auth_type == "session":
-            if "oauth" not in token.lower() and len(token) < 200:
-                auth_type = "api_key"
+        if (
+            auth_type == "session"
+            and (token.startswith("sk-ant-") or token.startswith("sk-"))
+            and "oauth" not in token.lower()
+            and len(token) < 200
+        ):
+            auth_type = "api_key"
         cred = AccountCredential(
             provider=provider,
             access_token=token,

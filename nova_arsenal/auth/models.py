@@ -7,7 +7,7 @@ Pydantic models for authentication requests and responses.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
@@ -29,13 +29,12 @@ class UserLogin(BaseModel):
 
 class UserResponse(UserBase):
     """User response model."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     role: str
     is_active: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class Token(BaseModel):
@@ -64,13 +63,12 @@ class PasswordChange(BaseModel):
 
 class OAuthAccountResponse(BaseModel):
     """OAuth account response model."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     provider: str
     provider_email: Optional[str] = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class OAuthLoginResponse(BaseModel):
@@ -85,6 +83,8 @@ class OAuthLoginResponse(BaseModel):
 
 class SubscriptionResponse(BaseModel):
     """Subscription details response."""
+    model_config = ConfigDict(from_attributes=True)
+
     tier: str
     api_calls_limit: int
     api_calls_used: int
@@ -92,9 +92,6 @@ class SubscriptionResponse(BaseModel):
     is_active: bool
     started_at: datetime
     expires_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class SubscriptionUpgradeRequest(BaseModel):
@@ -111,6 +108,8 @@ class ApiKeyCreateRequest(BaseModel):
 
 class ApiKeyResponse(BaseModel):
     """API key response (shows full key only once)."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     key_prefix: str
     name: str
@@ -119,18 +118,14 @@ class ApiKeyResponse(BaseModel):
     created_at: datetime
     last_used_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class ApiKeyListResponse(BaseModel):
     """API key list response (never shows full key)."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     key_prefix: str
     name: str
     is_active: bool
     created_at: datetime
     last_used_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

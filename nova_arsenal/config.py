@@ -165,25 +165,44 @@ def _account_preferred_primary() -> Optional[LLMProviderConfig]:
         from nova_arsenal.llm.account_auth import get_account_store
 
         store = get_account_store()
-        # Prefer explicit local registration
-        for name in ("ollama", "local", "openai", "anthropic", "gemini"):
+
+        def _cfg_for(name: str, acc) -> LLMProviderConfig:
+            meta = acc.meta or {}
+            kind = meta.get("kind") or name
+            if acc.auth_type == "local":
+                provider = "ollama" if kind == "ollama" or name == "ollama" else "local"
+                return LLMProviderConfig(
+                    provider=provider,
+                    model=meta.get("model") or resolve_model(provider),
+                    url=meta.get("base_url") or resolve_url(provider),
+                    api_key="",
+                    timeout=120,
+                ).resolved()
+            key = acc.access_token if acc.access_token and acc.access_token != "local" else ""
+            provider = "openai" if name == "openai" else name
+            return LLMProviderConfig(
+                provider=provider,
+                model=meta.get("model") or resolve_model(provider),
+                url=meta.get("base_url") or resolve_url(provider),
+                api_key=key or resolve_api_key(provider),
+                timeout=120,
+            ).resolved()
+
+        # 1) Explicit local registration
+        for name in ("ollama", "local"):
+            acc = store.get(name)
+            if acc and acc.auth_type == "local":
+                return _cfg_for(name, acc)
+
+        # 2) Accounts marked prefer_as_primary or subscription OAuth
+        for name in ("openai", "anthropic", "gemini", "openrouter"):
             acc = store.get(name)
             if not acc:
                 continue
             meta = acc.meta or {}
-            if acc.auth_type == "local" or meta.get("prefer_as_primary"):
-                url = meta.get("base_url") or resolve_url(name)
-                model = meta.get("model") or resolve_model(name)
-                key = acc.access_token if acc.auth_type != "local" else ""
-                return LLMProviderConfig(
-                    provider="ollama" if name in {"ollama", "local"} and acc.auth_type == "local" and meta.get("kind") == "ollama"
-                    else ("openai" if name == "openai" else name if name != "local" else "ollama"),
-                    model=model,
-                    url=url,
-                    api_key=key if key and key != "local" else resolve_api_key(name),
-                    timeout=120,
-                ).resolved()
-            # Any valid openai oauth counts as ready primary candidate later
+            if meta.get("prefer_as_primary") or meta.get("subscription_auth") or acc.auth_type == "oauth":
+                if acc.access_token and not acc.is_expired():
+                    return _cfg_for(name, acc)
     except Exception:  # noqa: BLE001
         pass
     return None

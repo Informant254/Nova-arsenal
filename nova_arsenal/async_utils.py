@@ -211,8 +211,9 @@ class ResourceTracker:
         Returns:
             (is_within_limits, message)
         """
-        if self.active_tasks >= self.limits.max_concurrent_tasks:
-            return False, f"Max concurrent tasks ({self.limits.max_concurrent_tasks}) reached"
+        # Allow filling up to the max; only reject when strictly over the limit.
+        if self.active_tasks > self.limits.max_concurrent_tasks:
+            return False, f"Max concurrent tasks ({self.limits.max_concurrent_tasks}) exceeded"
 
         if self.total_tool_calls > self.limits.max_tool_calls_per_step:
             return False, f"Tool call budget exceeded"

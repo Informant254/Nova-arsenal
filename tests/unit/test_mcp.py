@@ -29,7 +29,11 @@ class TestNovaMcpServer:
         assert "compliance_check" in tool_names
         assert "ctf_solve" in tool_names
         assert "swarm_scan" in tool_names
-        assert len(tools) == 9
+        # Includes baseline tools + zeroday_hunt (and any future registrations)
+        assert len(tools) >= 10
+        names = {t["name"] for t in tools}
+        assert "zeroday_hunt" in names
+        assert "nmap_scan" in names
 
     def test_tool_has_input_schema(self):
         server = NovaMcpServer()
