@@ -486,37 +486,37 @@
         <div class="chat-container" id="chatContainer">
             <div class="welcome" id="welcome">
                 <div class="logo-big">NOVA</div>
-                <div class="tagline">Autonomous Security Research Platform</div>
+                <div class="tagline">Talk to me like any AI assistant — security is my specialty</div>
                 <div class="capabilities">
-                    <div class="capability" onclick="sendQuick('What can you do?')">
-                        <div class="icon">🤖</div>
-                        <div class="label">Converse</div>
-                        <div class="desc">Ask me anything</div>
+                    <div class="capability" onclick="sendQuick('Hey Nova — introduce yourself and what you can help with today.')">
+                        <div class="icon">💬</div>
+                        <div class="label">Just chat</div>
+                        <div class="desc">Normal conversation</div>
                     </div>
-                    <div class="capability" onclick="sendQuick('Scan my network for open ports')">
-                        <div class="icon">🔍</div>
-                        <div class="label">Recon</div>
-                        <div class="desc">Scan & enumerate</div>
-                    </div>
-                    <div class="capability" onclick="sendQuick('Write a reverse shell payload')">
-                        <div class="icon">💻</div>
-                        <div class="label">Code</div>
-                        <div class="desc">Generate exploits</div>
-                    </div>
-                    <div class="capability" onclick="sendQuick('How does nmap work?')">
-                        <div class="icon">🛠️</div>
-                        <div class="label">Tools</div>
-                        <div class="desc">Learn Kali tools</div>
-                    </div>
-                    <div class="capability" onclick="sendQuick('Run a full penetration test')">
-                        <div class="icon">⚔️</div>
-                        <div class="label">Pentest</div>
-                        <div class="desc">Autonomous attack</div>
-                    </div>
-                    <div class="capability" onclick="sendQuick('Explain SQL injection')">
+                    <div class="capability" onclick="sendQuick('Explain SSRF like I am a junior engineer, with a real-world example.')">
                         <div class="icon">📖</div>
                         <div class="label">Learn</div>
-                        <div class="desc">Security concepts</div>
+                        <div class="desc">Concepts, no jargon wall</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('How should I recon a web app I have permission to test?')">
+                        <div class="icon">🔍</div>
+                        <div class="label">Recon plan</div>
+                        <div class="desc">Authorized testing only</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('Write a small Python script that checks HTTP status codes for a list of URLs.')">
+                        <div class="icon">💻</div>
+                        <div class="label">Code</div>
+                        <div class="desc">Scripts & tooling</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('What is the difference between ChatGPT OAuth and an OpenAI API key for Nova?')">
+                        <div class="icon">🔑</div>
+                        <div class="label">Setup help</div>
+                        <div class="desc">OAuth / Ollama / keys</div>
+                    </div>
+                    <div class="capability" onclick="sendQuick('I have Ollama installed — how do I make you use it?')">
+                        <div class="icon">🖥️</div>
+                        <div class="label">Local LLM</div>
+                        <div class="desc">Free offline chat</div>
                     </div>
                 </div>
             </div>
@@ -530,7 +530,7 @@
             <div class="input-wrapper">
                 <textarea
                     id="messageInput"
-                    placeholder="Talk to Nova..."
+                    placeholder="Message Nova… (Enter to send, Shift+Enter for new line)"
                     rows="1"
                     onkeydown="handleKey(event)"
                     oninput="autoResize(this)"

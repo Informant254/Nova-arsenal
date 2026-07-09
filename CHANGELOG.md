@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Natural multi-turn chat** — conversation-first system prompts, full history, fixed SSE streaming via LLMRouter (not broken `active_providers`), offline fallback that still talks; web UI welcome copy for “chat like ChatGPT”
 - **ChatGPT / Codex subscription OAuth** — `nova-agent login --provider openai --oauth` (PKCE browser) and `--device-code` for headless; token refresh; preferred primary when signed in
 - **Local LLM first-class** — Ollama auto-discovery, `nova-agent login --provider ollama`, LM Studio/OpenAI-compatible local servers; `GET /api/llm/local`
 - **Account-style AI login (Codex / Claude Code)** — `nova-agent login`, import local Claude/Codex sessions, `CLAUDE_CODE_OAUTH_TOKEN`, Google OAuth for Gemini; tokens in `~/.nova/accounts.json`; API `/api/llm/accounts/*`

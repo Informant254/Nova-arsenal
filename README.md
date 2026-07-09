@@ -7,11 +7,39 @@
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-326CE5?logo=kubernetes&logoColor=white)](k8s/)
 
-**Autonomous Security Research Platform (V2.0 - The Most Powerful Open-Source Tool)**
+**Autonomous security research platform with a real conversational chat UI**
 
-Nova-Arsenal is the most advanced autonomous security agent platform ever created, with **300+ modules** covering reconnaissance, exploitation, analysis, and reporting. Features a massively parallel **V2.0 multi-agent swarm architecture**, a **Self-Evolution Loop**, a self-training RL pipeline, and enterprise-grade resilience patterns for production-grade autonomous operation.
+Nova is two things at once:
 
-> ⚠️ **Ethical Use Only** – Nova-Arsenal is built for authorized security research and bug bounty engagements. Only run against targets you have explicit written permission to test.
+1. **A chat assistant** — talk to it like ChatGPT/Claude/Grok (streaming web UI + VS Code + API).
+2. **A security agent stack** — recon, swarm, tools, and zero-day *candidate* research for **authorized** work only.
+
+### How powerful is it (honest)
+
+| Layer | Strength | Limit |
+|-------|----------|--------|
+| **Conversation** | Multi-turn chat with history, streaming, your LLM (ChatGPT OAuth / API keys / **local Ollama**) | Quality = whichever model you connect |
+| **Security knowledge** | Broad Kali/tooling/concepts; offline tool cards when no LLM | Not a substitute for an expert human |
+| **Automation** | Swarm phases, tool selection, integrations (Nmap/Burp/MSF/SQLmap APIs) | Needs tools installed + scope/authorization |
+| **Zero-day pipeline** | Fast ranking, variants, fuzz *plans*, crash triage | **Candidates in seconds**, not guaranteed 0-days |
+| **Subscriptions** | ChatGPT/Codex OAuth, API keys, Ollama | Claude Pro OAuth is not a clean third-party path |
+
+> ⚠️ **Ethical use only** — only test systems you have written permission to assess.
+
+### Chat like a normal AI
+
+```bash
+# 1) Give Nova a brain (pick one)
+nova-agent login --provider openai --oauth    # ChatGPT subscription
+# or
+nova-agent login --provider ollama            # free local
+
+# 2) Start API + open the chat UI
+python -m nova_arsenal.api
+# → http://localhost:8000   (Chat tab — stream replies)
+```
+
+Also: VS Code **Nova: Open Chat**, or `POST /api/chat/stream` / `POST /api/chat/send`.
 
 ---
 
