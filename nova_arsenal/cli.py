@@ -32,8 +32,13 @@ def main() -> None:
         "accounts",
         "llm-status",
         "help-login",
+        "session",
+        "sessions",
     }:
-        _account_main(sys.argv[1:])
+        if sys.argv[1] in {"session", "sessions"}:
+            _session_main(sys.argv[1:])
+        else:
+            _account_main(sys.argv[1:])
         return
 
     parser = argparse.ArgumentParser(
@@ -49,6 +54,10 @@ Examples:
   nova-agent login --provider gemini --oauth
   nova-agent accounts
   nova-agent llm-status
+
+  # Concurrent session with parallel sub-agents
+  nova-agent session --target lab.local --goal "Map surface and find high-risk issues" --authorized --auth-ref ENG-1
+  nova-agent sessions
 
   # Agent runs
   nova-agent --target example.com
@@ -418,6 +427,89 @@ def _account_main(argv: list[str]) -> None:
         reset_llm_router()
         print(json.dumps({"status": "ok", "account": cred.to_public_dict()}, indent=2))
         return
+
+
+def _session_main(argv: list[str]) -> None:
+    """CLI for concurrent multi-agent work sessions."""
+    parser = argparse.ArgumentParser(
+        prog="nova-agent session",
+        description="Run concurrent sub-agents under one work session",
+    )
+    sub = parser.add_subparsers(dest="cmd")
+
+    # `nova-agent session --goal ...`  OR  `nova-agent sessions`
+    if argv and argv[0] == "sessions":
+        from nova_arsenal.sessions import get_session_manager
+
+        mgr = get_session_manager()
+        rows = []
+        for s in mgr.list_sessions()[:30]:
+            rows.append(
+                {
+                    "session_id": s.session_id,
+                    "status": s.status.value,
+                    "target": s.target,
+                    "goal": s.goal[:80],
+                    "agents": len(s.agents),
+                    "findings": len(s.aggregated_findings),
+                }
+            )
+        print(json.dumps({"sessions": rows}, indent=2))
+        return
+
+    # strip leading "session"
+    args_list = argv[1:] if argv and argv[0] == "session" else argv
+    parser.add_argument("--goal", required=True, help="Task for the multi-agent team")
+    parser.add_argument("--target", default="", help="Target host/domain/IP")
+    parser.add_argument(
+        "--roles",
+        default="recon,web,osint,researcher,exploit,validator,reporter",
+        help="Comma-separated sub-agent roles",
+    )
+    parser.add_argument("--max-concurrent", type=int, default=6)
+    parser.add_argument("--authorized", action="store_true")
+    parser.add_argument("--auth-ref", default="")
+    parser.add_argument("--wait", action="store_true", help="Wait until session finishes")
+    parser.add_argument("--json", action="store_true", help="Print full JSON result")
+    args = parser.parse_args(args_list)
+
+    from nova_arsenal.sessions import get_session_manager
+
+    mgr = get_session_manager()
+    roles = [r.strip() for r in args.roles.split(",") if r.strip()]
+    sess = mgr.create(
+        goal=args.goal,
+        target=args.target or "unspecified",
+        roles=roles,
+        max_concurrent=args.max_concurrent,
+        authorized=bool(args.authorized),
+        authorization_ref=args.auth_ref,
+    )
+    print(f"Session {sess.session_id} created — spawning {len(sess.agents)} sub-agents…")
+
+    async def run():
+        # Always wait for concurrent agents so the CLI prints a complete result
+        return await mgr.start(sess.session_id, wait=True)
+
+    final = asyncio.run(run())
+    if not final:
+        print("Session vanished")
+        sys.exit(1)
+    if args.json:
+        print(json.dumps(final.to_dict(), indent=2)[:12000])
+    else:
+        print(f"Status: {final.status.value}")
+        print(final.summary)
+        print(f"Findings: {len(final.aggregated_findings)} | Consensus: {len(final.consensus)}")
+        for aid, a in final.agents.items():
+            print(
+                f"  [{a.status.value}] {a.role.value:12} "
+                f"findings={len(a.findings):2}  {a.summary[:70]}"
+            )
+        if final.consensus:
+            print("\nTop consensus:")
+            for f in final.consensus[:8]:
+                print(f"  - [{f.get('severity','?')}] {f.get('title','')[:90]}")
 
 
 if __name__ == "__main__":

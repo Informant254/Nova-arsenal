@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Concurrent work sessions + sub-agents** — `SessionManager` runs recon/web/osint/researcher/exploit/validator/reporter **in parallel** under one session; API `/api/work-sessions`, CLI `nova-agent session`, consensus aggregation, event stream, disk persistence
 - **Natural multi-turn chat** — conversation-first system prompts, full history, fixed SSE streaming via LLMRouter (not broken `active_providers`), offline fallback that still talks; web UI welcome copy for “chat like ChatGPT”
 - **ChatGPT / Codex subscription OAuth** — `nova-agent login --provider openai --oauth` (PKCE browser) and `--device-code` for headless; token refresh; preferred primary when signed in
 - **Local LLM first-class** — Ollama auto-discovery, `nova-agent login --provider ollama`, LM Studio/OpenAI-compatible local servers; `GET /api/llm/local`

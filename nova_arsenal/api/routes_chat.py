@@ -85,6 +85,8 @@ INTENT_PATTERNS = [
         "scan ", "scan my", "pentest", "penetration test", "run nmap",
         "exploit ", "brute force", "start agent", "autonomous",
         "zero-day", "zeroday", "swarm scan", "recon on",
+        "sub-agent", "subagent", "work session", "parallel agents",
+        "multi-agent", "spawn agents",
     ]),
     ("code_request", [
         "write code", "write a script", "generate code", "write me a",

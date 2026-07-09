@@ -47,6 +47,10 @@ from nova_arsenal.zeroday import (
     AttackSurfaceMapper, VariantAnalyzer, FuzzOrchestrator, LiveFuzzWorker,
     CrashTriageEngine, StaticBugScanner, NoveltyScorer, findings_to_services,
 )
+from nova_arsenal.sessions import (
+    SessionManager, get_session_manager, TaskSession, SubAgentRole,
+    SessionStatus, SubAgentResult,
+)
 
 __all__ = [
     "MetasploitRPC", "BurpAPI", "NmapParser", "SQLmapAPI",
@@ -71,4 +75,6 @@ __all__ = [
     "ZeroDayHunter", "ZeroDayHuntConfig", "ZeroDayHuntResult", "ZeroDayCandidate",
     "AttackSurfaceMapper", "VariantAnalyzer", "FuzzOrchestrator", "LiveFuzzWorker",
     "CrashTriageEngine", "StaticBugScanner", "NoveltyScorer", "findings_to_services",
+    "SessionManager", "get_session_manager", "TaskSession", "SubAgentRole",
+    "SessionStatus", "SubAgentResult",
 ]

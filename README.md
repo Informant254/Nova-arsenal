@@ -41,6 +41,70 @@ python -m nova_arsenal.api
 
 Also: VS Code **Nova: Open Chat**, or `POST /api/chat/stream` / `POST /api/chat/send`.
 
+### Concurrent sessions + sub-agents
+
+Spin up a **work session** that runs specialized sub-agents **at the same time** toward one goal:
+
+| Role | Job |
+|------|-----|
+| `recon` | Attack surface map + tool suggestions |
+| `web` | Web path / risk checklist |
+| `osint` | Passiveive intel |
+| `researcher` | Zero-day candidate pipeline |
+| `exploit` | Authorized exploit planning |
+| `validator` | Promote / dedupe peer findings |
+| `reporter` | Session summary |
+
+```bash
+# CLI — all roles run concurrently (bounded by --max-concurrent)
+nova-agent session \
+  --target lab.example.local \
+  --goal "Map surface and surface high-risk candidates" \
+  --roles recon,web,osint,researcher,validator,reporter \
+  --max-concurrent 6 \
+  --authorized --auth-ref ENG-42
+
+nova-agent sessions   # list recent sessions
+```
+
+```bash
+# API
+curl -s -X POST http://localhost:8000/api/work-sessions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "goal": "Parallel recon + research on lab target",
+    "target": "lab.example.local",
+    "roles": ["recon","web","researcher","validator","reporter"],
+    "max_concurrent": 5,
+    "authorized": true,
+    "authorization_ref": "ENG-42",
+    "auto_start": true
+  }' | jq .
+
+# Poll status / live events
+curl -s http://localhost:8000/api/work-sessions/<session_id> | jq .status,.summary
+curl -s http://localhost:8000/api/work-sessions/<session_id>/events | jq .
+curl -s http://localhost:8000/api/work-sessions/<session_id>/agents | jq .
+```
+
+```python
+from nova_arsenal import get_session_manager
+
+mgr = get_session_manager()
+sess = mgr.create(
+    goal="Concurrent assessment",
+    target="lab.local",
+    roles=["recon", "web", "researcher", "validator", "reporter"],
+    max_concurrent=5,
+    authorized=True,
+    authorization_ref="ENG-1",
+)
+final = await mgr.start(sess.session_id, wait=True)
+print(final.summary, len(final.consensus))
+```
+
+Sessions persist under `~/.nova/work_sessions/` and emit lifecycle events (`agent_started`, `agent_completed`, `session_completed`) for UIs.
+
 ---
 
 ## Features
