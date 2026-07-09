@@ -18,7 +18,7 @@ Nova-Arsenal is the most advanced autonomous security agent platform ever create
 ## Features
 
 - **300+ Security Modules** – Massive Kali Linux knowledge base across 35 categories, including new Cloud, AD, Mobile, and IoT/SCADA suites.
-- **V2.0 Multi-Agent Swarm** – Massively parallel Recon, Web, Exploit, OSINT, **Validator**, and **Researcher** agents with a weighted, validator-aware consensus engine.
+- **V2.0 Multi-Agent Swarm** – Phased orchestration: **Recon → Zero-Day Researcher → Web/Exploit/Validator**, with weighted consensus. Researcher automatically runs `ZeroDayHunter` on recon output.
 - **Self-Evolution Loop** – Nova now analyzes her own trajectories in real-time, detecting failures, breaking infinite loops, and self-authoring new skills autonomously.
 - **Fugu-Style LLM Orchestration** – Dynamic routing across 10 providers (Anthropic, OpenAI, Gemini, DeepSeek, Qwen, OpenRouter, Ollama, HuggingFace, Opencode) with automatic fallback
 - **Native Tool Integrations** – Programmatic control of Metasploit (msfrpcd REST), Burp Suite (REST API + GraphQL), SQLmap (API mode), and Nmap (XML parsing)
@@ -36,8 +36,126 @@ Nova-Arsenal is the most advanced autonomous security agent platform ever create
 - **Web Dashboard** – Dark-themed Next.js UI with real-time agent chat, target management, findings review, and skills approval queue
 - **E2E Encryption** – RSA-4096 + AES-256-GCM for agent communications
 - **🔄 Production Resilience** – Async timeouts, circuit breakers, retry budgets, and resource limits prevent agent hangs and cascading failures
+- **⚡ Zero-Day Candidate Pipeline** – Seconds-scale attack-surface ranking, CVE variant/patch-gap analysis, static bug-class scan, **live fuzz worker** (ffuf / AFL++ / honggfuzz / radamsa / HTTP mutator when installed), crash triage, and novelty scoring. Outputs ranked *research candidates* (not auto-confirmed 0-days). Authorization-gated for live execution.
 
 📖 **[See the full feature reference →](docs/FEATURES.md)** — deep-dive config snippets and internals for every module above.
+
+---
+
+## Zero-Day Research Stack (v1.3)
+
+### What is wired
+
+| Layer | Module | Status |
+|-------|--------|--------|
+| Surface ranking | `nova_arsenal.zeroday.surface` | ✅ |
+| Variant / patch-gap | `nova_arsenal.zeroday.variant` | ✅ |
+| Static sinks | `nova_arsenal.zeroday.static_scanner` | ✅ |
+| Fuzz campaign planner | `nova_arsenal.zeroday.fuzz_orchestrator` | ✅ |
+| **Live fuzz worker** | `nova_arsenal.zeroday.fuzz_worker` | ✅ detects + runs installed engines |
+| Crash triage | `nova_arsenal.zeroday.crash_triage` | ✅ |
+| Novelty filter | `nova_arsenal.zeroday.novelty` | ✅ |
+| Unified hunter | `nova_arsenal.zeroday.pipeline` | ✅ |
+| Recon → services bridge | `nova_arsenal.zeroday.recon_bridge` | ✅ |
+| **Swarm Researcher** | `nova_arsenal.swarm` phase `researcher_zeroday` | ✅ after recon |
+| CLI | `--zeroday`, `--swarm`, `--live-fuzz` | ✅ |
+| MCP tool | `zeroday_hunt`, `swarm_scan` | ✅ |
+| Tool schema | `zeroday_hunt` in `NOVA_SECURITY_TOOLS` | ✅ |
+| Tool selector | web/SMB → recommend zeroday_hunt | ✅ |
+| Package export | `from nova_arsenal import ZeroDayHunter, LiveFuzzWorker, ...` | ✅ |
+
+### CLI
+
+```bash
+# 1) Candidate pipeline (plan + rank). Live engines only with --live-fuzz --authorized
+nova-agent --target lab.example.local --zeroday --authorized --auth-ref ENG-42 \
+  --services-json '{"https":{"ports":[443],"version":"nginx/1.25","paths":["/upload","/api"]}}'
+
+# 2) Same + live fuzz (ffuf/AFL++/http_mutator when installed on PATH)
+nova-agent --target lab.example.local --zeroday --authorized --auth-ref ENG-42 --live-fuzz
+
+# 3) Full swarm: recon → zeroday researcher → web/exploit/validator
+nova-agent --target lab.example.local --swarm --authorized --auth-ref ENG-42
+nova-agent --target lab.example.local --swarm --authorized --auth-ref ENG-42 --live-fuzz
+```
+
+### Python API
+
+```python
+from nova_arsenal import (
+    ZeroDayHunter, ZeroDayHuntConfig, LiveFuzzWorker,
+    SwarmOrchestrator, findings_to_services,
+)
+
+# Standalone hunt
+result = await ZeroDayHunter().hunt(
+    target="lab.example.local",
+    services={"https": {"ports": [443], "paths": ["/upload"], "params": ["file"]}},
+    config=ZeroDayHuntConfig(
+        authorized=True,
+        authorization_ref="ENG-42",
+        execute_fuzz=True,      # live worker
+        dry_run_fuzz=False,     # actually run available engines
+        live_fuzz=True,
+        fuzz_job_timeout=60,
+    ),
+)
+
+# Swarm with automatic researcher phase after recon
+swarm = SwarmOrchestrator(
+    target="lab.example.local",
+    enable_zeroday=True,
+    zeroday_authorized=True,
+    zeroday_auth_ref="ENG-42",
+    execute_live_fuzz=True,
+    dry_run_fuzz=False,
+)
+swarm_result = await swarm.run_swarm()
+print(swarm_result.summary)
+print(swarm_result.zeroday_hunt["candidate_count"])
+```
+
+### Live fuzz worker
+
+`LiveFuzzWorker` probes the host for:
+
+- **ffuf** — content discovery / path surface expansion  
+- **afl-fuzz** (AFL++) — coverage-guided binary fuzz (needs `binary_path` + corpus)  
+- **honggfuzz** / **radamsa** — when installed  
+- **http_mutator** — built-in Nova HTTP edge-case mutator (always available with Python)  
+
+Missing tools are **skipped** (not fatal). Crashes under `./fuzz_out` are collected and fed into crash triage.
+
+```python
+from nova_arsenal.zeroday import FuzzOrchestrator, LiveFuzzWorker, AttackSurfaceMapper
+
+surface = AttackSurfaceMapper().map("lab.local", services={"http": [80]})
+campaign = FuzzOrchestrator().plan("lab.local", surface.endpoints)
+worker = LiveFuzzWorker(authorized=True, authorization_ref="ENG-42", output_dir="./fuzz_out")
+print(worker.detect_engines())
+live = await worker.run(campaign, dry_run=False, job_timeout=45)
+```
+
+### Swarm phase flow
+
+```
+┌─────────┐    services/findings     ┌──────────────────────┐
+│  RECON  │ ───────────────────────► │ RESEARCHER           │
+│ (+OSINT)│                          │  ZeroDayHunter       │
+└─────────┘                          │  + LiveFuzzWorker    │
+                                     └──────────┬───────────┘
+                                                │ candidates
+                     ┌──────────────────────────┼──────────────┐
+                     ▼                          ▼              ▼
+                  ┌─────┐                  ┌─────────┐   ┌───────────┐
+                  │ WEB │                  │ EXPLOIT │   │ VALIDATOR │
+                  └─────┘                  └─────────┘   └───────────┘
+                                    │
+                                    ▼
+                              consensus merge
+```
+
+> **Reality check:** orchestration and prioritization run in milliseconds–seconds. Live fuzz runtime is capped (`fuzz_job_timeout`) so the agent stays responsive; deep AFL++ campaigns should be run longer in dedicated lab jobs. Confirmed zero-days still need human validation and responsible disclosure.
 
 ---
 

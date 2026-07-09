@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Zero-Day Candidate Pipeline (`nova_arsenal.zeroday`)** — high-speed research stack:
+  - Parallel attack-surface ranking (`AttackSurfaceMapper`)
+  - CVE variant / patch-gap analysis (`VariantAnalyzer`)
+  - Static bug-class heuristics (`StaticBugScanner`)
+  - Multi-engine fuzz campaign orchestration (`FuzzOrchestrator`)
+  - **Live fuzz worker** (`LiveFuzzWorker`) — detects/runs ffuf, AFL++, honggfuzz, radamsa, HTTP mutator
+  - Crash triage & dedup (`CrashTriageEngine`)
+  - Novelty scoring vs known CVE fingerprints (`NoveltyScorer`)
+  - Recon→services bridge (`findings_to_services`)
+  - Unified hunter (`ZeroDayHunter`) with authorization gate
+- **Swarm phase wiring:** recon → `researcher_zeroday` (auto ZeroDayHunter) → web/exploit/validator
+- CLI: `--zeroday`, `--swarm`, `--live-fuzz`, `--authorized`, `--auth-ref`
+- MCP: `zeroday_hunt`; `swarm_scan` returns phases + zeroday candidate count
+- Tool schema + tool-selector rules for zeroday research
+- Unit tests: `tests/unit/test_zeroday.py`, `tests/unit/test_swarm_zeroday.py`
+
+### Notes
+- Pipeline optimizes *seconds-scale prioritization and planning*. Live fuzz uses short
+  job timeouts by default. It does **not** guarantee confirmed zero-day discovery;
+  candidates require human validation and responsible disclosure. Authorized testing only.
+
+### Previous
 - Initial release of Nova-Arsenal platform
 - 70+ security modules (recon, attack, analysis, reporting)
 - Multi-LLM support (Ollama, OpenAI, Anthropic, Gemini)

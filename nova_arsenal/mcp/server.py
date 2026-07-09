@@ -157,6 +157,35 @@ class NovaMcpServer:
                 "required": ["target"],
             },
         )
+        self._register_tool(
+            "zeroday_hunt",
+            "High-speed zero-day candidate pipeline (surface, variants, static, fuzz plan, crash triage). Authorized use only.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "description": "Authorized target"},
+                    "authorization_ref": {
+                        "type": "string",
+                        "description": "Engagement / RoE / ticket ID",
+                    },
+                    "authorized": {
+                        "type": "boolean",
+                        "description": "Must be true to run",
+                        "default": False,
+                    },
+                    "services": {
+                        "type": "object",
+                        "description": "Optional service map from recon",
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "description": "Max ranked candidates",
+                        "default": 50,
+                    },
+                },
+                "required": ["target", "authorization_ref", "authorized"],
+            },
+        )
 
     def _register_tool(self, name: str, description: str,
                        input_schema: Dict[str, Any]) -> None:
@@ -319,18 +348,54 @@ class NovaMcpServer:
                 return json.dumps({"solved": False, "reason": "Flag not found"}, indent=2)
 
             elif tool_name == "swarm_scan":
-                swarm = SwarmOrchestrator()
-                if arguments.get("roles"):
-                    swarm = SwarmOrchestrator.create_swarm(roles=arguments["roles"])
-                result = await swarm.run_swarm(arguments["target"])
+                roles = arguments.get("roles")
+                swarm = SwarmOrchestrator.create_swarm(
+                    target=arguments["target"],
+                    roles=roles,
+                    enable_zeroday=arguments.get("enable_zeroday", True),
+                    zeroday_authorized=bool(arguments.get("authorized", False)),
+                    zeroday_auth_ref=str(arguments.get("authorization_ref") or ""),
+                    execute_live_fuzz=bool(arguments.get("execute_live_fuzz", False)),
+                    dry_run_fuzz=bool(arguments.get("dry_run_fuzz", True)),
+                )
+                result = await swarm.run_swarm()
                 return json.dumps({
                     "findings": [
-                        {"title": f.title, "severity": f.severity,
-                         "agent_role": f.agent_role, "confidence": f.confidence}
+                        {
+                            "title": f.title,
+                            "severity": f.severity,
+                            "agent_role": f.agent_role.value if hasattr(f.agent_role, "value") else f.agent_role,
+                            "confidence": f.confidence,
+                        }
                         for f in result.findings
                     ],
                     "summary": result.summary,
+                    "phases": result.phases,
+                    "zeroday_candidates": (
+                        (result.zeroday_hunt or {}).get("candidate_count")
+                        if result.zeroday_hunt
+                        else 0
+                    ),
                 }, indent=2)
+
+            elif tool_name == "zeroday_hunt":
+                from nova_arsenal.zeroday import ZeroDayHunter, ZeroDayHuntConfig
+
+                if not arguments.get("authorized"):
+                    return json.dumps({
+                        "error": "zeroday_hunt requires authorized=true and a valid authorization_ref",
+                    })
+                hunter = ZeroDayHunter()
+                result = await hunter.hunt(
+                    target=arguments["target"],
+                    services=arguments.get("services") or {},
+                    config=ZeroDayHuntConfig(
+                        authorized=True,
+                        authorization_ref=str(arguments.get("authorization_ref") or ""),
+                        max_candidates=int(arguments.get("max_candidates") or 50),
+                    ),
+                )
+                return json.dumps(result.to_dict(), indent=2)
 
             else:
                 return json.dumps({"error": f"Unknown tool: {tool_name}"})

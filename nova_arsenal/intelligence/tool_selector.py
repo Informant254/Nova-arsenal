@@ -121,6 +121,17 @@ class ToolSelector:
                         priority=8,
                         phase="exploitation",
                     ),
+                    ToolSuggestion(
+                        tool_name="zeroday_hunt",
+                        tool_type="zeroday",
+                        command="",
+                        reasoning=(
+                            "Web surface present: run ZeroDayHunter for variant analysis, "
+                            "static sinks, and parallel fuzz campaign planning (authorized only)"
+                        ),
+                        priority=9,
+                        phase="research",
+                    ),
                 ],
             },
             # ── SMB Services ──
@@ -166,6 +177,17 @@ class ToolSelector:
                         reasoning="NSE scripts for known SMB vulnerabilities (EternalBlue, etc.)",
                         priority=9,
                         phase="exploitation",
+                    ),
+                    ToolSuggestion(
+                        tool_name="zeroday_hunt",
+                        tool_type="zeroday",
+                        command="",
+                        reasoning=(
+                            "SMB is a high-yield 0-day surface historically; prioritize "
+                            "variant/patch-gap research and protocol fuzz planning"
+                        ),
+                        priority=10,
+                        phase="research",
                     ),
                 ],
             },

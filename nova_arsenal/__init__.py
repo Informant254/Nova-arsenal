@@ -3,7 +3,7 @@ Nova-Arsenal: Autonomous Security Research Platform
 
 A comprehensive security agent platform with 70+ modules covering
 reconnaissance, exploitation, analysis, intelligence, CTF solving,
-MCP integration, and E2E encryption.
+MCP integration, E2E encryption, and zero-day candidate research.
 
 Sub-packages:
 - integrations: Native API/RPC clients for Metasploit, Burp, Nmap, SQLmap
@@ -13,9 +13,10 @@ Sub-packages:
 - swarm: Multi-agent parallel orchestration with weighted voting
 - crypto: E2E encryption with RSA key exchange + AES-GCM
 - mcp: Model Context Protocol server for AI agent interoperability
+- zeroday: High-speed zero-day *candidate* discovery pipeline
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __author__ = "Informant254"
 
 from nova_arsenal.integrations import MetasploitRPC, BurpAPI, NmapParser, SQLmapAPI
@@ -41,6 +42,11 @@ from nova_arsenal.tool_definitions import (
     ToolSchema, CURSOR_BUILTIN_TOOLS, NOVA_SECURITY_TOOLS, ALL_TOOLS,
     get_tool_by_name, tools_to_openai_format, tools_to_anthropic_format,
 )
+from nova_arsenal.zeroday import (
+    ZeroDayHunter, ZeroDayHuntConfig, ZeroDayHuntResult, ZeroDayCandidate,
+    AttackSurfaceMapper, VariantAnalyzer, FuzzOrchestrator, LiveFuzzWorker,
+    CrashTriageEngine, StaticBugScanner, NoveltyScorer, findings_to_services,
+)
 
 __all__ = [
     "MetasploitRPC", "BurpAPI", "NmapParser", "SQLmapAPI",
@@ -62,4 +68,7 @@ __all__ = [
     "COT_INSTRUCTION",
     "ToolSchema", "CURSOR_BUILTIN_TOOLS", "NOVA_SECURITY_TOOLS", "ALL_TOOLS",
     "get_tool_by_name", "tools_to_openai_format", "tools_to_anthropic_format",
+    "ZeroDayHunter", "ZeroDayHuntConfig", "ZeroDayHuntResult", "ZeroDayCandidate",
+    "AttackSurfaceMapper", "VariantAnalyzer", "FuzzOrchestrator", "LiveFuzzWorker",
+    "CrashTriageEngine", "StaticBugScanner", "NoveltyScorer", "findings_to_services",
 ]

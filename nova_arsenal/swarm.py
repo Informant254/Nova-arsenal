@@ -1,9 +1,14 @@
 """
 Multi-Agent Swarm Architecture.
 
-Parallel sub-agents (Recon, Web, Exploit, OSINT) that work
-collaboratively with weighted voting for consensus decisions.
+Phased orchestration:
+1. RECON (+ optional OSINT) discovers surface
+2. RESEARCHER runs ZeroDayHunter on recon output (variant/fuzz/novelty)
+3. WEB / EXPLOIT / VALIDATOR run with recon context
+4. Weighted consensus merge
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -57,6 +62,9 @@ class SwarmResult:
     agent_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
     total_steps: int = 0
     elapsed_seconds: float = 0.0
+    zeroday_hunt: Optional[Dict[str, Any]] = None
+    phases: List[str] = field(default_factory=list)
+    summary: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -66,6 +74,9 @@ class SwarmResult:
             "agent_stats": self.agent_stats,
             "total_steps": self.total_steps,
             "elapsed_seconds": self.elapsed_seconds,
+            "zeroday_hunt": self.zeroday_hunt,
+            "phases": self.phases,
+            "summary": self.summary,
         }
 
 
@@ -107,78 +118,266 @@ AGENT_ROLE_CONFIGS: Dict[SwarmAgentRole, Dict[str, str]] = {
         "persona": "Validator - skeptical auditor focused on proof and reliability",
     },
     SwarmAgentRole.RESEARCHER: {
-        "objective": "Search for novel exploits and CVE details for specific versions found",
-        "persona": "Security Researcher - deep-diver into documentation and exploit databases",
+        "objective": (
+            "After recon, run zero-day candidate research: variant/patch-gap analysis, "
+            "surface ranking, fuzz campaign planning, and novelty scoring"
+        ),
+        "persona": "Security Researcher - zero-day candidate pipeline operator",
     },
 }
 
 
 class SwarmOrchestrator:
     """
-    Orchestrates multiple agent roles in parallel.
+    Orchestrates multiple agent roles in phases.
 
-    Each agent works independently on its specialty, then results
-    are merged with weighted voting for consensus findings.
+    Default flow:
+      recon (+osint) → researcher/zeroday → web+exploit+validator → consensus
     """
 
     def __init__(
         self,
-        target: str,
+        target: str = "",
         executor: Optional[SandboxExecutor] = None,
         llm_complete: Optional[Callable[..., Any]] = None,
         on_event: Optional[Callable[..., Any]] = None,
         configs: Optional[List[SwarmAgentConfig]] = None,
+        # Zero-day research integration
+        enable_zeroday: bool = True,
+        zeroday_authorized: bool = False,
+        zeroday_auth_ref: str = "",
+        execute_live_fuzz: bool = False,
+        dry_run_fuzz: bool = True,
     ) -> None:
         self.target = target
         self.executor = executor or SandboxExecutor(mode="local")
         self._llm_complete = llm_complete
         self._on_event = on_event
+        self.enable_zeroday = enable_zeroday
+        self.zeroday_authorized = zeroday_authorized
+        self.zeroday_auth_ref = zeroday_auth_ref
+        self.execute_live_fuzz = execute_live_fuzz
+        self.dry_run_fuzz = dry_run_fuzz
 
         if configs:
             self.agent_configs = configs
         else:
             self.agent_configs = [
                 SwarmAgentConfig(role=role, max_steps=10, weight=w)
-                for role, w in [(SwarmAgentRole.RECON, 1.0),
-                                (SwarmAgentRole.WEB, 1.1),
-                                (SwarmAgentRole.EXPLOIT, 1.3),
-                                (SwarmAgentRole.OSINT, 0.8),
-                                (SwarmAgentRole.VALIDATOR, 1.5),
-                                (SwarmAgentRole.RESEARCHER, 1.2)]
+                for role, w in [
+                    (SwarmAgentRole.RECON, 1.0),
+                    (SwarmAgentRole.WEB, 1.1),
+                    (SwarmAgentRole.EXPLOIT, 1.3),
+                    (SwarmAgentRole.OSINT, 0.8),
+                    (SwarmAgentRole.VALIDATOR, 1.5),
+                    (SwarmAgentRole.RESEARCHER, 1.2),
+                ]
             ]
 
     async def run(self) -> SwarmResult:
+        """Phased swarm: recon → zeroday researcher → remaining agents."""
+        return await self.run_swarm(self.target)
+
+    async def run_swarm(self, target: Optional[str] = None) -> SwarmResult:
+        if target:
+            self.target = target
+        if not self.target:
+            raise ValueError("SwarmOrchestrator requires a target")
+
         start_time = datetime.now(timezone.utc)
         result = SwarmResult(target=self.target)
+        result.phases = []
 
-        tasks = []
-        for config in self.agent_configs:
-            tasks.append(self._run_agent(config))
+        by_role = {c.role: c for c in self.agent_configs}
+        recon_roles = [r for r in (SwarmAgentRole.RECON, SwarmAgentRole.OSINT) if r in by_role]
+        researcher_cfg = by_role.get(SwarmAgentRole.RESEARCHER)
+        later_roles = [
+            r
+            for r in (
+                SwarmAgentRole.WEB,
+                SwarmAgentRole.EXPLOIT,
+                SwarmAgentRole.VALIDATOR,
+            )
+            if r in by_role
+        ]
 
-        agent_results = await asyncio.gather(*tasks, return_exceptions=True)
+        # ── Phase 1: recon (+ osint) ──────────────────────────────────────
+        recon_findings: List[SwarmFinding] = []
+        if recon_roles:
+            result.phases.append("recon")
+            await self._emit("swarm_phase", {"phase": "recon", "roles": [r.value for r in recon_roles]})
+            phase1 = await asyncio.gather(
+                *[self._run_agent(by_role[r]) for r in recon_roles],
+                return_exceptions=True,
+            )
+            for role, agent_result in zip(recon_roles, phase1):
+                if isinstance(agent_result, Exception):
+                    logger.error("Swarm agent %s failed: %s", role.value, agent_result)
+                    result.agent_stats[role.value] = {"status": "error", "error": str(agent_result)}
+                    continue
+                findings, stats = agent_result
+                recon_findings.extend(findings)
+                result.findings.extend(findings)
+                result.agent_stats[role.value] = stats
+                result.total_steps += stats.get("steps", 0)
 
-        for i, agent_result in enumerate(agent_results):
-            config = self.agent_configs[i]
-            role_name = config.role.value
+        # ── Phase 2: researcher + ZeroDayHunter (after recon) ─────────────
+        if researcher_cfg and self.enable_zeroday:
+            result.phases.append("researcher_zeroday")
+            await self._emit(
+                "swarm_phase",
+                {"phase": "researcher_zeroday", "recon_findings": len(recon_findings)},
+            )
+            zd_findings, zd_stats, zd_payload = await self._run_researcher_zeroday(
+                researcher_cfg,
+                recon_findings,
+            )
+            result.findings.extend(zd_findings)
+            result.agent_stats[SwarmAgentRole.RESEARCHER.value] = zd_stats
+            result.zeroday_hunt = zd_payload
+            result.total_steps += zd_stats.get("steps", 0)
+        elif researcher_cfg:
+            # Fallback: classic agent runner for researcher
+            result.phases.append("researcher")
+            try:
+                findings, stats = await self._run_agent(researcher_cfg)
+                result.findings.extend(findings)
+                result.agent_stats[researcher_cfg.role.value] = stats
+                result.total_steps += stats.get("steps", 0)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Researcher agent failed: %s", exc)
 
-            if isinstance(agent_result, Exception):
-                logger.error(f"Swarm agent {role_name} failed: {agent_result}")
-                continue
+        # ── Phase 3: web / exploit / validator ────────────────────────────
+        if later_roles:
+            result.phases.append("deep_scan")
+            await self._emit(
+                "swarm_phase",
+                {"phase": "deep_scan", "roles": [r.value for r in later_roles]},
+            )
+            phase3 = await asyncio.gather(
+                *[self._run_agent(by_role[r]) for r in later_roles],
+                return_exceptions=True,
+            )
+            for role, agent_result in zip(later_roles, phase3):
+                if isinstance(agent_result, Exception):
+                    logger.error("Swarm agent %s failed: %s", role.value, agent_result)
+                    result.agent_stats[role.value] = {"status": "error", "error": str(agent_result)}
+                    continue
+                findings, stats = agent_result
+                result.findings.extend(findings)
+                result.agent_stats[role.value] = stats
+                result.total_steps += stats.get("steps", 0)
 
-            findings, stats = agent_result
-            result.findings.extend(findings)
-            result.agent_stats[role_name] = stats
+        # Any other custom roles not in the phased sets
+        handled = set(recon_roles) | set(later_roles)
+        if researcher_cfg:
+            handled.add(SwarmAgentRole.RESEARCHER)
+        extras = [c for c in self.agent_configs if c.role not in handled]
+        if extras:
+            result.phases.append("extra")
+            extra_results = await asyncio.gather(
+                *[self._run_agent(c) for c in extras],
+                return_exceptions=True,
+            )
+            for config, agent_result in zip(extras, extra_results):
+                if isinstance(agent_result, Exception):
+                    continue
+                findings, stats = agent_result
+                result.findings.extend(findings)
+                result.agent_stats[config.role.value] = stats
 
         result.consensus_findings = self._compute_consensus(result.findings)
         result.elapsed_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
-
-        logger.info(
-            f"Swarm complete: {len(result.findings)} findings, "
-            f"{len(result.consensus_findings)} consensus, "
-            f"{result.elapsed_seconds:.1f}s"
+        zd_n = 0
+        if result.zeroday_hunt:
+            zd_n = result.zeroday_hunt.get("candidate_count") or len(
+                result.zeroday_hunt.get("candidates") or []
+            )
+        result.summary = (
+            f"phases={result.phases}; findings={len(result.findings)}; "
+            f"consensus={len(result.consensus_findings)}; "
+            f"zeroday_candidates={zd_n}; elapsed={result.elapsed_seconds:.1f}s"
         )
 
+        logger.info("Swarm complete: %s", result.summary)
+        await self._emit("swarm_completed", result.to_dict())
         return result
+
+    async def _run_researcher_zeroday(
+        self,
+        config: SwarmAgentConfig,
+        recon_findings: List[SwarmFinding],
+    ) -> tuple:
+        """Run ZeroDayHunter using recon output; emit SwarmFindings from candidates."""
+        from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter, findings_to_services
+
+        services = findings_to_services(recon_findings, target=self.target)
+        findings_payload = [f.to_dict() for f in recon_findings]
+
+        # Research planning always runs after recon; live fuzz only when authorized.
+        authorized = self.zeroday_authorized
+        auth_ref = self.zeroday_auth_ref or f"swarm:{self.target}"
+        live = bool(self.execute_live_fuzz and authorized)
+
+        hunter = ZeroDayHunter()
+        hunt = await hunter.hunt(
+            target=self.target,
+            services=services,
+            findings=findings_payload,
+            config=ZeroDayHuntConfig(
+                authorized=authorized,
+                authorization_ref=auth_ref,
+                require_authorization=False,  # candidate pipeline after recon (plan-safe)
+                execute_fuzz=live,
+                dry_run_fuzz=(not live) or self.dry_run_fuzz,
+                live_fuzz=True,
+                max_candidates=40,
+            ),
+        )
+
+        swarm_findings: List[SwarmFinding] = []
+        for c in hunt.candidates:
+            swarm_findings.append(
+                SwarmFinding(
+                    agent_role=SwarmAgentRole.RESEARCHER,
+                    title=c.title,
+                    severity=c.severity if c.severity in {"low", "medium", "high", "critical"} else "medium",
+                    description=c.evidence or c.bug_class,
+                    evidence=(
+                        f"novelty={c.novelty:.2f}; stage={c.source_stage}; "
+                        f"next={'; '.join(c.next_steps[:2])}"
+                    ),
+                    confidence=min(1.0, config.weight * (0.4 + 0.6 * c.confidence * c.novelty)),
+                    votes=1,
+                )
+            )
+
+        # Always attach a summary finding so swarm consumers see the pipeline ran
+        swarm_findings.insert(
+            0,
+            SwarmFinding(
+                agent_role=SwarmAgentRole.RESEARCHER,
+                title=f"Zero-day pipeline: {len(hunt.candidates)} candidates ({hunt.status})",
+                severity="info" if hunt.status == "completed" else "medium",
+                description=(
+                    f"Services={list(services.keys())}; "
+                    f"fuzz_jobs={(hunt.fuzz_campaign or {}).get('job_count', 0)}; "
+                    f"elapsed_ms={hunt.elapsed_ms:.0f}"
+                ),
+                evidence="; ".join(hunt.warnings[:3]),
+                confidence=config.weight,
+                votes=1,
+            ),
+        )
+
+        stats = {
+            "steps": 1,
+            "findings": len(swarm_findings),
+            "status": hunt.status,
+            "zeroday_candidates": len(hunt.candidates),
+            "services": list(services.keys()),
+        }
+        return swarm_findings, stats, hunt.to_dict()
 
     async def _run_agent(self, config: SwarmAgentConfig) -> tuple:
         role_config = AGENT_ROLE_CONFIGS.get(config.role, {})
@@ -218,44 +417,90 @@ class SwarmOrchestrator:
 
     def _compute_consensus(self, findings: List[SwarmFinding]) -> List[SwarmFinding]:
         merged: Dict[str, SwarmFinding] = {}
+        severity_order = ["info", "low", "medium", "high", "critical"]
 
         for f in findings:
             key = f.title.lower().strip()
             if key in merged:
                 existing = merged[key]
                 existing.votes += f.votes
-
-                # Boost confidence more if the new finding is from a VALIDATOR
                 boost = 0.5 if f.agent_role == SwarmAgentRole.VALIDATOR else 0.3
+                if f.agent_role == SwarmAgentRole.RESEARCHER:
+                    boost = 0.35
                 existing.confidence = min(1.0, existing.confidence + f.confidence * boost)
-
-                severity_order = ["low", "medium", "high", "critical"]
-                if severity_order.index(f.severity) > severity_order.index(existing.severity):
-                    existing.severity = f.severity
+                try:
+                    if severity_order.index(f.severity) > severity_order.index(existing.severity):
+                        existing.severity = f.severity
+                except ValueError:
+                    pass
             else:
-                merged[key] = f
+                merged[key] = SwarmFinding(
+                    agent_role=f.agent_role,
+                    title=f.title,
+                    severity=f.severity,
+                    description=f.description,
+                    evidence=f.evidence,
+                    confidence=f.confidence,
+                    votes=f.votes,
+                )
 
-        # Findings validated by a validator or having high confidence/votes are promoted
         consensus = []
         for f in merged.values():
             is_validated = any(
                 orig.agent_role == SwarmAgentRole.VALIDATOR
-                for orig in findings if orig.title.lower().strip() == f.title.lower().strip()
+                and orig.title.lower().strip() == f.title.lower().strip()
+                for orig in findings
             )
-
-            if is_validated or f.votes >= 2 or f.severity in ("critical", "high") or f.confidence > 0.8:
+            is_research = f.agent_role == SwarmAgentRole.RESEARCHER and f.severity in (
+                "critical",
+                "high",
+                "medium",
+            )
+            if (
+                is_validated
+                or is_research
+                or f.votes >= 2
+                or f.severity in ("critical", "high")
+                or f.confidence > 0.8
+            ):
                 consensus.append(f)
 
-        consensus.sort(key=lambda x: (["low", "medium", "high", "critical"].index(x.severity), x.confidence, x.votes), reverse=True)
+        def sort_key(x: SwarmFinding) -> tuple:
+            try:
+                si = severity_order.index(x.severity)
+            except ValueError:
+                si = 0
+            return (si, x.confidence, x.votes)
 
+        consensus.sort(key=sort_key, reverse=True)
         return consensus
 
     def get_role_configs(self) -> List[Dict[str, Any]]:
         return [c.to_dict() for c in self.agent_configs]
 
+    async def _emit(self, event: str, data: Any) -> None:
+        if not self._on_event:
+            return
+        try:
+            maybe = self._on_event(event, data)
+            if asyncio.iscoroutine(maybe):
+                await maybe
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("on_event error: %s", exc)
+
+    @classmethod
+    def create_swarm(
+        cls,
+        target: str = "",
+        roles: Optional[List[str]] = None,
+        executor: Optional[SandboxExecutor] = None,
+        **kwargs: Any,
+    ) -> "SwarmOrchestrator":
+        return create_swarm(target=target, roles=roles, executor=executor, **kwargs)
+
 
 def create_swarm(
-    target: str,
+    target: str = "",
     roles: Optional[List[str]] = None,
     executor: Optional[SandboxExecutor] = None,
     **kwargs: Any,
@@ -265,7 +510,8 @@ def create_swarm(
         role_map = {r.value: r for r in SwarmAgentRole}
         configs = [
             SwarmAgentConfig(role=role_map[r], max_steps=8, weight=1.0)
-            for r in roles if r in role_map
+            for r in roles
+            if r in role_map
         ]
 
-    return SwarmOrchestrator(target=target, executor=executor, configs=configs)
+    return SwarmOrchestrator(target=target, executor=executor, configs=configs, **kwargs)

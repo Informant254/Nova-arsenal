@@ -646,6 +646,49 @@ NOVA_SECURITY_TOOLS: List[ToolSchema] = [
             "required": ["module"],
         },
     ),
+    ToolSchema(
+        name="zeroday_hunt",
+        description=(
+            "Run the high-speed zero-day *candidate* pipeline: ranked attack surface, "
+            "CVE variant/patch-gap analysis, static bug-class scan, fuzz campaign plan, "
+            "and crash triage. Requires explicit authorization. Returns research leads, "
+            "not confirmed zero-days."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target hostname or IP",
+                },
+                "authorization_ref": {
+                    "type": "string",
+                    "description": "Engagement / RoE / ticket ID for audit trail",
+                },
+                "authorized": {
+                    "type": "boolean",
+                    "description": "Must be true — confirms written authorization",
+                    "default": False,
+                },
+                "services": {
+                    "type": "object",
+                    "description": "Detected services map, e.g. {\"https\": {\"ports\": [443], \"version\": \"nginx 1.25\"}}",
+                    "additionalProperties": True,
+                },
+                "max_candidates": {
+                    "type": "integer",
+                    "description": "Maximum ranked candidates to return",
+                    "default": 50,
+                },
+                "min_novelty_score": {
+                    "type": "number",
+                    "description": "Minimum novelty score (0-1) to keep a candidate",
+                    "default": 0.45,
+                },
+            },
+            "required": ["target", "authorization_ref", "authorized"],
+        },
+    ),
 ]
 
 
