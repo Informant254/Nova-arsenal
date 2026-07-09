@@ -159,15 +159,46 @@ def _provider_from_dict(raw: Dict[str, Any]) -> LLMProviderConfig:
     return cfg.resolved()
 
 
+def _account_preferred_primary() -> Optional[LLMProviderConfig]:
+    """If user registered local LLM or OAuth account as preferred, use it."""
+    try:
+        from nova_arsenal.llm.account_auth import get_account_store
+
+        store = get_account_store()
+        # Prefer explicit local registration
+        for name in ("ollama", "local", "openai", "anthropic", "gemini"):
+            acc = store.get(name)
+            if not acc:
+                continue
+            meta = acc.meta or {}
+            if acc.auth_type == "local" or meta.get("prefer_as_primary"):
+                url = meta.get("base_url") or resolve_url(name)
+                model = meta.get("model") or resolve_model(name)
+                key = acc.access_token if acc.auth_type != "local" else ""
+                return LLMProviderConfig(
+                    provider="ollama" if name in {"ollama", "local"} and acc.auth_type == "local" and meta.get("kind") == "ollama"
+                    else ("openai" if name == "openai" else name if name != "local" else "ollama"),
+                    model=model,
+                    url=url,
+                    api_key=key if key and key != "local" else resolve_api_key(name),
+                    timeout=120,
+                ).resolved()
+            # Any valid openai oauth counts as ready primary candidate later
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
     """
-    Build / enrich LLM config from environment.
+    Build / enrich LLM config from environment + account store.
 
     Priority for primary:
       1. LLM_PROVIDER / NOVA_LLM_PROVIDER if set
-      2. Existing YAML primary if it has a usable key (or is ollama)
-      3. First available API key (openai → anthropic → …)
-      4. Ollama local default
+      2. Account store preferred (local Ollama or ChatGPT OAuth)
+      3. Existing YAML primary if it has a usable key (or is ollama)
+      4. First available API key / session (openai → anthropic → …)
+      5. Ollama local default
     """
     base = existing or LLMConfig()
     preferred = preferred_provider_from_env()
@@ -184,23 +215,48 @@ def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
             api_key=resolve_api_key(preferred, ""),
             timeout=primary.timeout,
         ).resolved()
-    elif primary.provider != "ollama" and not primary.api_key:
-        # Cloud primary in YAML but no key → switch to first available or ollama
-        auto = preferred_provider_from_env()
-        if auto:
-            primary = LLMProviderConfig(
-                provider=auto,
-                model=resolve_model(auto),
-                url=resolve_url(auto),
-                api_key=resolve_api_key(auto),
-                timeout=primary.timeout,
-            ).resolved()
-        else:
-            primary = LLMProviderConfig(
-                provider="ollama",
-                model=resolve_model("ollama", os.getenv("LLM_MODEL", "deepseek-r1")),
-                url=resolve_url("ollama"),
-            ).resolved()
+    else:
+        acct_primary = _account_preferred_primary()
+        if acct_primary and (acct_primary.api_key or acct_primary.provider in {"ollama", "local"}):
+            primary = acct_primary
+        elif primary.provider != "ollama" and not primary.api_key:
+            # Cloud primary in YAML but no key → switch to first available or ollama
+            auto = preferred_provider_from_env()
+            if auto:
+                primary = LLMProviderConfig(
+                    provider=auto,
+                    model=resolve_model(auto),
+                    url=resolve_url(auto),
+                    api_key=resolve_api_key(auto),
+                    timeout=primary.timeout,
+                ).resolved()
+            else:
+                # Prefer healthy local Ollama if present
+                try:
+                    from nova_arsenal.llm.local_llm import discover_local_llms
+
+                    local = [e for e in discover_local_llms() if e.healthy]
+                    if local:
+                        ep = local[0]
+                        primary = LLMProviderConfig(
+                            provider="ollama" if ep.kind == "ollama" else "ollama",
+                            model=ep.preferred_model or "llama3.2",
+                            url=ep.base_url,
+                            api_key="",
+                            timeout=120,
+                        ).resolved()
+                    else:
+                        primary = LLMProviderConfig(
+                            provider="ollama",
+                            model=resolve_model("ollama", os.getenv("LLM_MODEL", "deepseek-r1")),
+                            url=resolve_url("ollama"),
+                        ).resolved()
+                except Exception:  # noqa: BLE001
+                    primary = LLMProviderConfig(
+                        provider="ollama",
+                        model=resolve_model("ollama", os.getenv("LLM_MODEL", "deepseek-r1")),
+                        url=resolve_url("ollama"),
+                    ).resolved()
 
     # Build fallbacks: keep YAML fallbacks (resolved) + any env keys not already listed
     fallbacks: List[LLMProviderConfig] = []

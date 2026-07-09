@@ -344,19 +344,24 @@ Nova supports **two** ways to power the agent:
 2. **Classic API keys** in `.env`
 
 ```bash
-# A) Import sessions from tools already signed in on this machine
+# A) ChatGPT Plus/Pro subscription via Codex OAuth (browser)
+nova-agent login --provider openai --oauth
+# Headless / SSH:
+nova-agent login --provider openai --oauth --device-code
+
+# B) Local LLM — Ollama (no cloud account, fully offline)
+ollama pull llama3.2
+nova-agent login --provider ollama
+# or: nova-agent login --provider ollama --url http://127.0.0.1:11434 --model llama3.2
+
+# C) Import sessions from tools already signed in on this machine
 nova-agent login --import-existing
 
-# B) Paste a Claude Code OAuth token (from `claude setup-token` / CLAUDE_CODE_OAUTH_TOKEN)
+# D) Claude Code token / Google OAuth / API keys still work
 nova-agent login --provider anthropic --token "$CLAUDE_CODE_OAUTH_TOKEN"
-
-# C) Paste a Codex / OpenAI session or API token
-nova-agent login --provider openai --token "<token>"
-
-# D) Google account OAuth for Gemini (needs GOOGLE_OAUTH_CLIENT_ID)
 nova-agent login --provider gemini --oauth
 
-nova-agent accounts          # list signed-in accounts (no secrets)
+nova-agent accounts          # accounts + local LLM discovery
 nova-agent llm-status        # full wiring status
 ```
 

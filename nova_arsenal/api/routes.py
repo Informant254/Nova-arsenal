@@ -127,35 +127,78 @@ class LlmAccountLoginRequest(BaseModel):
     provider: str
     token: str = ""
     oauth: bool = False
+    device_code: bool = False
     label: str = ""
+    url: str = ""
+    model: str = ""
 
 
 @router.get("/llm/accounts")
 async def llm_list_accounts():
-    """List signed-in AI accounts (Claude Code / Codex / Google) — no secrets."""
+    """List signed-in AI accounts + local LLM discovery — no secrets."""
     from nova_arsenal.llm.account_auth import account_status
 
     return account_status()
 
 
+@router.get("/llm/local")
+async def llm_local_status():
+    """Discover local Ollama / OpenAI-compatible servers."""
+    from nova_arsenal.llm.local_llm import local_llm_status
+
+    return local_llm_status()
+
+
 @router.post("/llm/accounts/login")
 async def llm_account_login(body: LlmAccountLoginRequest):
     """
-    Sign in with an AI account token (Claude Code / Codex style) or start Google OAuth.
+    Sign in with ChatGPT/Codex OAuth, local Ollama, Claude/Codex tokens, or Google OAuth.
 
-    Prefer importing existing tool sessions: POST /api/llm/accounts/import
+    Note: interactive browser OAuth for OpenAI should be run via CLI on the host:
+      nova-agent login --provider openai --oauth
+    API accepts token paste, local registration, and import.
     """
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
 
     store = get_account_store()
     provider = body.provider.strip().lower()
+    if provider == "google":
+        provider = "gemini"
+
+    if provider in {"ollama", "local"}:
+        kind = "ollama" if provider == "ollama" else "openai_compatible"
+        cred = store.login_local_llm(
+            url=body.url,
+            model=body.model,
+            kind=kind,
+            label=body.label,
+        )
+        reset_llm_router()
+        return {"status": "ok", "account": cred.to_public_dict()}
+
+    if body.oauth and provider in {"openai", "codex", "chatgpt"}:
+        # Interactive — may block; prefer CLI. Still allow for local server use.
+        cred = store.login_openai_codex_oauth(
+            open_browser=True,
+            device_code=bool(body.device_code),
+        )
+        reset_llm_router()
+        return {"status": "ok", "account": cred.to_public_dict()}
+
     if body.oauth and provider in {"gemini", "google"}:
         cred = store.login_google_oauth(open_browser=False)
         reset_llm_router()
         return {"status": "ok", "account": cred.to_public_dict()}
+
     if not body.token:
-        raise HTTPException(status_code=400, detail="token required (or oauth=true for gemini)")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "token required, or oauth=true for openai/gemini, "
+                "or provider=ollama for local LLM"
+            ),
+        )
     cred = store.login_with_token(
         provider,
         body.token,

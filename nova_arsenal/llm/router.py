@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_CLASSES = {
     "ollama": OllamaProvider,
+    "local": OpenAIProvider,  # OpenAI-compatible local servers (LM Studio, vLLM, …)
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "gemini": GeminiProvider,
@@ -172,7 +173,33 @@ class LLMRouter:
 
         try:
             if name == "ollama":
+                # Apply account-store local URL/model if present
+                try:
+                    from nova_arsenal.llm.account_auth import get_account_store
+
+                    acc = get_account_store().get("ollama")
+                    if acc and acc.meta:
+                        base = acc.meta.get("base_url") or base
+                        model = acc.meta.get("model") or model
+                except Exception:  # noqa: BLE001
+                    pass
                 return OllamaProvider(model=model, base_url=base or "http://localhost:11434")
+            if name == "local":
+                # Local OpenAI-compatible — no key required
+                try:
+                    from nova_arsenal.llm.account_auth import get_account_store
+
+                    acc = get_account_store().get("local") or get_account_store().get("ollama")
+                    if acc and acc.meta:
+                        base = acc.meta.get("base_url") or base
+                        model = acc.meta.get("model") or model
+                except Exception:  # noqa: BLE001
+                    pass
+                return OpenAIProvider(
+                    model=model or "local-model",
+                    api_key=key or "local",
+                    base_url=base or "http://127.0.0.1:1234/v1",
+                )
             if name not in PROVIDER_CLASSES:
                 logger.warning("Unknown provider: %s", provider)
                 return None
@@ -181,10 +208,20 @@ class LLMRouter:
                 return None
 
             cls = PROVIDER_CLASSES[name]
-            kwargs = {"model": model, "api_key": key}
+            kwargs: dict = {"model": model, "api_key": key}
             # Pass base_url when the constructor supports it
             if base:
                 kwargs["base_url"] = base
+            # ChatGPT subscription OAuth tokens still use OpenAI HTTP APIs
+            if name == "openai":
+                try:
+                    from nova_arsenal.llm.account_auth import get_account_store
+
+                    acc = get_account_store().get("openai")
+                    if acc and (acc.meta or {}).get("subscription_auth"):
+                        kwargs["api_key"] = acc.access_token or key
+                except Exception:  # noqa: BLE001
+                    pass
             return cls(**kwargs)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to create provider %s: %s", provider, e)
@@ -387,21 +424,31 @@ class LLMRouter:
             "provider_catalog": provider_status_snapshot(),
             "accounts": accounts,
             "how_to": {
-                "account_login": (
-                    "nova-agent login --import-existing  "
-                    "# reuse Claude Code / Codex sessions"
-                ),
+                "chatgpt_subscription": "nova-agent login --provider openai --oauth",
+                "chatgpt_device_code": "nova-agent login --provider openai --oauth --device-code",
+                "account_login": "nova-agent login --import-existing",
                 "claude_token": "nova-agent login --provider anthropic --token $CLAUDE_CODE_OAUTH_TOKEN",
-                "codex": "nova-agent login --provider openai --token <codex-or-openai-token>",
                 "google_oauth": "nova-agent login --provider gemini --oauth",
+                "local_ollama": "nova-agent login --provider ollama",
+                "local_custom": "nova-agent login --provider ollama --url http://127.0.0.1:11434 --model llama3.2",
                 "openai_key": "export OPENAI_API_KEY=sk-...",
                 "anthropic_key": "export ANTHROPIC_API_KEY=sk-ant-...",
                 "gemini_key": "export GOOGLE_API_KEY=...",
                 "openrouter": "export OPENROUTER_API_KEY=...  # one key → many models",
                 "prefer": "export LLM_PROVIDER=openai LLM_MODEL=gpt-4o",
+                "prefer_local": "export LLM_PROVIDER=ollama LLM_MODEL=llama3.2",
                 "env_file": "cp config/.env.example .env  # then fill keys",
             },
+            "local_llm": self._local_status(),
         }
+
+    def _local_status(self) -> dict:
+        try:
+            from nova_arsenal.llm.local_llm import local_llm_status
+
+            return local_llm_status()
+        except Exception as exc:  # noqa: BLE001
+            return {"available": False, "error": str(exc)}
 
 
 # Global router singleton

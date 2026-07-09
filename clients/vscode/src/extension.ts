@@ -62,19 +62,49 @@ async function configureApi() {
 async function signIn() {
     const provider = await vscode.window.showQuickPick(
         [
+            {
+                label: 'openai-oauth',
+                description: 'ChatGPT Plus/Pro via Codex OAuth (run on host CLI if remote)',
+            },
+            { label: 'ollama', description: 'Local Ollama (no cloud account / free offline)' },
             { label: 'anthropic', description: 'Claude (paste OAuth/session token from Claude Code)' },
             { label: 'openai', description: 'OpenAI / Codex (paste session or API token)' },
             { label: 'gemini', description: 'Google Gemini (API key or token)' },
             { label: 'openrouter', description: 'OpenRouter key' },
             { label: 'import', description: 'Import Claude Code / Codex sessions from this machine' },
         ],
-        { placeHolder: 'Sign in with AI account (Codex / Claude Code style)' }
+        { placeHolder: 'Sign in with AI account or use local LLM' }
     );
     if (!provider) {
         return;
     }
     if (provider.label === 'import') {
         await importAccounts();
+        return;
+    }
+    if (provider.label === 'openai-oauth') {
+        vscode.window.showInformationMessage(
+            'Run on the machine with a browser: nova-agent login --provider openai --oauth'
+        );
+        output.appendLine('[Nova] ChatGPT OAuth: nova-agent login --provider openai --oauth');
+        output.appendLine('[Nova] Headless: nova-agent login --provider openai --oauth --device-code');
+        output.show(true);
+        return;
+    }
+    if (provider.label === 'ollama') {
+        const model = await vscode.window.showInputBox({
+            prompt: 'Ollama model (leave empty to auto-detect)',
+            placeHolder: 'llama3.2',
+        });
+        const result = await callNovaApi('/api/llm/accounts/login', {
+            provider: 'ollama',
+            model: model || '',
+            label: 'vscode:ollama',
+        });
+        if (result) {
+            vscode.window.showInformationMessage('Nova: local Ollama registered');
+            output.appendLine(result);
+        }
         return;
     }
 

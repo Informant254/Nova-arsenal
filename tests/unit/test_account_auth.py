@@ -34,6 +34,28 @@ class TestAccountAuth:
         assert "sk-ant-testtoken1234567890" not in json.dumps(pub)
         assert pub["has_token"] is True
 
+    def test_store_openai_tokens(self, store):
+        cred = store._store_openai_tokens(
+            {
+                "access_token": "access-tok-abcdefghijklmnopqrstuv",
+                "refresh_token": "refresh-tok-xyz",
+                "expires_in": 3600,
+            },
+            source="test",
+            client_id="app_test",
+        )
+        assert cred.provider == "openai"
+        assert cred.auth_type == "oauth"
+        assert (cred.meta or {}).get("subscription_auth") is True
+        assert store.get_token("openai").startswith("access-tok")
+
+    def test_pkce_challenge_shape(self):
+        from nova_arsenal.llm.account_auth import _pkce_challenge
+
+        c = _pkce_challenge("verifier-value-1234567890")
+        assert len(c) >= 40
+        assert "=" not in c
+
     def test_resolve_uses_account_token(self, store, monkeypatch):
         store.login_with_token("openai", "session-token-codex-abcdef012345")
         # Ensure no env key shadows

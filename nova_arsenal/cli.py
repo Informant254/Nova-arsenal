@@ -275,23 +275,38 @@ def _account_main(argv: list[str]) -> None:
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_login = sub.add_parser("login", help="Sign in with AI account or import tool sessions")
+    p_login = sub.add_parser("login", help="Sign in with AI account, ChatGPT OAuth, or local LLM")
     p_login.add_argument(
         "--provider",
-        choices=["openai", "anthropic", "gemini", "openrouter", "google"],
-        help="Provider to sign into",
+        choices=[
+            "openai",
+            "anthropic",
+            "gemini",
+            "openrouter",
+            "google",
+            "ollama",
+            "local",
+        ],
+        help="Provider: openai (ChatGPT/Codex), ollama/local (offline), etc.",
     )
     p_login.add_argument("--token", default="", help="Session / OAuth / API token to store")
     p_login.add_argument(
         "--oauth",
         action="store_true",
-        help="Browser OAuth (gemini/google; needs GOOGLE_OAUTH_CLIENT_ID)",
+        help="Browser OAuth (openai=ChatGPT/Codex subscription; gemini=Google)",
+    )
+    p_login.add_argument(
+        "--device-code",
+        action="store_true",
+        help="Use device-code flow for OpenAI Codex (headless/SSH)",
     )
     p_login.add_argument(
         "--import-existing",
         action="store_true",
         help="Import from local Claude Code / Codex / Cursor credentials",
     )
+    p_login.add_argument("--url", default="", help="Local LLM base URL (Ollama / LM Studio)")
+    p_login.add_argument("--model", default="", help="Model name for local LLM or preferred cloud model")
     p_login.add_argument("--label", default="", help="Friendly label for this account")
 
     p_logout = sub.add_parser("logout", help="Remove a stored AI account")
@@ -337,23 +352,58 @@ def _account_main(argv: list[str]) -> None:
         if provider == "google":
             provider = "gemini"
 
-        if args.oauth:
-            if provider not in {"gemini", ""}:
-                print("Error: --oauth currently supports gemini/google only", file=sys.stderr)
-                sys.exit(2)
-            print("Starting Google OAuth (browser)…")
-            print("Ensure GOOGLE_OAUTH_CLIENT_ID is set.")
-            cred = store.login_google_oauth(open_browser=True)
+        # Local LLM (Ollama / LM Studio) — no cloud account
+        if provider in {"ollama", "local"} or (
+            not provider and (args.url or args.model) and not args.token and not args.oauth
+        ):
+            kind = "ollama" if provider in {"ollama", ""} else "openai_compatible"
+            print("Registering local LLM…")
+            cred = store.login_local_llm(
+                url=args.url,
+                model=args.model,
+                kind=kind,
+                label=args.label,
+            )
             reset_llm_router()
             print(json.dumps({"status": "ok", "account": cred.to_public_dict()}, indent=2))
             return
 
+        if args.oauth:
+            if provider in {"openai", "codex", "chatgpt", ""}:
+                print("Starting ChatGPT / Codex OAuth (subscription)…")
+                cred = store.login_openai_codex_oauth(
+                    open_browser=True,
+                    device_code=bool(args.device_code),
+                )
+                reset_llm_router()
+                print(json.dumps({"status": "ok", "account": cred.to_public_dict()}, indent=2))
+                return
+            if provider in {"gemini", "google"}:
+                print("Starting Google OAuth (browser)…")
+                print("Ensure GOOGLE_OAUTH_CLIENT_ID is set.")
+                cred = store.login_google_oauth(open_browser=True)
+                reset_llm_router()
+                print(json.dumps({"status": "ok", "account": cred.to_public_dict()}, indent=2))
+                return
+            print(
+                "Error: --oauth supports: openai (ChatGPT/Codex), gemini (Google)",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
         if not provider or not args.token:
             print(
                 "Usage:\n"
+                "  # ChatGPT Plus/Pro subscription (browser OAuth)\n"
+                "  nova-agent login --provider openai --oauth\n"
+                "  nova-agent login --provider openai --oauth --device-code\n"
+                "  # Local LLM (Ollama)\n"
+                "  nova-agent login --provider ollama\n"
+                "  nova-agent login --provider ollama --model llama3.2\n"
+                "  # Import Claude Code / Codex sessions\n"
                 "  nova-agent login --import-existing\n"
+                "  # Token paste\n"
                 "  nova-agent login --provider anthropic --token <token>\n"
-                "  nova-agent login --provider openai --token <token>\n"
                 "  nova-agent login --provider gemini --oauth\n",
                 file=sys.stderr,
             )

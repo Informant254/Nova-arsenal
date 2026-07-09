@@ -27,10 +27,17 @@ class ProviderKeySpec:
 PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "openai": ProviderKeySpec(
         name="openai",
-        env_keys=("OPENAI_API_KEY",),
+        env_keys=("OPENAI_API_KEY", "CODEX_API_KEY"),
         default_model="gpt-4o",
         default_url="https://api.openai.com/v1",
         model_env="OPENAI_MODEL",
+    ),
+    "local": ProviderKeySpec(
+        name="local",
+        env_keys=(),  # OpenAI-compatible local server; no key
+        default_model="local-model",
+        default_url="http://127.0.0.1:1234/v1",
+        model_env="LOCAL_LLM_MODEL",
     ),
     "anthropic": ProviderKeySpec(
         name="anthropic",
@@ -94,12 +101,17 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
 PROVIDER_ALIASES: Dict[str, str] = {
     "gpt": "openai",
     "chatgpt": "openai",
+    "codex": "openai",
+    "openai-codex": "openai",
     "claude": "anthropic",
     "google": "gemini",
     "google-gemini": "gemini",
     "hf": "huggingface",
     "dashscope": "qwen",
     "or": "openrouter",
+    "lmstudio": "local",
+    "vllm": "local",
+    "llamacpp": "local",
 }
 
 
