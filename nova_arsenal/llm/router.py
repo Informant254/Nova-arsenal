@@ -2,14 +2,26 @@
 Nova-Arsenal LLM Router
 
 Multi-provider routing with fallback support + Fugu-style orchestration.
+Bring-your-own-key: providers are registered from settings.yaml and from
+environment API keys (OpenAI, Anthropic, Gemini, OpenRouter, …).
 """
 
+from __future__ import annotations
+
 import logging
-import os
 from typing import Optional
 
 from nova_arsenal.config import get_config
 from nova_arsenal.llm.base import LLMProvider
+from nova_arsenal.llm.keys import (
+    PROVIDER_SPECS,
+    env_providers_with_keys,
+    normalize_provider,
+    provider_status_snapshot,
+    resolve_api_key,
+    resolve_model,
+    resolve_url,
+)
 from nova_arsenal.llm.ollama import OllamaProvider
 from nova_arsenal.llm.openai import OpenAIProvider
 from nova_arsenal.llm.anthropic import AnthropicProvider
@@ -23,6 +35,18 @@ from nova_arsenal.llm.multi_router import MultiProviderRouter
 
 logger = logging.getLogger(__name__)
 
+PROVIDER_CLASSES = {
+    "ollama": OllamaProvider,
+    "openai": OpenAIProvider,
+    "anthropic": AnthropicProvider,
+    "gemini": GeminiProvider,
+    "openrouter": OpenRouterProvider,
+    "huggingface": HuggingFaceProvider,
+    "qwen": QwenProvider,
+    "deepseek": DeepSeekProvider,
+    "opencode": OpencodeProvider,
+}
+
 
 class LLMRouter:
     """Multi-provider LLM router with fallback and Fugu-style orchestration."""
@@ -33,10 +57,9 @@ class LLMRouter:
         self._setup_providers()
 
     def _setup_providers(self):
-        """Setup providers from configuration."""
+        """Setup providers from configuration + env keys."""
         config = get_config()
 
-        # Setup primary provider
         primary = config.llm.primary
         provider = self._create_provider(
             provider=primary.provider,
@@ -48,7 +71,6 @@ class LLMRouter:
         if provider:
             self.providers.append(provider)
 
-        # Setup fallback providers
         for fb in config.llm.fallbacks:
             provider = self._create_provider(
                 provider=fb.provider,
@@ -58,81 +80,81 @@ class LLMRouter:
                 timeout=fb.timeout,
             )
             if provider:
+                # Avoid duplicate provider/model pairs
+                if any(p.name == provider.name and p.model == provider.model for p in self.providers):
+                    continue
                 self.providers.append(provider)
 
-        # Setup multi-provider router
         self._setup_multi_router(config)
-
-        logger.info(f"Initialized {len(self.providers)} LLM providers")
+        logger.info(
+            "Initialized %d LLM providers: %s",
+            len(self.providers),
+            [f"{p.name}/{p.model}" for p in self.providers],
+        )
 
     def _setup_multi_router(self, config) -> None:
         """Setup the Fugu-style multi-provider router."""
         self._multi_router = MultiProviderRouter()
 
-        # Register all available providers
-        provider_map = {
-            "ollama": OllamaProvider,
-            "openai": OpenAIProvider,
-            "anthropic": AnthropicProvider,
-            "gemini": GeminiProvider,
-            "openrouter": OpenRouterProvider,
-            "huggingface": HuggingFaceProvider,
-            "qwen": QwenProvider,
-            "deepseek": DeepSeekProvider,
-            "opencode": OpencodeProvider,
-        }
-
-        # Register primary
-        primary = config.llm.primary
-        if primary.provider in provider_map:
+        def _register(name: str, model: str, api_key: str, url: str) -> None:
+            assert self._multi_router is not None
+            if name in self._multi_router.list_providers():
+                return
             try:
-                p = provider_map[primary.provider](
-                    model=primary.model,
-                    api_key=primary.api_key,
-                    url=primary.url,
-                )
-                self._multi_router.register_provider(primary.provider, p)
-            except Exception as e:
-                logger.warning(f"Failed to register {primary.provider} in multi-router: {e}")
+                p = self._create_provider(name, model, api_key, url)
+                if p:
+                    self._multi_router.register_provider(name, p)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Failed to register %s in multi-router: %s", name, e)
 
-        # Register fallbacks
+        primary = config.llm.primary
+        _register(primary.provider, primary.model, primary.api_key, primary.url)
+
         for fb in config.llm.fallbacks:
-            if fb.provider in provider_map:
-                try:
-                    p = provider_map[fb.provider](
-                        model=fb.model,
-                        api_key=fb.api_key,
-                        url=fb.url,
-                    )
-                    self._multi_router.register_provider(fb.provider, p)
-                except Exception as e:
-                    logger.warning(f"Failed to register {fb.provider} in multi-router: {e}")
+            _register(fb.provider, fb.model, fb.api_key, fb.url)
 
-        # Also try to register providers from environment variables
+        # Any remaining env keys (covers keys not listed in YAML)
         self._register_env_providers()
 
     def _register_env_providers(self) -> None:
-        """Register providers from environment variables if keys are available."""
+        """Register every provider that has an API key in the environment."""
         if not self._multi_router:
             return
 
-        env_providers = {
-            "OPENROUTER_API_KEY": ("openrouter", OpenRouterProvider, "openrouter/google-gemini-2.5-flash"),
-            "HUGGINGFACE_API_KEY": ("huggingface", HuggingFaceProvider, "meta-llama/Llama-3.3-70B-Instruct"),
-            "DASHSCOPE_API_KEY": ("qwen", QwenProvider, "qwen-max"),
-            "DEEPSEEK_API_KEY": ("deepseek", DeepSeekProvider, "deepseek-chat"),
-            "OPCODE_API_KEY": ("opencode", OpencodeProvider, "opencode-qwen-72b"),
-        }
+        for name in list(PROVIDER_SPECS.keys()):
+            if name == "ollama":
+                # Always allow local ollama as multi-router option
+                if name not in self._multi_router.list_providers():
+                    try:
+                        p = OllamaProvider(
+                            model=resolve_model("ollama"),
+                            base_url=resolve_url("ollama"),
+                        )
+                        self._multi_router.register_provider("ollama", p)
+                    except Exception as e:  # noqa: BLE001
+                        logger.debug("Ollama not registered: %s", e)
+                continue
 
-        for env_key, (name, provider_cls, model) in env_providers.items():
-            api_key = os.getenv(env_key, "")
-            if api_key and name not in self._multi_router.list_providers():
-                try:
-                    p = provider_cls(model=model, api_key=api_key)
+            api_key = resolve_api_key(name)
+            if not api_key:
+                continue
+            if name in self._multi_router.list_providers():
+                continue
+            try:
+                p = self._create_provider(
+                    provider=name,
+                    model=resolve_model(name),
+                    api_key=api_key,
+                    url=resolve_url(name),
+                )
+                if p:
                     self._multi_router.register_provider(name, p)
-                    logger.info(f"Registered {name} from environment")
-                except Exception as e:
-                    logger.warning(f"Failed to register {name}: {e}")
+                    # Also add to sequential list if missing
+                    if not any(x.name == name for x in self.providers):
+                        self.providers.append(p)
+                    logger.info("Registered %s from environment API key", name)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Failed to register %s from env: %s", name, e)
 
     def _create_provider(
         self,
@@ -142,55 +164,30 @@ class LLMRouter:
         url: str = "",
         timeout: int = 120,
     ) -> Optional[LLMProvider]:
-        """Create a provider instance."""
+        """Create a provider instance, resolving keys from env when empty."""
+        name = normalize_provider(provider)
+        key = resolve_api_key(name, api_key)
+        model = resolve_model(name, model)
+        base = resolve_url(name, url)
+
         try:
-            if provider == "ollama":
-                return OllamaProvider(model=model, base_url=url or "http://localhost:11434")
-            elif provider == "openai":
-                if not api_key:
-                    logger.warning("OpenAI API key not provided, skipping")
-                    return None
-                return OpenAIProvider(model=model, api_key=api_key)
-            elif provider == "anthropic":
-                if not api_key:
-                    logger.warning("Anthropic API key not provided, skipping")
-                    return None
-                return AnthropicProvider(model=model, api_key=api_key)
-            elif provider == "gemini":
-                if not api_key:
-                    logger.warning("Gemini API key not provided, skipping")
-                    return None
-                return GeminiProvider(model=model, api_key=api_key)
-            elif provider == "openrouter":
-                if not api_key:
-                    logger.warning("OpenRouter API key not provided, skipping")
-                    return None
-                return OpenRouterProvider(model=model, api_key=api_key)
-            elif provider == "huggingface":
-                if not api_key:
-                    logger.warning("HuggingFace API key not provided, skipping")
-                    return None
-                return HuggingFaceProvider(model=model, api_key=api_key)
-            elif provider == "qwen":
-                if not api_key:
-                    logger.warning("Qwen/DashScope API key not provided, skipping")
-                    return None
-                return QwenProvider(model=model, api_key=api_key)
-            elif provider == "deepseek":
-                if not api_key:
-                    logger.warning("DeepSeek API key not provided, skipping")
-                    return None
-                return DeepSeekProvider(model=model, api_key=api_key)
-            elif provider == "opencode":
-                if not api_key:
-                    logger.warning("Opencode API key not provided, skipping")
-                    return None
-                return OpencodeProvider(model=model, api_key=api_key)
-            else:
-                logger.warning(f"Unknown provider: {provider}")
+            if name == "ollama":
+                return OllamaProvider(model=model, base_url=base or "http://localhost:11434")
+            if name not in PROVIDER_CLASSES:
+                logger.warning("Unknown provider: %s", provider)
                 return None
-        except Exception as e:
-            logger.error(f"Failed to create provider {provider}: {e}")
+            if not key:
+                logger.warning("%s API key not provided, skipping", name)
+                return None
+
+            cls = PROVIDER_CLASSES[name]
+            kwargs = {"model": model, "api_key": key}
+            # Pass base_url when the constructor supports it
+            if base:
+                kwargs["base_url"] = base
+            return cls(**kwargs)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to create provider %s: %s", provider, e)
             return None
 
     @property
@@ -208,14 +205,8 @@ class LLMRouter:
         preference: Optional[str] = None,
         **kwargs,
     ) -> str:
-        """
-        Generate a completion with automatic fallback.
-        
-        If use_multi_router=True, uses Fugu-style routing to pick the best provider.
-        Otherwise, falls back through the ordered provider list.
-        """
-        # Use multi-router if available and requested
-        if use_multi_router and self._multi_router and len(self._multi_router.list_providers()) > 1:
+        """Generate a completion with automatic fallback."""
+        if use_multi_router and self._multi_router and len(self._multi_router.list_providers()) > 0:
             try:
                 return await self._multi_router.complete(
                     prompt=prompt,
@@ -225,20 +216,29 @@ class LLMRouter:
                     preference=preference,
                     **kwargs,
                 )
-            except Exception as e:
-                logger.warning(f"Multi-router failed, falling back to sequential: {e}")
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Multi-router failed, falling back to sequential: %s", e)
 
-        # Sequential fallback
         last_error = None
         config = get_config()
         max_retries = config.llm.max_retries
+
+        if not self.providers:
+            raise RuntimeError(
+                "No LLM providers configured. Set OPENAI_API_KEY / ANTHROPIC_API_KEY / "
+                "GOOGLE_API_KEY / OPENROUTER_API_KEY (or run Ollama) and restart Nova. "
+                "See config/.env.example"
+            )
 
         for provider in self.providers:
             for attempt in range(max_retries):
                 try:
                     logger.debug(
-                        f"Trying provider {provider.name}/{provider.model} "
-                        f"(attempt {attempt + 1}/{max_retries})"
+                        "Trying provider %s/%s (attempt %s/%s)",
+                        provider.name,
+                        provider.model,
+                        attempt + 1,
+                        max_retries,
                     )
                     result = await provider.complete(
                         prompt=prompt,
@@ -247,12 +247,15 @@ class LLMRouter:
                         max_tokens=max_tokens,
                         **kwargs,
                     )
-                    logger.debug(f"Success with provider {provider.name}")
+                    logger.debug("Success with provider %s", provider.name)
                     return result
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     last_error = e
                     logger.warning(
-                        f"Provider {provider.name} failed (attempt {attempt + 1}): {e}"
+                        "Provider %s failed (attempt %s): %s",
+                        provider.name,
+                        attempt + 1,
+                        e,
                     )
                     continue
 
@@ -268,11 +271,8 @@ class LLMRouter:
         preference: Optional[str] = None,
         **kwargs,
     ):
-        """
-        Stream a completion with automatic fallback.
-        """
-        # Use multi-router if available and requested
-        if use_multi_router and self._multi_router and len(self._multi_router.list_providers()) > 1:
+        """Stream a completion with automatic fallback."""
+        if use_multi_router and self._multi_router and len(self._multi_router.list_providers()) > 0:
             try:
                 async for chunk in self._multi_router.stream(
                     prompt=prompt,
@@ -284,21 +284,22 @@ class LLMRouter:
                 ):
                     yield chunk
                 return
-            except Exception as e:
-                logger.warning(f"Multi-router stream failed, falling back: {e}")
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Multi-router stream failed, falling back: %s", e)
 
-        # Sequential fallback
         last_error = None
         config = get_config()
         max_retries = config.llm.max_retries
 
+        if not self.providers:
+            raise RuntimeError(
+                "No LLM providers configured. Set an API key or start Ollama. "
+                "See config/.env.example"
+            )
+
         for provider in self.providers:
             for attempt in range(max_retries):
                 try:
-                    logger.debug(
-                        f"Trying provider {provider.name}/{provider.model} "
-                        f"(attempt {attempt + 1}/{max_retries})"
-                    )
                     async for chunk in provider.stream(
                         prompt=prompt,
                         system_prompt=system_prompt,
@@ -307,12 +308,14 @@ class LLMRouter:
                         **kwargs,
                     ):
                         yield chunk
-                    logger.debug(f"Success with provider {provider.name}")
                     return
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     last_error = e
                     logger.warning(
-                        f"Provider {provider.name} stream failed (attempt {attempt + 1}): {e}"
+                        "Provider %s stream failed (attempt %s): %s",
+                        provider.name,
+                        attempt + 1,
+                        e,
                     )
                     continue
 
@@ -320,21 +323,20 @@ class LLMRouter:
 
     async def health_check(self) -> dict[str, bool]:
         """Check health of all providers."""
-        results = {}
+        results: dict[str, bool] = {}
         for provider in self.providers:
             try:
                 results[f"{provider.name}/{provider.model}"] = await provider.health_check()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 results[f"{provider.name}/{provider.model}"] = False
 
-        # Also check multi-router providers
         if self._multi_router:
             for name in self._multi_router.list_providers():
                 provider = self._multi_router.get_provider(name)
                 if provider:
                     try:
                         results[f"multi/{name}/{provider.model}"] = await provider.health_check()
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         results[f"multi/{name}/{provider.model}"] = False
 
         return results
@@ -344,7 +346,8 @@ class LLMRouter:
         providers = [f"{p.name}/{p.model}" for p in self.providers]
         if self._multi_router:
             for name in self._multi_router.list_providers():
-                providers.append(f"multi/{name}")
+                if f"multi/{name}" not in providers:
+                    providers.append(f"multi/{name}")
         return providers
 
     def get_routing_stats(self) -> dict:
@@ -352,6 +355,37 @@ class LLMRouter:
         if self._multi_router:
             return self._multi_router.get_stats()
         return {"total_routes": 0, "registered_providers": []}
+
+    def byok_status(self) -> dict:
+        """Public, non-secret status of BYOK configuration."""
+        config = get_config()
+        return {
+            "primary": {
+                "provider": config.llm.primary.provider,
+                "model": config.llm.primary.model,
+                "has_key": bool(config.llm.primary.api_key)
+                or config.llm.primary.provider == "ollama",
+            },
+            "fallbacks": [
+                {
+                    "provider": f.provider,
+                    "model": f.model,
+                    "has_key": bool(f.api_key) or f.provider == "ollama",
+                }
+                for f in config.llm.fallbacks
+            ],
+            "active_providers": self.list_providers(),
+            "env_keys_detected": env_providers_with_keys(),
+            "provider_catalog": provider_status_snapshot(),
+            "how_to": {
+                "openai": "export OPENAI_API_KEY=sk-...",
+                "anthropic": "export ANTHROPIC_API_KEY=sk-ant-...",
+                "gemini": "export GOOGLE_API_KEY=...  # or GEMINI_API_KEY",
+                "openrouter": "export OPENROUTER_API_KEY=...  # one key → many models",
+                "prefer": "export LLM_PROVIDER=openai LLM_MODEL=gpt-4o",
+                "env_file": "cp config/.env.example .env  # then fill keys",
+            },
+        }
 
 
 # Global router singleton
@@ -364,3 +398,9 @@ def get_llm_router() -> LLMRouter:
     if _router is None:
         _router = LLMRouter()
     return _router
+
+
+def reset_llm_router() -> None:
+    """Clear singleton (used after reload_config)."""
+    global _router
+    _router = None

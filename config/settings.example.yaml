@@ -11,11 +11,15 @@ agent:
   auto_visual: true
   auto_cve: true
 
+# Bring-your-own-key: set keys in .env (see config/.env.example).
+# You can also set LLM_PROVIDER / LLM_MODEL to force primary without editing this file.
+# Empty api_key fields are filled from the matching environment variable automatically.
 llm:
   primary:
-    provider: "ollama"
+    provider: "ollama"          # change to openai|anthropic|gemini|openrouter or set LLM_PROVIDER
     model: "deepseek-r1"
     url: "http://llm:11434"
+    api_key: ""                 # not needed for ollama; cloud keys come from env
     timeout: 120
     
   fallbacks:
@@ -40,7 +44,7 @@ llm:
       api_key: "${DASHSCOPE_API_KEY}"
       timeout: 60
     - provider: "openrouter"
-      model: "openrouter/google-gemini-2.5-flash"
+      model: "openrouter/auto"
       api_key: "${OPENROUTER_API_KEY}"
       timeout: 60
     - provider: "huggingface"

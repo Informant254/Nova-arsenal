@@ -115,13 +115,43 @@ auth:
 
 ## Environment Variables
 
-All configuration values can be overridden by environment variables:
+All configuration values can be overridden by environment variables. Copy
+`config/.env.example` → `.env` at the project root.
+
+### Bring-your-own-key (BYOK)
+
+| Provider | Environment variable(s) |
+|----------|-------------------------|
+| OpenAI | `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
+| Anthropic | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` |
+| Gemini | `GOOGLE_API_KEY` or `GEMINI_API_KEY` |
+| OpenRouter | `OPENROUTER_API_KEY` |
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| Qwen | `DASHSCOPE_API_KEY` or `QWEN_API_KEY` |
+| Hugging Face | `HUGGINGFACE_API_KEY` or `HF_TOKEN` |
+| Opencode | `OPCODE_API_KEY` or `OPENCODE_API_KEY` |
+| Ollama | no key; `NOVA_LLM_URL`, `OLLAMA_MODEL` |
+
+Prefer a provider without editing YAML:
+
+```bash
+export LLM_PROVIDER=anthropic   # or openai, gemini, openrouter, ...
+export LLM_MODEL=claude-sonnet-4-20250514
+```
+
+Nova auto-registers every provider that has a key set and uses the others as
+fallbacks. Verify with:
+
+```bash
+curl -s http://localhost:8000/api/llm/status
+curl -s -X POST http://localhost:8000/api/llm/reload
+```
 
 | Config Path | Environment Variable |
 |-------------|---------------------|
 | `auth.jwt_secret` | `JWT_SECRET` |
 | `database.url` | `DATABASE_URL` |
-| `llm.primary.api_key` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` |
+| `llm.primary` | `LLM_PROVIDER`, `LLM_MODEL`, provider `*_API_KEY` |
 | `logging.level` | `LOG_LEVEL` |
 
 ## LiteLLM Configuration

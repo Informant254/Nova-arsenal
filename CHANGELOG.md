@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **BYOK (bring-your-own-key) LLM wiring** — auto-detect OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/Qwen/HF keys from `.env`; honor `LLM_PROVIDER` + `LLM_MODEL`; `GET /api/llm/status` + `POST /api/llm/reload`; Settings UI shows live key status (no secrets leaked)
 - **Zero-Day Candidate Pipeline (`nova_arsenal.zeroday`)** — high-speed research stack:
   - Parallel attack-surface ranking (`AttackSurfaceMapper`)
   - CVE variant / patch-gap analysis (`VariantAnalyzer`)

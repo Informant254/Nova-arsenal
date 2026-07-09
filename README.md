@@ -336,25 +336,67 @@ python -m nova_arsenal.api
 
 ## Configuration
 
-All configuration lives in `.env` (copied from `config/.env.example`).
+### Bring your own AI subscription (BYOK)
 
-### LLM Providers
+Nova does **not** require a Nova-branded LLM plan. Plug in the API keys from the
+subscriptions you already pay for (ChatGPT/OpenAI, Claude, Gemini, OpenRouter, etc.).
 
-Nova supports 10 LLM providers with automatic fallback. Configure as many or as few as you want – she'll use whatever's available.
+```bash
+cp config/.env.example .env
+# edit .env — paste your keys
+
+export OPENAI_API_KEY=sk-...              # ChatGPT / OpenAI API
+export ANTHROPIC_API_KEY=sk-ant-...       # Claude
+export GOOGLE_API_KEY=...                 # Gemini
+export OPENROUTER_API_KEY=sk-or-...       # one key → 200+ models
+
+# optional: pick primary
+export LLM_PROVIDER=openai
+export LLM_MODEL=gpt-4o
+
+python -m nova_arsenal.api
+# verify (never prints full secrets)
+curl -s http://localhost:8000/api/llm/status | jq .
+```
+
+| Provider | Env var(s) | Notes |
+|----------|------------|--------|
+| OpenAI | `OPENAI_API_KEY` | GPT-4o, etc. |
+| Anthropic | `ANTHROPIC_API_KEY` | Claude |
+| Gemini | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | Google AI Studio |
+| OpenRouter | `OPENROUTER_API_KEY` | Best “one key, many models” option |
+| DeepSeek | `DEEPSEEK_API_KEY` | |
+| Qwen | `DASHSCOPE_API_KEY` | Alibaba DashScope |
+| Hugging Face | `HUGGINGFACE_API_KEY` or `HF_TOKEN` | |
+| Ollama | none | Local free models via `NOVA_LLM_URL` |
+
+After keys are set, **all** of these work with the same agent:
+- Chat UI / API (`/api/chat`)
+- Autonomous agent runs
+- Swarm + zero-day researcher (LLM reasoning steps)
+
+Check wiring anytime: `GET /api/llm/status` · reload keys: `POST /api/llm/reload` · dashboard **Settings**.
+
+### LLM Providers (YAML)
+
+Optional advanced config in `settings.yaml` (env keys still win when YAML leaves `api_key` empty):
 
 ```yaml
 # config/settings.yaml
 llm:
   primary:
-    provider: "ollama"          # free, local, no key needed
-    model: "qwen3:1.7b"        # or deepseek-r1, llama3, etc.
+    provider: "openai"          # or ollama / anthropic / openrouter / ...
+    model: "gpt-4o"
+    api_key: "${OPENAI_API_KEY}"
   fallbacks:
-    - provider: "openrouter"    # one key, 200+ models
-      model: "qwen/qwen3-1.7b:free"
     - provider: "anthropic"
       model: "claude-sonnet-4-20250514"
-    - provider: "openai"
-      model: "gpt-4o"
+      api_key: "${ANTHROPIC_API_KEY}"
+    - provider: "openrouter"
+      model: "openrouter/auto"
+      api_key: "${OPENROUTER_API_KEY}"
+    - provider: "ollama"          # free local fallback
+      model: "qwen3:1.7b"
 ```
 
 ### Platform Connectors (Skills Marketplace)

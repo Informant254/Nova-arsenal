@@ -83,7 +83,43 @@ async def detailed_health_check():
         "service": "nova-arsenal",
         "components": {
             "llm_providers": llm_health,
+            "byok": llm_router.byok_status(),
         },
+    }
+
+
+@router.get("/llm/status")
+async def llm_byok_status():
+    """
+    Show which LLM providers are configured (bring-your-own-key).
+
+    Does not return secret keys — only whether keys are present and which
+    providers are active. Use this to verify OpenAI/Anthropic/Gemini/etc.
+    """
+    from nova_arsenal.llm.router import get_llm_router
+
+    return get_llm_router().byok_status()
+
+
+@router.post("/llm/reload")
+async def llm_reload_config():
+    """Reload .env / settings.yaml and re-initialize the LLM router."""
+    from nova_arsenal.config import reload_config
+    from nova_arsenal.llm.router import get_llm_router, reset_llm_router
+
+    cfg = reload_config()
+    reset_llm_router()
+    router_inst = get_llm_router()
+    return {
+        "status": "reloaded",
+        "primary": {
+            "provider": cfg.llm.primary.provider,
+            "model": cfg.llm.primary.model,
+            "has_key": bool(cfg.llm.primary.api_key)
+            or cfg.llm.primary.provider == "ollama",
+        },
+        "active_providers": router_inst.list_providers(),
+        "env_keys_detected": router_inst.byok_status().get("env_keys_detected"),
     }
 
 
