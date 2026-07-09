@@ -101,3 +101,14 @@ environment.yml
 
 # Kubernetes secrets (never commit)
 k8s/secrets.yaml
+node_modules/
+clients/vscode/node_modules/
+*.vsix
+.env
+config/.env
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+fuzz_out/
