@@ -27,6 +27,16 @@ from nova_arsenal.sessions.api_routes import router as sessions_router
 
 logger = logging.getLogger(__name__)
 
+
+def _cors_origins() -> list[str]:
+    """Return the explicit browser origins allowed to call the API."""
+    raw = os.getenv("NOVA_CORS_ORIGINS", "http://localhost:3000")
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    if not origins or "*" in origins:
+        raise RuntimeError("NOVA_CORS_ORIGINS must contain explicit origins, never '*'")
+    return origins
+
+
 # ── App Factory ──────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
@@ -41,7 +51,7 @@ def create_app() -> FastAPI:
     # ── CORS ─────────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
