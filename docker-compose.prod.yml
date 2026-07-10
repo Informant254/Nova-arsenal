@@ -35,7 +35,7 @@ services:
     restart: always
 
   sandbox:
-    image: ghcr.io/informant254/nova-web:latest
+    image: ghcr.io/informant254/nova-kali:latest
     container_name: nova-sandbox
     cap_drop:
       - ALL
