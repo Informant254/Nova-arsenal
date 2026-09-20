@@ -101,6 +101,23 @@ async def llm_byok_status():
     return get_llm_router().byok_status()
 
 
+@router.get("/llm/routing")
+async def llm_routing_status():
+    """Return non-secret runtime routing telemetry for the dashboard."""
+    from nova_arsenal.llm.router import get_llm_router
+
+    llm_router = get_llm_router()
+    stats = llm_router.get_routing_stats()
+    history = []
+    multi = llm_router.multi_router
+    if multi:
+        history = multi.get_routing_history()[-20:]
+    return {
+        **stats,
+        "recent_routes": history,
+    }
+
+
 @router.post("/llm/reload")
 async def llm_reload_config():
     """Reload .env / settings.yaml and re-initialize the LLM router."""
