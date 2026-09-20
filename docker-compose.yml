@@ -16,14 +16,14 @@ services:
       - workspace:/workspace
       - ./nova_arsenal:/app/nova_arsenal:ro
     ports:
-      - "${AGENT_PORT:-8080}:8080"
+      - "${AGENT_PORT:-8080}:8000"
     networks:
       - agent-net
     depends_on:
       sandbox:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import nova_arsenal; print('ok')"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
       interval: 30s
       timeout: 10s
       start_period: 5s
@@ -94,7 +94,7 @@ services:
     environment:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-changeme}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-      - AGENT_API_URL=http://agent:8080
+      - AGENT_API_URL=http://agent:8000
       - DATABASE_URL=file:/app/data/nova.db
     volumes:
       - web-data:/app/data
