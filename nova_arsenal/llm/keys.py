@@ -28,7 +28,7 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "openai": ProviderKeySpec(
         name="openai",
         env_keys=("OPENAI_API_KEY", "CODEX_API_KEY"),
-        default_model="gpt-4o",
+        default_model="gpt-5.6-terra",
         default_url="https://api.openai.com/v1",
         model_env="OPENAI_MODEL",
     ),
@@ -42,14 +42,14 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "anthropic": ProviderKeySpec(
         name="anthropic",
         env_keys=("ANTHROPIC_API_KEY",),
-        default_model="claude-sonnet-4-20250514",
+        default_model="claude-sonnet-5",
         default_url="https://api.anthropic.com",
         model_env="ANTHROPIC_MODEL",
     ),
     "gemini": ProviderKeySpec(
         name="gemini",
         env_keys=("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-        default_model="gemini-2.5-flash",
+        default_model="gemini-3.8-flash",
         default_url="https://generativelanguage.googleapis.com",
         model_env="GEMINI_MODEL",
     ),
@@ -63,14 +63,14 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "deepseek": ProviderKeySpec(
         name="deepseek",
         env_keys=("DEEPSEEK_API_KEY",),
-        default_model="deepseek-chat",
+        default_model="deepseek-flash",
         default_url="https://api.deepseek.com/v1",
         model_env="DEEPSEEK_MODEL",
     ),
     "qwen": ProviderKeySpec(
         name="qwen",
         env_keys=("DASHSCOPE_API_KEY", "QWEN_API_KEY"),
-        default_model="qwen-max",
+        default_model="qwen3.8-flash",
         default_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         model_env="QWEN_MODEL",
     ),
