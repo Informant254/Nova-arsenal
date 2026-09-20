@@ -1,11 +1,10 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -44,7 +43,7 @@ export default function LoginPage() {
       }
 
       window.localStorage.removeItem('nova_chat_session');
-      const next = searchParams.get('next');
+      const next = new URLSearchParams(window.location.search).get('next');
       const safeNext =
         next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')
           ? next
