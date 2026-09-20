@@ -10,8 +10,11 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:///workspace/nova.db
       - NOVA_LLM_URL=http://llm:11434
       - NOVA_WORKSPACE=/workspace
-      - JWT_SECRET=${JWT_SECRET:-changeme}
+      - JWT_SECRET=${JWT_SECRET:?Set a strong JWT_SECRET in .env}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - NOVA_ADMIN_EMAIL=${NOVA_ADMIN_EMAIL:-}
+      - NOVA_ADMIN_USERNAME=${NOVA_ADMIN_USERNAME:-admin}
+      - NOVA_ADMIN_PASSWORD=${NOVA_ADMIN_PASSWORD:-}
     volumes:
       - workspace:/workspace
       - ./nova_arsenal:/app/nova_arsenal:ro
