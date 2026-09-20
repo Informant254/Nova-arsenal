@@ -43,6 +43,7 @@ export default function LoginPage() {
         throw new Error(data.detail || 'Invalid email or password');
       }
 
+      window.localStorage.removeItem('nova_chat_session');
       const next = searchParams.get('next');
       router.replace(next && next.startsWith('/') ? next : '/');
       router.refresh();
