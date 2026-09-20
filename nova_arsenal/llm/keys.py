@@ -230,8 +230,8 @@ def provider_status_snapshot() -> List[Dict[str, object]]:
                 "key_env": list(spec.env_keys),
                 "default_model": resolve_model(name, spec.default_model),
                 "has_key": bool(key),
-                # Never return the key; only prefix hint for UX
-                "key_hint": (key[:7] + "…") if key and len(key) > 8 else ("" if not key else "set"),
+                # Never return any part of the credential.
+                "key_hint": "set" if key else "",
             }
         )
     return rows
