@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
+from urllib.parse import urlencode
 
 import httpx
 
@@ -166,14 +167,16 @@ class GitHubOAuthProvider(BaseOAuthProvider):
         return "github"
 
     def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
-        url = (
-            f"{self.AUTHORIZE_URL}?client_id={self.client_id}"
-            f"&redirect_uri={self.redirect_uri}"
-            f"&scope={self.SCOPES}&state={state}"
-        )
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "scope": self.SCOPES,
+            "state": state,
+        }
         if code_challenge:
-            url += f"&code_challenge={code_challenge}&code_challenge_method=S256"
-        return url
+            params["code_challenge"] = code_challenge
+            params["code_challenge_method"] = "S256"
+        return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
 
     async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
         data = {
@@ -243,15 +246,18 @@ class GoogleOAuthProvider(BaseOAuthProvider):
         return "google"
 
     def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
-        url = (
-            f"{self.AUTHORIZE_URL}?client_id={self.client_id}"
-            f"&redirect_uri={self.redirect_uri}"
-            f"&scope={self.SCOPES}&response_type=code"
-            f"&state={state}&access_type=offline"
-        )
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "scope": self.SCOPES,
+            "response_type": "code",
+            "state": state,
+            "access_type": "offline",
+        }
         if code_challenge:
-            url += f"&code_challenge={code_challenge}&code_challenge_method=S256"
-        return url
+            params["code_challenge"] = code_challenge
+            params["code_challenge_method"] = "S256"
+        return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
 
     async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
         data = {
