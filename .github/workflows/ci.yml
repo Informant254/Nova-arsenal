@@ -1,3 +1,4 @@
+# Revival baseline: required build/test gates are blocking; legacy debt audits are advisory.
 name: CI
 
 on:
