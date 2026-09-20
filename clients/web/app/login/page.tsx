@@ -1,97 +1,159 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function submit(event: FormEvent) {
+    event.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
+      if (mode === 'register') {
+        const register = await fetch('/api/nova/auth/register', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email, username, password }),
+        });
+
+        if (!register.ok) {
+          const data = await register.json().catch(() => ({}));
+          throw new Error(data.detail || 'Could not create account');
+        }
+      }
+
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (result?.error) {
-        setError('Invalid email or password');
-      } else {
-        router.push('/');
-        router.refresh();
+      if (!loginResponse.ok) {
+        const data = await loginResponse.json().catch(() => ({}));
+        throw new Error(data.detail || 'Invalid email or password');
       }
+
+      const next = searchParams.get('next');
+      router.replace(next && next.startsWith('/') ? next : '/');
+      router.refresh();
     } catch (err) {
-      setError('An error occurred');
+      setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
-        <div>
-          <h1 className="text-center text-3xl font-bold text-nova-600">
-            Nova-Arsenal
-          </h1>
-          <h2 className="mt-2 text-center text-gray-600">
-            Sign in to your account
-          </h2>
+    <main className="grid min-h-screen place-items-center bg-[#070a0f] p-5 text-zinc-100">
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-lg font-semibold text-emerald-300">
+            N
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Nova-Arsenal</h1>
+          <p className="mt-2 text-sm text-zinc-500">
+            {mode === 'login' ? 'Sign in to your research workspace.' : 'Create your local Nova account.'}
+          </p>
         </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+
+        <form onSubmit={submit} className="panel space-y-5 p-6">
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded text-sm">
+            <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-sm text-red-300">
               {error}
             </div>
           )}
-          
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
+
+          {mode === 'register' && (
+            <Field label="Username">
+              <input
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                minLength={3}
+                required
+                autoComplete="username"
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/10"
+              />
+            </Field>
+          )}
+
+          <Field label="Email">
             <input
-              id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-nova-500 focus:border-nova-500"
+              onChange={(event) => setEmail(event.target.value)}
               required
+              autoComplete="email"
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/10"
             />
-          </div>
-          
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
+          </Field>
+
+          <Field label="Password">
             <input
-              id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-nova-500 focus:border-nova-500"
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={8}
               required
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/10"
             />
-          </div>
-          
+          </Field>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-600 hover:bg-nova-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-500 disabled:opacity-50"
+            className="w-full rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-medium text-black transition hover:bg-emerald-300 disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading
+              ? mode === 'login'
+                ? 'Signing in…'
+                : 'Creating account…'
+              : mode === 'login'
+                ? 'Sign in'
+                : 'Create account'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode((current) => (current === 'login' ? 'register' : 'login'));
+              setError('');
+            }}
+            className="w-full text-sm text-zinc-500 transition hover:text-zinc-300"
+          >
+            {mode === 'login'
+              ? 'No account yet? Create one'
+              : 'Already have an account? Sign in'}
           </button>
         </form>
       </div>
-    </div>
+    </main>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
