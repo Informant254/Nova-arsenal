@@ -46,11 +46,10 @@ function buildHeaders(request: NextRequest, accessToken?: string) {
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<Tokens | null> {
-  const url = new URL(API_BASE + '/api/auth/refresh');
-  url.searchParams.set('refresh_token', refreshToken);
-
-  const response = await fetch(url, {
+  const response = await fetch(API_BASE + '/api/auth/refresh', {
     method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
     cache: 'no-store',
   });
 
