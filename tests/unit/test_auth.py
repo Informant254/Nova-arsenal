@@ -37,6 +37,22 @@ class TestOAuthState:
         state = generate_oauth_state("github", "/dashboard")
         assert extract_redirect(state) == "/dashboard"
 
+    def test_state_preserves_redirect_with_colons_and_query(self):
+        from nova_arsenal.auth.oauth import extract_redirect, generate_oauth_state
+
+        redirect = "/callback?next=https://example.test:8443/path"
+        state = generate_oauth_state("github", redirect)
+        assert extract_redirect(state) == redirect
+
+    def test_state_expires(self, monkeypatch):
+        from nova_arsenal.auth import oauth
+
+        monkeypatch.setattr(oauth.time, "time", lambda: 1_000)
+        state = oauth.generate_oauth_state("github", "/dashboard")
+
+        monkeypatch.setattr(oauth.time, "time", lambda: 1_701)
+        assert not oauth.verify_oauth_state(state, "github")
+
 
 class TestPKCE:
     def test_generate_pkce(self):
@@ -324,3 +340,21 @@ class TestPasswordHashMigration:
 
         assert verify_password("password", "not-a-valid-hash") is False
         assert verify_and_upgrade_password("password", "not-a-valid-hash") == (False, None)
+
+
+class TestProductionSecretPolicy:
+    def test_production_rejects_missing_jwt_secret(self, monkeypatch):
+        from nova_arsenal.config import _resolve_jwt_secret
+
+        monkeypatch.setenv("NOVA_ENV", "production")
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+
+        with pytest.raises(RuntimeError, match="JWT_SECRET"):
+            _resolve_jwt_secret("")
+
+    def test_production_accepts_strong_jwt_secret(self, monkeypatch):
+        from nova_arsenal.config import _resolve_jwt_secret
+
+        monkeypatch.setenv("NOVA_ENV", "production")
+        value = "x" * 48
+        assert _resolve_jwt_secret(value) == value
