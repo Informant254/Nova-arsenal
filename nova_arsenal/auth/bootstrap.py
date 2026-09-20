@@ -8,7 +8,7 @@ import os
 from passlib.context import CryptContext
 from sqlalchemy import select
 
-from nova_arsenal.db.models import User, UserRole
+from nova_arsenal.db.models import Subscription, SubscriptionTier, User, UserRole
 from nova_arsenal.db.session import get_session_factory
 
 logger = logging.getLogger(__name__)
@@ -68,6 +68,14 @@ async def ensure_bootstrap_admin() -> bool:
             is_active=True,
         )
         db.add(user)
+        await db.flush()
+        db.add(
+            Subscription(
+                user_id=user.id,
+                tier=SubscriptionTier.FREE,
+                api_calls_limit=100,
+            )
+        )
         await db.commit()
         logger.info("Bootstrap administrator created for %s", email)
         return True
