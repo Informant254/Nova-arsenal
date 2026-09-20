@@ -34,6 +34,15 @@ logger = logging.getLogger(__name__)
 _EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
 
 
+def _is_production_environment() -> bool:
+    value = (
+        os.getenv("NOVA_ENV", "")
+        or os.getenv("ENVIRONMENT", "")
+        or os.getenv("ENV", "")
+    ).strip().lower()
+    return value in {"prod", "production"}
+
+
 def _resolve_jwt_secret(configured: str = "") -> str:
     candidate = (configured or os.getenv("JWT_SECRET", "")).strip()
     known_placeholders = {
@@ -44,6 +53,12 @@ def _resolve_jwt_secret(configured: str = "") -> str:
     }
     if len(candidate) >= 32 and candidate.lower() not in known_placeholders:
         return candidate
+
+    if _is_production_environment():
+        raise RuntimeError(
+            "JWT_SECRET must be explicitly configured with at least 32 characters "
+            "when NOVA_ENV/ENVIRONMENT/ENV is production"
+        )
 
     logger.warning(
         "JWT_SECRET is missing or weak; using an ephemeral development secret. "
