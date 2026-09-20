@@ -189,7 +189,7 @@ def env_providers_with_keys() -> List[str]:
     """List cloud providers that have API keys present in the environment."""
     found: List[str] = []
     for name, spec in PROVIDER_SPECS.items():
-        if name == "ollama":
+        if name in {"ollama", "local"}:
             continue
         if resolve_api_key(name):
             found.append(name)
@@ -220,12 +220,13 @@ def provider_status_snapshot() -> List[Dict[str, object]]:
     """Non-secret status for UI /health."""
     rows: List[Dict[str, object]] = []
     for name, spec in PROVIDER_SPECS.items():
-        key = resolve_api_key(name) if name != "ollama" else ""
+        requires_key = name not in {"ollama", "local"}
+        key = resolve_api_key(name) if requires_key else ""
         rows.append(
             {
                 "provider": name,
-                "configured": bool(key) if name != "ollama" else True,
-                "requires_key": name != "ollama",
+                "configured": bool(key) if requires_key else True,
+                "requires_key": requires_key,
                 "key_env": list(spec.env_keys),
                 "default_model": resolve_model(name, spec.default_model),
                 "has_key": bool(key),
