@@ -31,7 +31,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from nova_arsenal.auth.middleware import get_current_user, require_analyst
+from nova_arsenal.auth.middleware import get_current_user, require_admin
 from nova_arsenal.db.models import User
 
 from .session_memory import SessionMemory
@@ -100,24 +100,20 @@ def get_preferences(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/skills/pending")
-def list_pending_skills(current_user: User = Depends(get_current_user)):
+def list_pending_skills(current_user: User = Depends(require_admin)):
     """
     Self-authored skills awaiting human review before they can load.
-    Any authenticated user can view the pending queue; only
-    analyst/admin can approve or reject (see routes below) — visibility
-    into what's pending shouldn't itself be gated, only the ability to
-    make a skill live.
+    Pending self-authored code is restricted to administrators because
+    review metadata and generated source are operationally sensitive.
     """
     return _author.list_pending()
 
 
 @router.post("/skills/pending/{name}/approve")
-def approve_pending_skill(name: str, current_user: User = Depends(require_analyst)):
+def approve_pending_skill(name: str, current_user: User = Depends(require_admin)):
     """
-    Requires analyst or admin role. This is the action that moves
-    Nova-written code from an inert draft into something SkillRegistry
-    will import and execute — not something a plain viewer role should
-    be able to trigger.
+    Requires administrator review. This moves generated code from an
+    inert draft into something SkillRegistry may import and execute.
     """
     try:
         path = _author.approve_skill(name)
@@ -135,7 +131,7 @@ def approve_pending_skill(name: str, current_user: User = Depends(require_analys
 def reject_pending_skill(
     name: str,
     payload: RejectPayload,
-    current_user: User = Depends(require_analyst),
+    current_user: User = Depends(require_admin),
 ):
     try:
         _author.reject_skill(name, reason=payload.reason)
