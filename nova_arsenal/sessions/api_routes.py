@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from nova_arsenal.auth.middleware import get_current_user, require_analyst
+from nova_arsenal.db.models import User
 
 from .models import DEFAULT_PARALLEL_ROLES, SubAgentRole
 from .runtime import get_session_manager
@@ -18,12 +21,12 @@ class CreateSessionRequest(BaseModel):
     target: str = Field(default="", description="Primary target host/domain/IP")
     roles: Optional[List[str]] = Field(
         default=None,
-        description="Sub-agent roles (recon, web, exploit, osint, researcher, validator, reporter)",
+        description="Sub-agent roles",
     )
     max_concurrent: int = Field(default=6, ge=1, le=32)
     authorized: bool = False
     authorization_ref: str = ""
-    auto_start: bool = True
+    auto_start: bool = False
     services: Optional[Dict[str, Any]] = None
 
 
@@ -31,16 +34,42 @@ class StartSessionRequest(BaseModel):
     force: bool = False
 
 
+def _can_access(session, user: User) -> bool:
+    if user.role.value == "admin":
+        return True
+    owner_id = (session.metadata or {}).get("owner_id")
+    return owner_id == user.id
+
+
+def _owned_session(session_id: str, user: User):
+    session = get_session_manager().get(session_id)
+    if not session or not _can_access(session, user):
+        # Avoid revealing whether another user's session exists.
+        raise HTTPException(404, f"Session {session_id} not found")
+    return session
+
+
+def _public_session(session, include_events: bool = True) -> Dict[str, Any]:
+    """Serialize a session without internal ownership metadata."""
+    data = session.to_dict(include_events=include_events)
+    metadata = dict(data.get("metadata") or {})
+    metadata.pop("owner_id", None)
+    data["metadata"] = metadata
+    return data
+
+
 @router.get("/roles")
-async def list_roles():
+async def list_roles(
+    _current_user: User = Depends(get_current_user),
+):
     return {
         "roles": [r.value for r in SubAgentRole],
         "default": [r.value for r in DEFAULT_PARALLEL_ROLES],
         "description": {
             "recon": "Attack surface mapping + tool suggestions",
-            "web": "Web path / vuln checklist",
+            "web": "Web review checklist",
             "osint": "Passive intelligence",
-            "researcher": "Zero-day candidate pipeline",
+            "researcher": "Research and candidate analysis",
             "exploit": "Authorized exploit planning",
             "validator": "Promote/dedupe peer findings",
             "reporter": "Aggregate session report",
@@ -49,12 +78,27 @@ async def list_roles():
 
 
 @router.post("")
-async def create_session(body: CreateSessionRequest):
+async def create_session(
+    body: CreateSessionRequest,
+    current_user: User = Depends(require_analyst),
+):
+    if body.authorized and not body.authorization_ref.strip():
+        raise HTTPException(
+            400,
+            "authorization_ref is required when authorized=true",
+        )
+    if body.auto_start and not body.authorized:
+        raise HTTPException(
+            403,
+            "Starting a work session requires explicit authorization metadata",
+        )
+
     mgr = get_session_manager()
-    meta = {}
+    meta: Dict[str, Any] = {"owner_id": current_user.id}
     if body.services:
         meta["services"] = body.services
-    sess = mgr.create(
+
+    session = mgr.create(
         goal=body.goal,
         target=body.target,
         roles=body.roles,
@@ -64,69 +108,83 @@ async def create_session(body: CreateSessionRequest):
         metadata=meta,
     )
     if body.auto_start:
-        # Don't block HTTP forever; run concurrently and return snapshot
-        sess = await mgr.start(sess.session_id, wait=False)
-    return sess.to_dict()
+        session = await mgr.start(session.session_id, wait=False)
+    return _public_session(session)
 
 
 @router.get("")
-async def list_sessions():
-    mgr = get_session_manager()
+async def list_sessions(
+    current_user: User = Depends(get_current_user),
+):
+    manager = get_session_manager()
+    sessions = manager.list_sessions()[:50]
+    if current_user.role.value != "admin":
+        sessions = [session for session in sessions if _can_access(session, current_user)]
     return {
         "sessions": [
-            s.to_dict(include_events=False) for s in mgr.list_sessions()[:50]
+            _public_session(session, include_events=False) for session in sessions
         ]
     }
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: str):
-    sess = get_session_manager().get(session_id)
-    if not sess:
-        raise HTTPException(404, f"Session {session_id} not found")
-    return sess.to_dict()
+async def get_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    return _public_session(_owned_session(session_id, current_user))
 
 
 @router.post("/{session_id}/start")
-async def start_session(session_id: str):
-    mgr = get_session_manager()
-    if not mgr.get(session_id):
-        raise HTTPException(404, f"Session {session_id} not found")
-    sess = await mgr.start(session_id)
-    return sess.to_dict()
+async def start_session(
+    session_id: str,
+    current_user: User = Depends(require_analyst),
+):
+    session = _owned_session(session_id, current_user)
+    if not session.authorized or not session.authorization_ref.strip():
+        raise HTTPException(
+            403,
+            "Session start requires explicit authorization metadata",
+        )
+    session = await get_session_manager().start(session_id)
+    return _public_session(session)
 
 
 @router.post("/{session_id}/cancel")
-async def cancel_session(session_id: str):
-    mgr = get_session_manager()
-    if not mgr.get(session_id):
-        raise HTTPException(404, f"Session {session_id} not found")
-    sess = await mgr.cancel(session_id)
-    return sess.to_dict()
+async def cancel_session(
+    session_id: str,
+    current_user: User = Depends(require_analyst),
+):
+    _owned_session(session_id, current_user)
+    session = await get_session_manager().cancel(session_id)
+    return _public_session(session)
 
 
 @router.get("/{session_id}/events")
-async def session_events(session_id: str, after: int = 0):
-    sess = get_session_manager().get(session_id)
-    if not sess:
-        raise HTTPException(404, f"Session {session_id} not found")
-    events = sess.events[after:]
+async def session_events(
+    session_id: str,
+    after: int = 0,
+    current_user: User = Depends(get_current_user),
+):
+    session = _owned_session(session_id, current_user)
+    events = session.events[after:]
     return {
         "session_id": session_id,
-        "status": sess.status.value,
+        "status": session.status.value,
         "offset": after,
-        "events": [e.to_dict() for e in events],
+        "events": [event.to_dict() for event in events],
         "next_offset": after + len(events),
-        "summary": sess.summary,
+        "summary": session.summary,
     }
 
 
 @router.get("/{session_id}/agents")
-async def session_agents(session_id: str):
-    sess = get_session_manager().get(session_id)
-    if not sess:
-        raise HTTPException(404, f"Session {session_id} not found")
+async def session_agents(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    session = _owned_session(session_id, current_user)
     return {
         "session_id": session_id,
-        "agents": {k: v.to_dict() for k, v in sess.agents.items()},
+        "agents": {key: value.to_dict() for key, value in session.agents.items()},
     }
