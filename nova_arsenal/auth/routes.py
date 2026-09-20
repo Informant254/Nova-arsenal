@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import secrets
@@ -129,6 +129,14 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.flush()
     await db.refresh(user)
+
+    db.add(
+        Subscription(
+            user_id=user.id,
+            tier=SubscriptionTier.FREE,
+            api_calls_limit=get_config().auth.oauth.free_api_calls_per_day,
+        )
+    )
 
     return UserResponse(
         id=user.id,
@@ -256,7 +264,21 @@ async def update_user_role(
             detail="User not found",
         )
 
-    user.role = UserRole(body.role)
+    new_role = UserRole(body.role)
+    if user.role == UserRole.ADMIN and new_role != UserRole.ADMIN:
+        admin_count_result = await db.execute(
+            select(func.count(User.id)).where(
+                User.role == UserRole.ADMIN,
+                User.is_active == True,
+            )
+        )
+        if int(admin_count_result.scalar_one()) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot demote the last active administrator",
+            )
+
+    user.role = new_role
     await db.flush()
     await db.refresh(user)
     return UserResponse(
@@ -489,36 +511,15 @@ async def get_subscription(
 async def upgrade_subscription(
     request: SubscriptionUpgradeRequest,
     current_user: User = Depends(require_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
-    """Upgrade subscription tier."""
-    result = await db.execute(
-        select(Subscription).where(Subscription.user_id == current_user.id)
+    """Self-service upgrades are disabled until a verified billing flow exists."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=(
+            "Self-service subscription upgrades are not configured. "
+            "Connect a verified billing provider before enabling paid tiers."
+        ),
     )
-    sub = result.scalar_one_or_none()
-
-    new_tier = SubscriptionTier(request.tier)
-    limit_map = {
-        SubscriptionTier.FREE: get_config().auth.oauth.free_api_calls_per_day,
-        SubscriptionTier.PRO: get_config().auth.oauth.pro_api_calls_per_day,
-        SubscriptionTier.ENTERPRISE: get_config().auth.oauth.enterprise_api_calls_per_day,
-    }
-
-    if sub:
-        sub.tier = new_tier
-        sub.api_calls_limit = limit_map[new_tier]
-        sub.is_active = True
-    else:
-        sub = Subscription(
-            user_id=current_user.id,
-            tier=new_tier,
-            api_calls_limit=limit_map[new_tier],
-        )
-        db.add(sub)
-
-    await db.commit()
-    audit_subscription_upgraded(current_user.id, new_tier.value)
-    return {"message": f"Subscription upgraded to {new_tier.value}"}
 
 
 # ── API Key Routes ───────────────────────────────────────────────────────────
