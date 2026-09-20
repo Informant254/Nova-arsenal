@@ -27,6 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    window.localStorage.removeItem('nova_chat_session');
     window.location.assign('/login');
   }
 
