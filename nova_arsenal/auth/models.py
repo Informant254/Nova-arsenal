@@ -46,7 +46,7 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     """JWT token payload model."""
-    sub: int
+    sub: str
     email: str
     role: str
     exp: datetime
