@@ -231,3 +231,31 @@ class TestCleanup:
         from nova_arsenal.auth.cleanup import cleanup_expired_api_keys, start_cleanup_task
         assert callable(cleanup_expired_api_keys)
         assert callable(start_cleanup_task)
+
+
+# ── JWT / dependency regression tests ────────────────────────────────────────
+
+class TestJWTRegression:
+    def test_access_token_uses_string_subject(self):
+        from jose import jwt
+        from nova_arsenal.auth.routes import create_access_token
+
+        with patch("nova_arsenal.auth.routes.get_config") as mock_cfg:
+            mock_cfg.return_value.auth.jwt_secret = "test-secret"
+            mock_cfg.return_value.auth.access_token_expire_minutes = 15
+            token = create_access_token(
+                {"sub": "42", "email": "test@example.com", "role": "analyst"}
+            )
+
+        payload = jwt.decode(token, "test-secret", algorithms=["HS256"])
+        assert payload["sub"] == "42"
+        assert isinstance(payload["sub"], str)
+
+    def test_current_user_declares_http_bearer_dependency(self):
+        import inspect
+
+        from fastapi.params import Depends
+        from nova_arsenal.auth.middleware import get_current_user
+
+        parameter = inspect.signature(get_current_user).parameters["credentials"]
+        assert isinstance(parameter.default, Depends)
