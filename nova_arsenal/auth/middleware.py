@@ -22,7 +22,7 @@ from nova_arsenal.config import get_config
 from nova_arsenal.db import get_db
 from nova_arsenal.db.models import ApiKey, Subscription, SubscriptionTier, User, UserRole
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 logger = logging.getLogger(__name__)
 
 SUBSCRIPTION_CALL_LIMITS = {
@@ -34,7 +34,7 @@ SUBSCRIPTION_CALL_LIMITS = {
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = None,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
@@ -146,11 +146,18 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token type",
             )
-        user_id = payload.get("sub")
-        if user_id is None:
+        raw_user_id = payload.get("sub")
+        if raw_user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token payload",
+            )
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token subject",
             )
     except JWTError:
         raise HTTPException(
