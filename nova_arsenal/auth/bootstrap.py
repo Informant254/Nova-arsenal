@@ -6,7 +6,7 @@ import logging
 import os
 
 from passlib.context import CryptContext
-from sqlalchemy import or_, select
+from sqlalchemy import select
 
 from nova_arsenal.db.models import User, UserRole
 from nova_arsenal.db.session import get_session_factory
@@ -26,10 +26,8 @@ async def ensure_bootstrap_admin() -> bool:
     password = os.getenv("NOVA_ADMIN_PASSWORD", "")
     username = os.getenv("NOVA_ADMIN_USERNAME", "admin").strip() or "admin"
 
-    configured = any(
-        os.getenv(name)
-        for name in ("NOVA_ADMIN_EMAIL", "NOVA_ADMIN_PASSWORD", "NOVA_ADMIN_USERNAME")
-    )
+    # Username has a harmless default, so only email/password opt into bootstrap.
+    configured = bool(email or password)
     if not configured:
         return False
     if not email or not password:
@@ -42,19 +40,25 @@ async def ensure_bootstrap_admin() -> bool:
 
     factory = get_session_factory()
     async with factory() as db:
-        result = await db.execute(
-            select(User).where(
-                or_(User.email == email, User.username == username)
-            )
+        email_result = await db.execute(
+            select(User).where(User.email == email)
         )
-        existing = result.scalar_one_or_none()
-        if existing:
-            if existing.role != UserRole.ADMIN:
+        email_user = email_result.scalar_one_or_none()
+        if email_user:
+            if email_user.role != UserRole.ADMIN:
                 logger.warning(
-                    "Bootstrap admin identity already belongs to a non-admin user; "
+                    "Bootstrap admin email already belongs to a non-admin user; "
                     "refusing silent privilege escalation"
                 )
             return False
+
+        username_result = await db.execute(
+            select(User).where(User.username == username)
+        )
+        if username_result.scalar_one_or_none():
+            raise RuntimeError(
+                "NOVA_ADMIN_USERNAME is already used by another account"
+            )
 
         user = User(
             email=email,
