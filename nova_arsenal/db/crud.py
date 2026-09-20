@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nova_arsenal.db.models import (
@@ -122,16 +122,23 @@ async def list_chat_sessions(
         query = query.where(ChatSession.user_id == user_id)
     result = await db.execute(query.limit(limit))
     sessions = result.scalars().all()
-    return [
-        {
-            "session_id": s.session_id,
-            "title": s.title,
-            "created_at": s.created_at.isoformat(),
-            "updated_at": s.updated_at.isoformat(),
-            "message_count": len(s.messages) if s.messages else 0,
-        }
-        for s in sessions
-    ]
+    rows: list[dict[str, Any]] = []
+    for session in sessions:
+        count_result = await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.session_id == session.session_id
+            )
+        )
+        rows.append(
+            {
+                "session_id": session.session_id,
+                "title": session.title,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+                "message_count": int(count_result.scalar_one()),
+            }
+        )
+    return rows
 
 
 # ── Agent Run Result CRUD ────────────────────────────────────────────────────
