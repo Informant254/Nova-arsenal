@@ -2,6 +2,7 @@
 
 import { MessageSquarePlus, Send, Trash2 } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import Markdown from 'react-markdown';
 
 import { novaFetch } from '@/lib/nova-api';
 
@@ -344,9 +345,29 @@ export default function ChatPage() {
                         {message.intent.replaceAll('_', ' ')}
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap break-words">
-                      {message.content || (streaming ? '…' : '')}
-                    </div>
+                    {message.role === 'assistant' ? (
+                      <div className="nova-markdown">
+                        <Markdown
+                          components={{
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                              >
+                                {children}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {message.content || (streaming ? '…' : '')}
+                        </Markdown>
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap break-words">
+                        {message.content}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
