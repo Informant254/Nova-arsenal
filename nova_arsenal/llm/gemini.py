@@ -17,7 +17,7 @@ class GeminiProvider(LLMProvider):
 
     def __init__(
         self,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.8-flash",
         api_key: str = "",
         base_url: str = "https://generativelanguage.googleapis.com",
         **kwargs,
