@@ -369,7 +369,7 @@ async def oauth_callback(
                 email=user_info.email,
                 username=user_info.username,
                 hashed_password="",
-                role=UserRole.ANALYST,
+                role=UserRole.VIEWER,
             )
             db.add(user)
             await db.flush()
