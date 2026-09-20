@@ -237,7 +237,7 @@ class TestCleanup:
 
 class TestJWTRegression:
     def test_access_token_uses_string_subject(self):
-        from jose import jwt
+        import jwt
         from nova_arsenal.auth.routes import create_access_token
 
         with patch("nova_arsenal.auth.routes.get_config") as mock_cfg:
@@ -295,3 +295,32 @@ class TestAuthHardening:
 
         request = RefreshTokenRequest(refresh_token="refresh-token-value")
         assert request.refresh_token == "refresh-token-value"
+
+
+class TestPasswordHashMigration:
+    def test_new_passwords_use_argon2(self):
+        from nova_arsenal.auth.routes import get_password_hash, verify_password
+
+        hashed = get_password_hash("correct horse battery staple")
+        assert hashed.startswith("$argon2id$")
+        assert verify_password("correct horse battery staple", hashed)
+        assert not verify_password("wrong password", hashed)
+
+    def test_legacy_bcrypt_hash_is_upgraded(self):
+        from pwdlib import PasswordHash
+        from pwdlib.hashers.bcrypt import BcryptHasher
+
+        from nova_arsenal.auth.routes import verify_and_upgrade_password
+
+        legacy = PasswordHash((BcryptHasher(),)).hash("legacy-password")
+        valid, upgraded = verify_and_upgrade_password("legacy-password", legacy)
+
+        assert valid is True
+        assert upgraded is not None
+        assert upgraded.startswith("$argon2id$")
+
+    def test_invalid_hash_fails_closed(self):
+        from nova_arsenal.auth.routes import verify_and_upgrade_password, verify_password
+
+        assert verify_password("password", "not-a-valid-hash") is False
+        assert verify_and_upgrade_password("password", "not-a-valid-hash") == (False, None)
