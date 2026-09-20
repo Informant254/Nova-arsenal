@@ -21,6 +21,11 @@ type ChatSession = {
   message_count: number;
 };
 
+type LlmStatus = {
+  primary: { provider: string; model: string; has_key: boolean };
+  active_providers: string[];
+};
+
 type HistoryResponse = {
   session_id: string;
   messages: Array<{
@@ -37,6 +42,7 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sessionId, setSessionId] = useState('');
+  const [brain, setBrain] = useState<LlmStatus | null>(null);
   const [error, setError] = useState('');
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -84,6 +90,7 @@ export default function ChatPage() {
     window.localStorage.setItem('nova_chat_session', id);
     setSessionId(id);
     void loadSessions();
+    void novaFetch<LlmStatus>('llm/status').then(setBrain).catch(() => setBrain(null));
   }, [loadSessions]);
 
   useEffect(() => {
@@ -284,25 +291,56 @@ export default function ChatPage() {
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="border-b border-white/10 px-5 py-4 md:px-8">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-            <div>
-              <h1 className="font-semibold">Nova chat</h1>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-semibold">Nova chat</h1>
+                {brain && (
+                  <span className="max-w-[260px] truncate rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[10px] text-emerald-300">
+                    {brain.primary.provider} / {brain.primary.model}
+                  </span>
+                )}
+              </div>
               <p className="mt-1 text-xs text-zinc-500">
                 Persistent conversation with runtime model routing.
               </p>
             </div>
-            <button
-              onClick={newConversation}
-              disabled={streaming}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-white disabled:opacity-40 lg:hidden"
-            >
-              <MessageSquarePlus size={14} />
-              New chat
-            </button>
+            <div className="flex items-center gap-2 lg:hidden">
+              {sessions.length > 0 && (
+                <select
+                  value={sessions.some((session) => session.session_id === sessionId) ? sessionId : ''}
+                  onChange={(event) => {
+                    if (event.target.value) selectSession(event.target.value);
+                  }}
+                  disabled={streaming}
+                  aria-label="Recent conversations"
+                  className="max-w-[150px] rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-xs text-zinc-400 outline-none disabled:opacity-40"
+                >
+                  <option value="">Recent chats</option>
+                  {sessions.map((session) => (
+                    <option key={session.session_id} value={session.session_id}>
+                      {session.title || 'New Chat'}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={newConversation}
+                disabled={streaming}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-white disabled:opacity-40"
+              >
+                <MessageSquarePlus size={14} />
+                New chat
+              </button>
+            </div>
           </div>
         </div>
 
         {error && (
-          <div className="mx-auto mt-4 w-full max-w-5xl px-5 md:px-8">
+          <div
+            className="mx-auto mt-4 w-full max-w-5xl px-5 md:px-8"
+            role="alert"
+            aria-live="polite"
+          >
             <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-xs text-red-300">
               {error}
             </div>
