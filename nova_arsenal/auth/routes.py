@@ -38,6 +38,7 @@ from nova_arsenal.auth.models import (
     UserCreate,
     UserLogin,
     UserResponse,
+    UserRoleUpdate,
 )
 from nova_arsenal.auth.oauth import (
     extract_pkce_verifier,
@@ -123,7 +124,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         email=user_data.email,
         username=user_data.username,
         hashed_password=get_password_hash(user_data.password),
-        role=UserRole.ANALYST,
+        role=UserRole.VIEWER,
     )
     db.add(user)
     await db.flush()
@@ -236,6 +237,35 @@ async def get_current_user(
         role=current_user.role.value,
         is_active=current_user.is_active,
         created_at=current_user.created_at,
+    )
+
+
+@router.patch("/users/{user_id}/role", response_model=UserResponse)
+async def update_user_role(
+    user_id: int,
+    body: UserRoleUpdate,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change a user's role. Admin only."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    user.role = UserRole(body.role)
+    await db.flush()
+    await db.refresh(user)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        role=user.role.value,
+        is_active=user.is_active,
+        created_at=user.created_at,
     )
 
 
