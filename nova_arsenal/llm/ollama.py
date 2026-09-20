@@ -19,10 +19,12 @@ class OllamaProvider(LLMProvider):
         self,
         model: str = "deepseek-r1",
         base_url: str = "http://localhost:11434",
+        timeout: float = 120.0,
         **kwargs,
     ):
         super().__init__(name="ollama", model=model, **kwargs)
         self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
 
     async def complete(
         self,
@@ -38,7 +40,7 @@ class OllamaProvider(LLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
@@ -69,7 +71,7 @@ class OllamaProvider(LLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/chat",
