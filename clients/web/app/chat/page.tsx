@@ -53,6 +53,10 @@ export default function ChatPage() {
         }),
       });
 
+      if (response.status === 401) {
+        window.location.assign('/login');
+        return;
+      }
       if (!response.ok || !response.body) {
         throw new Error('Nova API returned HTTP ' + response.status);
       }
