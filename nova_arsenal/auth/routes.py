@@ -163,7 +163,7 @@ async def login(
     audit_login_success(user.id, user.email, client_ip)
 
     # Create tokens
-    token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
@@ -192,7 +192,14 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
             detail="Invalid refresh token",
         )
 
-    user_id = payload.get("sub")
+    raw_user_id = payload.get("sub")
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject",
+        )
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
@@ -203,7 +210,7 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
         )
 
     # Create new tokens
-    token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     new_access_token = create_access_token(token_data)
     new_refresh_token = create_refresh_token(token_data)
 
@@ -341,7 +348,7 @@ async def oauth_callback(
     audit_oauth_login(provider, user.id, user.email, client_ip, is_new_user)
 
     # Create JWT tokens
-    token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     access_token = create_access_token(token_data)
     refresh_token_str = create_refresh_token(token_data)
 
