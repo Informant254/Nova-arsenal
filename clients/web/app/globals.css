@@ -36,3 +36,110 @@ body {
     @apply text-zinc-500;
   }
 }
+
+
+.nova-markdown {
+  overflow-wrap: anywhere;
+}
+
+.nova-markdown > :first-child {
+  margin-top: 0;
+}
+
+.nova-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.nova-markdown p,
+.nova-markdown ul,
+.nova-markdown ol,
+.nova-markdown pre,
+.nova-markdown blockquote,
+.nova-markdown table {
+  margin: 0.7rem 0;
+}
+
+.nova-markdown h1,
+.nova-markdown h2,
+.nova-markdown h3 {
+  margin: 1rem 0 0.45rem;
+  font-weight: 600;
+  color: #f4f4f5;
+}
+
+.nova-markdown h1 {
+  font-size: 1.15rem;
+}
+
+.nova-markdown h2 {
+  font-size: 1.05rem;
+}
+
+.nova-markdown h3 {
+  font-size: 0.95rem;
+}
+
+.nova-markdown ul,
+.nova-markdown ol {
+  padding-left: 1.35rem;
+}
+
+.nova-markdown ul {
+  list-style: disc;
+}
+
+.nova-markdown ol {
+  list-style: decimal;
+}
+
+.nova-markdown li + li {
+  margin-top: 0.25rem;
+}
+
+.nova-markdown a {
+  color: #6ee7b7;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.nova-markdown code {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.35rem;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.12rem 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82em;
+}
+
+.nova-markdown pre {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.75rem;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.9rem;
+}
+
+.nova-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.nova-markdown blockquote {
+  border-left: 2px solid rgba(52, 211, 153, 0.45);
+  padding-left: 0.8rem;
+  color: #a1a1aa;
+}
+
+.nova-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86em;
+}
+
+.nova-markdown th,
+.nova-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
