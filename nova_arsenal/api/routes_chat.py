@@ -131,31 +131,75 @@ NOVA_ACTION_SYSTEM_PROMPT = """You are Nova in action-assist mode inside a chat.
 The user wants something operational (scan, code, exploit, agent).
 - Stay conversational — do NOT reply with only raw JSON unless they explicitly ask for JSON.
 - Give a clear plan in plain language, then commands or code in fenced blocks.
-- Always remind them to only test systems they are authorized to assess.
-- If they gave a target, use it. If not, ask for one.
-- Offer to go deeper (swarm, zero-day candidate pipeline, specific tools) when useful.
+- Treat a supplied target as context, not proof of authorization.
+- Keep tool execution and active testing gated behind explicit authorization context.
+- Prefer non-destructive analysis, validation, and defensive guidance before active actions.
+- Never claim an action ran unless a tool actually ran and returned results.
 """
 
 
 # ── History formatting ───────────────────────────────────────────────────────
 
-def _format_history(messages: list[dict], max_messages: int = 40) -> str:
-    """Turn multi-turn history into a single prompt for providers that lack chat APIs."""
-    recent = messages[-max_messages:] if messages else []
-    lines: list[str] = []
-    for m in recent:
-        role = m.get("role", "user")
-        content = (m.get("content") or "").strip()
+def _truncate_middle(text: str, limit: int) -> str:
+    """Keep both ends of oversized content instead of silently dropping context."""
+    if len(text) <= limit:
+        return text
+    if limit <= 32:
+        return text[:limit]
+    marker = "\n...[earlier content truncated]...\n"
+    remaining = limit - len(marker)
+    head = int(remaining * 0.6)
+    tail = remaining - head
+    return text[:head] + marker + text[-tail:]
+
+
+def _format_history(
+    messages: list[dict],
+    max_messages: int = 80,
+    max_chars: int = 48_000,
+) -> str:
+    """Build bounded recent context for providers that accept a flat prompt.
+
+    The newest turns are kept first within a character budget. A single
+    oversized newest message is middle-truncated so both its opening context and
+    ending request survive. This avoids sending arbitrarily large histories to
+    providers with different context limits.
+    """
+    if not messages or max_chars <= 0:
+        return ""
+
+    recent = messages[-max_messages:]
+    selected: list[str] = []
+    used = 0
+
+    for message in reversed(recent):
+        role = message.get("role", "user")
+        content = (message.get("content") or "").strip()
         if not content:
             continue
+
         label = "User" if role == "user" else "Nova"
-        lines.append(f"{label}: {content}")
-    if not lines:
+        rendered = f"{label}: {content}"
+        separator_cost = 2 if selected else 0
+
+        if used + separator_cost + len(rendered) > max_chars:
+            if not selected:
+                prefix = f"{label}: "
+                budget = max(0, max_chars - len(prefix))
+                selected.append(prefix + _truncate_middle(content, budget))
+            break
+
+        selected.append(rendered)
+        used += separator_cost + len(rendered)
+
+    selected.reverse()
+    if not selected:
         return ""
-    # Ensure the model continues as Nova
-    if not lines[-1].startswith("User:"):
-        return "\n\n".join(lines)
-    return "\n\n".join(lines) + "\n\nNova:"
+
+    prompt = "\n\n".join(selected)
+    if selected[-1].startswith("User:"):
+        prompt += "\n\nNova:"
+    return prompt
 
 
 def _system_for_intent(intent: str) -> str:
