@@ -45,7 +45,11 @@ export default function LoginPage() {
 
       window.localStorage.removeItem('nova_chat_session');
       const next = searchParams.get('next');
-      router.replace(next && next.startsWith('/') ? next : '/');
+      const safeNext =
+        next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')
+          ? next
+          : '/';
+      router.replace(safeNext);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
