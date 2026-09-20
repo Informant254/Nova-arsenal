@@ -79,6 +79,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Create an access token."""
     config = get_config()
     to_encode = data.copy()
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=config.auth.access_token_expire_minutes)
     )
@@ -90,6 +92,8 @@ def create_refresh_token(data: dict) -> str:
     """Create a refresh token."""
     config = get_config()
     to_encode = data.copy()
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + timedelta(days=config.auth.refresh_token_expire_days)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, config.auth.jwt_secret, algorithm="HS256")
