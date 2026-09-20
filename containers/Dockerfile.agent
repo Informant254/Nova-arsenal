@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy application
-COPY pyproject.toml .
+# Copy package metadata and application
+COPY pyproject.toml README.md ./
 COPY nova_arsenal/ nova_arsenal/
 
 # Install Python package
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir .
 
 # Create workspace directory
 RUN mkdir -p /workspace
