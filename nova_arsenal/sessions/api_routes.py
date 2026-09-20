@@ -49,6 +49,15 @@ def _owned_session(session_id: str, user: User):
     return session
 
 
+def _public_session(session, include_events: bool = True) -> Dict[str, Any]:
+    """Serialize a session without internal ownership metadata."""
+    data = session.to_dict(include_events=include_events)
+    metadata = dict(data.get("metadata") or {})
+    metadata.pop("owner_id", None)
+    data["metadata"] = metadata
+    return data
+
+
 @router.get("/roles")
 async def list_roles(
     _current_user: User = Depends(get_current_user),
@@ -100,7 +109,7 @@ async def create_session(
     )
     if body.auto_start:
         session = await mgr.start(session.session_id, wait=False)
-    return session.to_dict()
+    return _public_session(session)
 
 
 @router.get("")
@@ -113,7 +122,7 @@ async def list_sessions(
         sessions = [session for session in sessions if _can_access(session, current_user)]
     return {
         "sessions": [
-            session.to_dict(include_events=False) for session in sessions
+            _public_session(session, include_events=False) for session in sessions
         ]
     }
 
@@ -123,7 +132,7 @@ async def get_session(
     session_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    return _owned_session(session_id, current_user).to_dict()
+    return _public_session(_owned_session(session_id, current_user))
 
 
 @router.post("/{session_id}/start")
@@ -138,7 +147,7 @@ async def start_session(
             "Session start requires explicit authorization metadata",
         )
     session = await get_session_manager().start(session_id)
-    return session.to_dict()
+    return _public_session(session)
 
 
 @router.post("/{session_id}/cancel")
@@ -148,7 +157,7 @@ async def cancel_session(
 ):
     _owned_session(session_id, current_user)
     session = await get_session_manager().cancel(session_id)
-    return session.to_dict()
+    return _public_session(session)
 
 
 @router.get("/{session_id}/events")
