@@ -57,7 +57,28 @@ async function refreshAccessToken(refreshToken: string): Promise<Tokens | null> 
   return (await response.json()) as Tokens;
 }
 
+function isSafeMutationOrigin(request: NextRequest) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return true;
+
+  const origin = request.headers.get('origin');
+  if (origin && origin !== request.nextUrl.origin) return false;
+
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) {
+    return false;
+  }
+
+  return true;
+}
+
 async function proxy(request: NextRequest, path: string[]) {
+  if (!isSafeMutationOrigin(request)) {
+    return NextResponse.json(
+      { detail: 'Cross-site mutation rejected' },
+      { status: 403 },
+    );
+  }
+
   const suffix = path.map(encodeURIComponent).join('/');
   const url = new URL(API_BASE + '/api/' + suffix);
   request.nextUrl.searchParams.forEach((value, key) => url.searchParams.append(key, value));
