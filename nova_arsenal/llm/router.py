@@ -183,7 +183,11 @@ class LLMRouter:
                         model = acc.meta.get("model") or model
                 except Exception:  # noqa: BLE001
                     pass
-                return OllamaProvider(model=model, base_url=base or "http://localhost:11434")
+                return OllamaProvider(
+                    model=model,
+                    base_url=base or "http://localhost:11434",
+                    timeout=timeout,
+                )
             if name == "local":
                 # Local OpenAI-compatible — no key required
                 try:
@@ -199,6 +203,7 @@ class LLMRouter:
                     model=model or "local-model",
                     api_key=key or "local",
                     base_url=base or "http://127.0.0.1:1234/v1",
+                    timeout=timeout,
                 )
             if name not in PROVIDER_CLASSES:
                 logger.warning("Unknown provider: %s", provider)
@@ -208,7 +213,7 @@ class LLMRouter:
                 return None
 
             cls = PROVIDER_CLASSES[name]
-            kwargs: dict = {"model": model, "api_key": key}
+            kwargs: dict = {"model": model, "api_key": key, "timeout": timeout}
             # Pass base_url when the constructor supports it
             if base:
                 kwargs["base_url"] = base
