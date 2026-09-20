@@ -15,6 +15,10 @@ type ProviderRow = {
   key_hint: string;
 };
 
+type UserProfile = {
+  role: 'viewer' | 'analyst' | 'admin';
+};
+
 type ByokStatus = {
   primary: { provider: string; model: string; has_key: boolean };
   fallbacks: { provider: string; model: string; has_key: boolean }[];
@@ -25,6 +29,7 @@ type ByokStatus = {
 
 export default function SettingsPage() {
   const [status, setStatus] = useState<ByokStatus | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -33,7 +38,12 @@ export default function SettingsPage() {
     setLoading(true);
     setError('');
     try {
-      setStatus(await novaFetch<ByokStatus>('llm/status'));
+      const [modelStatus, userProfile] = await Promise.all([
+        novaFetch<ByokStatus>('llm/status'),
+        novaFetch<UserProfile>('auth/me'),
+      ]);
+      setStatus(modelStatus);
+      setProfile(userProfile);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load model status');
     } finally {
@@ -80,13 +90,15 @@ export default function SettingsPage() {
               <RefreshCw size={15} />
               Refresh
             </button>
-            <button
-              onClick={() => void reload()}
-              disabled={reloading}
-              className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-300 disabled:opacity-50"
-            >
-              {reloading ? 'Reloading…' : 'Reload config'}
-            </button>
+            {profile && profile.role !== 'viewer' && (
+              <button
+                onClick={() => void reload()}
+                disabled={reloading}
+                className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-300 disabled:opacity-50"
+              >
+                {reloading ? 'Reloading…' : 'Reload config'}
+              </button>
+            )}
           </div>
         </div>
 
