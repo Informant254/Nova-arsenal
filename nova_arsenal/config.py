@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -27,6 +28,28 @@ from nova_arsenal.llm.keys import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Safe fallback for ad-hoc local development. It is stable for this process only,
+# so real deployments must set JWT_SECRET explicitly.
+_EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
+
+
+def _resolve_jwt_secret(configured: str = "") -> str:
+    candidate = (configured or os.getenv("JWT_SECRET", "")).strip()
+    known_placeholders = {
+        "changeme",
+        "change-me",
+        "change-this-to-a-random-secret",
+        "secret",
+    }
+    if len(candidate) >= 32 and candidate.lower() not in known_placeholders:
+        return candidate
+
+    logger.warning(
+        "JWT_SECRET is missing or weak; using an ephemeral development secret. "
+        "Existing sessions will become invalid after restart."
+    )
+    return _EPHEMERAL_JWT_SECRET
 
 
 @dataclass
@@ -397,7 +420,7 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
     oauth_fields = {f.name for f in OAuthConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     oauth = OAuthConfig(**{k: v for k, v in oauth_raw.items() if k in oauth_fields})
     auth = AuthConfig(
-        jwt_secret=auth_raw.get("jwt_secret") or os.getenv("JWT_SECRET", ""),
+        jwt_secret=_resolve_jwt_secret(auth_raw.get("jwt_secret") or ""),
         access_token_expire_minutes=int(auth_raw.get("access_token_expire_minutes") or 15),
         refresh_token_expire_days=int(auth_raw.get("refresh_token_expire_days") or 7),
         oauth=oauth,
