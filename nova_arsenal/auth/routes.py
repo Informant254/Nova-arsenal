@@ -11,9 +11,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 import jwt
 from jwt.exceptions import InvalidTokenError
-from pwdlib import PasswordHash
-from pwdlib.hashers.argon2 import Argon2Hasher
-from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,35 +63,12 @@ from nova_arsenal.db.models import (
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# Password hashing
-# Argon2 is primary; bcrypt remains for transparent migration of legacy users.
-password_hash = PasswordHash((Argon2Hasher(), BcryptHasher()))
-DUMMY_PASSWORD_HASH = password_hash.hash("nova-auth-dummy-password")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against Argon2 or legacy bcrypt."""
-    try:
-        return password_hash.verify(plain_password, hashed_password)
-    except Exception:
-        return False
-
-
-def verify_and_upgrade_password(
-    plain_password: str,
-    hashed_password: str,
-) -> tuple[bool, str | None]:
-    """Verify and return an upgraded Argon2 hash when the stored hash is legacy."""
-    try:
-        return password_hash.verify_and_update(plain_password, hashed_password)
-    except Exception:
-        return False, None
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password using the current Argon2 policy."""
-    return password_hash.hash(password)
-
+from nova_arsenal.auth.passwords import (
+    DUMMY_PASSWORD_HASH,
+    get_password_hash,
+    verify_and_upgrade_password,
+    verify_password,
+)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create an access token."""
