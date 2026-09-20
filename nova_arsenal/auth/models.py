@@ -59,6 +59,11 @@ class PasswordChange(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
+class UserRoleUpdate(BaseModel):
+    """Admin-only user role update."""
+    role: str = Field(..., pattern=r"^(viewer|analyst|admin)$")
+
+
 # ── OAuth Models ─────────────────────────────────────────────────────────────
 
 class OAuthAccountResponse(BaseModel):
