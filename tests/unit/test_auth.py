@@ -259,3 +259,39 @@ class TestJWTRegression:
 
         parameter = inspect.signature(get_current_user).parameters["credentials"]
         assert isinstance(parameter.default, Depends)
+
+
+# ── Auth hardening regressions ───────────────────────────────────────────────
+
+class TestAuthHardening:
+    def test_pat_does_not_reuse_github_token(self, monkeypatch):
+        from nova_arsenal.auth.middleware import _configured_pat_token
+
+        monkeypatch.delenv("NOVA_PAT_TOKEN", raising=False)
+        monkeypatch.delenv("PAT_TOKEN", raising=False)
+        monkeypatch.setenv("GITHUB_TOKEN", "github-secret-that-is-not-a-nova-pat")
+
+        assert _configured_pat_token() == ""
+
+    def test_nova_pat_takes_precedence(self, monkeypatch):
+        from nova_arsenal.auth.middleware import _configured_pat_token
+
+        monkeypatch.setenv("PAT_TOKEN", "legacy-pat")
+        monkeypatch.setenv("NOVA_PAT_TOKEN", "nova-pat")
+
+        assert _configured_pat_token() == "nova-pat"
+
+    def test_pat_match_rejects_empty_values(self):
+        from nova_arsenal.auth.middleware import _pat_matches
+
+        assert not _pat_matches(None, "configured")
+        assert not _pat_matches("", "configured")
+        assert not _pat_matches("candidate", "")
+        assert _pat_matches("same-secret", "same-secret")
+        assert not _pat_matches("wrong-secret", "same-secret")
+
+    def test_refresh_token_body_model(self):
+        from nova_arsenal.auth.models import RefreshTokenRequest
+
+        request = RefreshTokenRequest(refresh_token="refresh-token-value")
+        assert request.refresh_token == "refresh-token-value"
