@@ -71,7 +71,9 @@ async def health_check():
 
 
 @router.get("/health/detailed")
-async def detailed_health_check():
+async def detailed_health_check(
+    _current_user: User = Depends(get_current_user),
+):
     """Detailed health check with component status."""
     from nova_arsenal.llm import get_llm_router
 
@@ -89,7 +91,9 @@ async def detailed_health_check():
 
 
 @router.get("/llm/status")
-async def llm_byok_status():
+async def llm_byok_status(
+    _current_user: User = Depends(get_current_user),
+):
     """
     Show which LLM providers are configured (bring-your-own-key).
 
@@ -102,7 +106,9 @@ async def llm_byok_status():
 
 
 @router.get("/llm/routing")
-async def llm_routing_status():
+async def llm_routing_status(
+    _current_user: User = Depends(get_current_user),
+):
     """Return non-secret runtime routing telemetry for the dashboard."""
     from nova_arsenal.llm.router import get_llm_router
 
@@ -119,7 +125,9 @@ async def llm_routing_status():
 
 
 @router.post("/llm/reload")
-async def llm_reload_config():
+async def llm_reload_config(
+    _current_user: User = Depends(require_analyst),
+):
     """Reload .env / settings.yaml and re-initialize the LLM router."""
     from nova_arsenal.config import reload_config
     from nova_arsenal.llm.router import get_llm_router, reset_llm_router
@@ -151,7 +159,9 @@ class LlmAccountLoginRequest(BaseModel):
 
 
 @router.get("/llm/accounts")
-async def llm_list_accounts():
+async def llm_list_accounts(
+    _current_user: User = Depends(get_current_user),
+):
     """List signed-in AI accounts + local LLM discovery — no secrets."""
     from nova_arsenal.llm.account_auth import account_status
 
@@ -159,7 +169,9 @@ async def llm_list_accounts():
 
 
 @router.get("/llm/local")
-async def llm_local_status():
+async def llm_local_status(
+    _current_user: User = Depends(get_current_user),
+):
     """Discover local Ollama / OpenAI-compatible servers."""
     from nova_arsenal.llm.local_llm import local_llm_status
 
@@ -167,7 +179,10 @@ async def llm_local_status():
 
 
 @router.post("/llm/accounts/login")
-async def llm_account_login(body: LlmAccountLoginRequest):
+async def llm_account_login(
+    body: LlmAccountLoginRequest,
+    _current_user: User = Depends(require_analyst),
+):
     """
     Sign in with ChatGPT/Codex OAuth, local Ollama, Claude/Codex tokens, or Google OAuth.
 
@@ -227,7 +242,9 @@ async def llm_account_login(body: LlmAccountLoginRequest):
 
 
 @router.post("/llm/accounts/import")
-async def llm_account_import():
+async def llm_account_import(
+    _current_user: User = Depends(require_analyst),
+):
     """Import credentials from local Claude Code / Codex / Cursor installs."""
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
@@ -239,7 +256,10 @@ async def llm_account_import():
 
 
 @router.delete("/llm/accounts/{provider}")
-async def llm_account_logout(provider: str):
+async def llm_account_logout(
+    provider: str,
+    _current_user: User = Depends(require_analyst),
+):
     """Remove a stored AI account login."""
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
