@@ -20,10 +20,12 @@ class GeminiProvider(LLMProvider):
         model: str = "gemini-3.8-flash",
         api_key: str = "",
         base_url: str = "https://generativelanguage.googleapis.com",
+        timeout: float = 120.0,
         **kwargs,
     ):
         super().__init__(name="gemini", model=model, api_key=api_key, **kwargs)
         self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
 
     async def complete(
         self,
@@ -40,7 +42,7 @@ class GeminiProvider(LLMProvider):
             contents.append({"role": "model", "parts": [{"text": "Understood."}]})
         contents.append({"role": "user", "parts": [{"text": prompt}]})
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.base_url}/v1beta/models/{self.model}:generateContent",
                 params={"key": self.api_key},
@@ -78,7 +80,7 @@ class GeminiProvider(LLMProvider):
             contents.append({"role": "model", "parts": [{"text": "Understood."}]})
         contents.append({"role": "user", "parts": [{"text": prompt}]})
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/v1beta/models/{self.model}:streamGenerateContent",
