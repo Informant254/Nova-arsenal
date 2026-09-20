@@ -61,14 +61,14 @@ from nova_arsenal.db.models import (
     UserRole,
 )
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
-
 from nova_arsenal.auth.passwords import (
     DUMMY_PASSWORD_HASH,
     get_password_hash,
     verify_and_upgrade_password,
     verify_password,
 )
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create an access token."""
