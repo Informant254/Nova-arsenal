@@ -74,9 +74,14 @@ async def add_chat_message(
     )
     db.add(msg)
 
-    await db.execute(
-        select(ChatSession).where(ChatSession.session_id == session_id)
-    )
+    session = await get_chat_session(db, session_id)
+    if session:
+        session.updated_at = datetime.now(timezone.utc)
+        if role == "user" and (not session.title or session.title == "New Chat"):
+            compact = " ".join((content or "").split())
+            if compact:
+                session.title = compact[:80] + ("…" if len(compact) > 80 else "")
+
     await db.flush()
     await db.refresh(msg)
     return msg
