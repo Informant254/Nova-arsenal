@@ -32,6 +32,7 @@ from nova_arsenal.auth.models import (
     OAuthAccountResponse,
     OAuthLoginResponse,
     PasswordChange,
+    RefreshTokenRequest,
     SubscriptionResponse,
     SubscriptionUpgradeRequest,
     Token,
@@ -187,12 +188,27 @@ async def login(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
-    """Refresh access token using refresh token."""
+async def refresh_token(
+    body: RefreshTokenRequest | None = None,
+    refresh_token: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Refresh access token.
+
+    JSON body is the preferred transport. The query parameter remains temporarily
+    supported for backwards compatibility with older Nova clients.
+    """
+    token_value = body.refresh_token if body else (refresh_token or "")
+    if not token_value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="refresh_token is required",
+        )
+
     config = get_config()
     try:
         payload = jwt.decode(
-            refresh_token, config.auth.jwt_secret, algorithms=["HS256"]
+            token_value, config.auth.jwt_secret, algorithms=["HS256"]
         )
         if payload.get("type") != "refresh":
             raise HTTPException(
