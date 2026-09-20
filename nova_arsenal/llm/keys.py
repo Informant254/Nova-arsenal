@@ -28,7 +28,7 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "openai": ProviderKeySpec(
         name="openai",
         env_keys=("OPENAI_API_KEY", "CODEX_API_KEY"),
-        default_model="gpt-4o",
+        default_model="gpt-5.6-terra",
         default_url="https://api.openai.com/v1",
         model_env="OPENAI_MODEL",
     ),
@@ -42,14 +42,14 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "anthropic": ProviderKeySpec(
         name="anthropic",
         env_keys=("ANTHROPIC_API_KEY",),
-        default_model="claude-sonnet-4-20250514",
+        default_model="claude-sonnet-5",
         default_url="https://api.anthropic.com",
         model_env="ANTHROPIC_MODEL",
     ),
     "gemini": ProviderKeySpec(
         name="gemini",
         env_keys=("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-        default_model="gemini-2.5-flash",
+        default_model="gemini-3.8-flash",
         default_url="https://generativelanguage.googleapis.com",
         model_env="GEMINI_MODEL",
     ),
@@ -63,14 +63,14 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
     "deepseek": ProviderKeySpec(
         name="deepseek",
         env_keys=("DEEPSEEK_API_KEY",),
-        default_model="deepseek-chat",
+        default_model="deepseek-flash",
         default_url="https://api.deepseek.com/v1",
         model_env="DEEPSEEK_MODEL",
     ),
     "qwen": ProviderKeySpec(
         name="qwen",
         env_keys=("DASHSCOPE_API_KEY", "QWEN_API_KEY"),
-        default_model="qwen-max",
+        default_model="qwen3.8-flash",
         default_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         model_env="QWEN_MODEL",
     ),
@@ -189,7 +189,7 @@ def env_providers_with_keys() -> List[str]:
     """List cloud providers that have API keys present in the environment."""
     found: List[str] = []
     for name, spec in PROVIDER_SPECS.items():
-        if name == "ollama":
+        if name in {"ollama", "local"}:
             continue
         if resolve_api_key(name):
             found.append(name)
@@ -220,17 +220,18 @@ def provider_status_snapshot() -> List[Dict[str, object]]:
     """Non-secret status for UI /health."""
     rows: List[Dict[str, object]] = []
     for name, spec in PROVIDER_SPECS.items():
-        key = resolve_api_key(name) if name != "ollama" else ""
+        requires_key = name not in {"ollama", "local"}
+        key = resolve_api_key(name) if requires_key else ""
         rows.append(
             {
                 "provider": name,
-                "configured": bool(key) if name != "ollama" else True,
-                "requires_key": name != "ollama",
+                "configured": bool(key) if requires_key else True,
+                "requires_key": requires_key,
                 "key_env": list(spec.env_keys),
                 "default_model": resolve_model(name, spec.default_model),
                 "has_key": bool(key),
-                # Never return the key; only prefix hint for UX
-                "key_hint": (key[:7] + "…") if key and len(key) > 8 else ("" if not key else "set"),
+                # Never return any part of the credential.
+                "key_hint": "set" if key else "",
             }
         )
     return rows
