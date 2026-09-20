@@ -8,6 +8,7 @@ Allows Nova to:
 - Chain modules together
 """
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -24,7 +25,7 @@ class MsfModuleResult:
     module: str
     module_type: str
     status: str
-    output: str
+    output: str = ""
     session_id: Optional[int] = None
     findings: List[Dict[str, Any]] = field(default_factory=list)
     duration_ms: float = 0
@@ -120,7 +121,7 @@ class MetasploitRPC:
             logger.error(f"MSF RPC login error: {e}")
             return False
 
-    async def _rpc_call(self, method: str, params: List[Any] = None) -> Dict[str, Any]:
+    async def _rpc_call(self, method: str, params: Optional[List[Any]] = None) -> Dict[str, Any]:
         """Make a JSON-RPC call to msfrpcd."""
         import aiohttp
 
