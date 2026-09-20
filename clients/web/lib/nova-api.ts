@@ -7,6 +7,11 @@ export async function novaFetch<T>(
     cache: 'no-store',
   });
 
+  if (response.status === 401 && typeof window !== 'undefined') {
+    window.location.assign('/login');
+    throw new Error('Authentication required');
+  }
+
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
     try {
