@@ -7,12 +7,8 @@ and serves the web dashboard.
 
 import logging
 import os
-from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from nova_arsenal.api.routes import router as api_router
 from nova_arsenal.api.routes_chat import router as chat_router
@@ -39,9 +35,20 @@ def create_app() -> FastAPI:
     )
 
     # ── CORS ─────────────────────────────────────────────────────────────────
+    # The Next.js dashboard proxies API calls server-side, so browser CORS is
+    # normally unnecessary. Explicit origins remain configurable for direct
+    # development clients without combining wildcard origins with credentials.
+    cors_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "NOVA_CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if origin.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -106,17 +113,14 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(sessions_router)
 
-    # ── Static files (web dashboard) ─────────────────────────────────────────
-    static_dir = Path(__file__).parent / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
     @app.get("/", include_in_schema=False)
     async def index():
-        dashboard = static_dir / "index.html"
-        if dashboard.exists():
-            return FileResponse(str(dashboard))
-        return {"message": "Nova-Arsenal API", "docs": "/docs"}
+        return {
+            "service": "nova-arsenal-api",
+            "status": "ok",
+            "dashboard": "Run the Next.js client from clients/web (default http://localhost:3000)",
+            "docs": "/docs",
+        }
 
     @app.get("/health")
     async def health():
