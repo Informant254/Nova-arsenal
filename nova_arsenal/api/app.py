@@ -73,6 +73,10 @@ def create_app() -> FastAPI:
             from nova_arsenal.db.session import create_tables
             await create_tables()
             logger.info("Database tables created / verified")
+
+            from nova_arsenal.auth.bootstrap import ensure_bootstrap_admin
+
+            await ensure_bootstrap_admin()
         except Exception as e:
             logger.warning(f"Database initialization skipped (non-fatal): {e}")
 
