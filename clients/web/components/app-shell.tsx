@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import {
   Bot,
   BrainCircuit,
+  LogOut,
   MessageSquareText,
-  Settings,
   Waves,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -20,6 +20,15 @@ const items = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.assign('/login');
+  }
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100">
@@ -56,9 +65,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-auto rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs leading-5 text-zinc-500">
-            Active testing stays behind Nova&apos;s authorization controls. The dashboard focuses on
-            conversation, visibility, and review.
+          <div className="mt-auto space-y-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs leading-5 text-zinc-500">
+              Active testing stays behind Nova&apos;s authorization controls. The dashboard focuses on
+              conversation, visibility, and review.
+            </div>
+            <button
+              onClick={() => void logout()}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+            >
+              <LogOut size={16} />
+              Sign out
+            </button>
           </div>
         </aside>
 
@@ -67,8 +85,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href="/" className="font-semibold tracking-wide text-emerald-300">
               NOVA
             </Link>
-            <div className="flex gap-1">
-              {items.slice(0, 4).map(({ href, label, icon: Icon }) => (
+            <div className="flex items-center gap-1">
+              {items.map(({ href, label, icon: Icon }) => (
                 <Link
                   key={href}
                   href={href}
@@ -78,6 +96,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Icon size={18} />
                 </Link>
               ))}
+              <button
+                onClick={() => void logout()}
+                aria-label="Sign out"
+                className="rounded-lg p-2 text-zinc-500 hover:bg-white/5 hover:text-white"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
           </header>
           {children}
