@@ -1,6 +1,9 @@
 'use client';
 
+import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+
+import { novaFetch } from '@/lib/nova-api';
 
 type ProviderRow = {
   provider: string;
@@ -18,17 +21,11 @@ type ByokStatus = {
   active_providers: string[];
   env_keys_detected: string[];
   provider_catalog: ProviderRow[];
-  how_to: Record<string, string>;
 };
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_AGENT_API_URL ||
-  process.env.AGENT_API_URL ||
-  'http://localhost:8000';
 
 export default function SettingsPage() {
   const [status, setStatus] = useState<ByokStatus | null>(null);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
 
@@ -36,178 +33,168 @@ export default function SettingsPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/llm/status`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as ByokStatus;
-      setStatus(data);
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not reach agent API. Is Nova running on :8000?'
-      );
+      setStatus(await novaFetch<ByokStatus>('llm/status'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load model status');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
-  async function reloadConfig() {
+  async function reload() {
     setReloading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/llm/reload`, { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await novaFetch('llm/reload', { method: 'POST' });
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Reload failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reload failed');
     } finally {
       setReloading(false);
     }
   }
 
   return (
-    <div className="min-h-screen p-8 bg-gray-950 text-gray-100">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-emerald-400 mb-2">Settings</h1>
-        <p className="text-gray-400 mb-8">
-          Bring your own AI subscription — set API keys in <code className="text-emerald-300">.env</code> and
-          Nova routes the agent through your providers.
-        </p>
-
-        <div className="space-y-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">LLM / BYOK status</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={load}
-                  className="px-3 py-1.5 text-sm rounded bg-gray-800 hover:bg-gray-700 border border-gray-700"
-                >
-                  Refresh
-                </button>
-                <button
-                  onClick={reloadConfig}
-                  disabled={reloading}
-                  className="px-3 py-1.5 text-sm rounded bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
-                >
-                  {reloading ? 'Reloading…' : 'Reload keys'}
-                </button>
-              </div>
-            </div>
-
-            {loading && <p className="text-gray-500">Loading provider status…</p>}
-            {error && (
-              <p className="text-red-400 mb-4 text-sm">
-                {error}
-              </p>
-            )}
-
-            {status && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="rounded border border-gray-800 p-4">
-                    <div className="text-xs uppercase text-gray-500 mb-1">Primary</div>
-                    <div className="text-lg font-medium">
-                      {status.primary.provider}
-                      <span className="text-gray-500"> / {status.primary.model}</span>
-                    </div>
-                    <div className="text-sm mt-1">
-                      {status.primary.has_key ? (
-                        <span className="text-emerald-400">Key ready</span>
-                      ) : (
-                        <span className="text-amber-400">No key (will fail for cloud providers)</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="rounded border border-gray-800 p-4">
-                    <div className="text-xs uppercase text-gray-500 mb-1">Active providers</div>
-                    <div className="text-sm text-gray-300">
-                      {status.active_providers.length
-                        ? status.active_providers.join(', ')
-                        : 'None configured'}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      Env keys detected: {status.env_keys_detected.join(', ') || 'none'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-800">
-                        <th className="py-2 pr-4">Provider</th>
-                        <th className="py-2 pr-4">Key</th>
-                        <th className="py-2 pr-4">Env vars</th>
-                        <th className="py-2">Default model</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {status.provider_catalog.map((p) => (
-                        <tr key={p.provider} className="border-b border-gray-900">
-                          <td className="py-2 pr-4 font-medium">{p.provider}</td>
-                          <td className="py-2 pr-4">
-                            {p.provider === 'ollama' ? (
-                              <span className="text-emerald-400">local (no key)</span>
-                            ) : p.has_key ? (
-                              <span className="text-emerald-400">set ({p.key_hint})</span>
-                            ) : (
-                              <span className="text-gray-500">not set</span>
-                            )}
-                          </td>
-                          <td className="py-2 pr-4 text-gray-400 font-mono text-xs">
-                            {p.key_env.join(', ') || '—'}
-                          </td>
-                          <td className="py-2 text-gray-400">{p.default_model}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="bg-gray-900 border border-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-3">How to connect your subscription</h2>
-            <ol className="list-decimal list-inside space-y-2 text-gray-300 text-sm">
-              <li>
-                Copy <code className="text-emerald-300">config/.env.example</code> →{' '}
-                <code className="text-emerald-300">.env</code>
-              </li>
-              <li>Paste the API key from your OpenAI / Claude / Gemini / OpenRouter account</li>
-              <li>
-                Optional: set <code className="text-emerald-300">LLM_PROVIDER=openai</code> and{' '}
-                <code className="text-emerald-300">LLM_MODEL=gpt-4o</code>
-              </li>
-              <li>Restart the agent API (or click Reload keys)</li>
-              <li>
-                Verify with <code className="text-emerald-300">GET /api/llm/status</code>
-              </li>
-            </ol>
-            <pre className="mt-4 p-4 rounded bg-black/50 text-xs text-emerald-200 overflow-x-auto">
-{`# examples
-export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-ant-...
-export GOOGLE_API_KEY=...
-export OPENROUTER_API_KEY=sk-or-...
-
-export LLM_PROVIDER=anthropic
-export LLM_MODEL=claude-sonnet-4-20250514
-
-python -m nova_arsenal.api`}
-            </pre>
-            <p className="mt-3 text-xs text-gray-500">
-              Keys stay on your machine / server env. The dashboard never displays full secrets.
-              Platform login (JWT) is separate from LLM provider keys.
+    <main className="p-5 md:p-8 lg:p-10">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.25em] text-emerald-400">
+              Model stack
+            </p>
+            <h1 className="text-3xl font-semibold">Models</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
+              Provider status is read from Nova&apos;s runtime. Full secrets are never returned to
+              the dashboard.
             </p>
           </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void load()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-white"
+            >
+              <RefreshCw size={15} />
+              Refresh
+            </button>
+            <button
+              onClick={() => void reload()}
+              disabled={reloading}
+              className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-300 disabled:opacity-50"
+            >
+              {reloading ? 'Reloading…' : 'Reload config'}
+            </button>
+          </div>
         </div>
+
+        {error && (
+          <div className="mb-5 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="panel p-8 text-sm text-zinc-500">Loading model stack…</div>
+        ) : status ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <section className="panel p-5">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Primary</div>
+                <div className="mt-3 text-xl font-medium text-emerald-200">
+                  {status.primary.provider + ' / ' + status.primary.model}
+                </div>
+                <div className="mt-2 text-xs text-zinc-500">
+                  {status.primary.has_key || status.primary.provider === 'ollama' || status.primary.provider === 'local'
+                    ? 'Ready or local'
+                    : 'Credential not detected'}
+                </div>
+              </section>
+
+              <section className="panel p-5">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Runtime providers</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {status.active_providers.length ? (
+                    status.active_providers.map((provider) => (
+                      <span
+                        key={provider}
+                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300"
+                      >
+                        {provider}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-zinc-500">None active</span>
+                  )}
+                </div>
+                <div className="mt-3 text-xs text-zinc-600">
+                  Environment credentials detected: {status.env_keys_detected.join(', ') || 'none'}
+                </div>
+              </section>
+            </div>
+
+            <section className="panel mt-6 overflow-hidden">
+              <div className="border-b border-white/10 px-5 py-4">
+                <h2 className="font-medium">Provider catalog</h2>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Defaults are fallbacks only. Environment or account configuration wins.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px] text-left text-sm">
+                  <thead className="bg-black/20 text-xs uppercase tracking-wider text-zinc-600">
+                    <tr>
+                      <th className="px-5 py-3">Provider</th>
+                      <th className="px-5 py-3">Credential</th>
+                      <th className="px-5 py-3">Default model</th>
+                      <th className="px-5 py-3">Environment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {status.provider_catalog.map((provider) => (
+                      <tr key={provider.provider} className="border-t border-white/5">
+                        <td className="px-5 py-4 font-medium">{provider.provider}</td>
+                        <td className="px-5 py-4">
+                          {!provider.requires_key ? (
+                            <span className="text-emerald-300">local / no key</span>
+                          ) : provider.has_key ? (
+                            <span className="text-emerald-300">
+                              detected {provider.key_hint ? '(' + provider.key_hint + ')' : ''}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-600">not set</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-zinc-400">{provider.default_model}</td>
+                        <td className="px-5 py-4 font-mono text-xs text-zinc-600">
+                          {provider.key_env.join(', ') || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="panel mt-6 p-5">
+              <h2 className="font-medium">Configuration</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">
+                Set provider credentials and model overrides in the server environment or
+                <code className="mx-1 rounded bg-black/30 px-1.5 py-0.5 text-zinc-300">.env</code>.
+                Useful overrides include
+                <code className="mx-1 rounded bg-black/30 px-1.5 py-0.5 text-zinc-300">LLM_PROVIDER</code>
+                and
+                <code className="mx-1 rounded bg-black/30 px-1.5 py-0.5 text-zinc-300">LLM_MODEL</code>.
+                The dashboard intentionally does not accept or display full secret keys.
+              </p>
+            </section>
+          </>
+        ) : (
+          <div className="panel p-8 text-sm text-zinc-500">No model status available.</div>
+        )}
       </div>
-    </div>
+    </main>
   );
 }
