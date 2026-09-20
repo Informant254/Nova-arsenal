@@ -24,7 +24,7 @@ from nova_arsenal.auth.audit import (
     audit_oauth_login,
     audit_subscription_upgraded,
 )
-from nova_arsenal.auth.middleware import get_current_user
+from nova_arsenal.auth.middleware import get_current_user as require_current_user, require_admin
 from nova_arsenal.auth.models import (
     ApiKeyCreateRequest,
     ApiKeyListResponse,
@@ -226,7 +226,7 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
 ):
     """Get current user profile."""
     return UserResponse(
@@ -365,7 +365,7 @@ async def oauth_callback(
 
 @router.get("/oauth/accounts", response_model=list[OAuthAccountResponse])
 async def list_oauth_accounts(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List OAuth accounts linked to current user."""
@@ -387,7 +387,7 @@ async def list_oauth_accounts(
 @router.delete("/oauth/{provider}")
 async def unlink_oauth_account(
     provider: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Unlink an OAuth account."""
@@ -426,7 +426,7 @@ async def unlink_oauth_account(
 
 @router.get("/subscription", response_model=SubscriptionResponse)
 async def get_subscription(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get current user's subscription details."""
@@ -458,7 +458,7 @@ async def get_subscription(
 @router.post("/subscription/upgrade")
 async def upgrade_subscription(
     request: SubscriptionUpgradeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upgrade subscription tier."""
@@ -508,7 +508,7 @@ def generate_api_key() -> tuple[str, str, str]:
 @router.post("/api-keys", response_model=ApiKeyResponse)
 async def create_api_key(
     request: ApiKeyCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a new API key for subscription-based access."""
@@ -549,7 +549,7 @@ async def create_api_key(
 
 @router.get("/api-keys", response_model=list[ApiKeyListResponse])
 async def list_api_keys(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List API keys for the current user."""
@@ -576,7 +576,7 @@ async def list_api_keys(
 @router.delete("/api-keys/{key_id}")
 async def revoke_api_key(
     key_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Revoke an API key."""
@@ -600,7 +600,7 @@ async def revoke_api_key(
 
 @router.get("/api-keys/usage")
 async def get_api_key_usage(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get API key usage statistics."""
