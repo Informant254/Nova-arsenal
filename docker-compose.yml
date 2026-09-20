@@ -92,10 +92,7 @@ services:
       dockerfile: containers/Dockerfile.web
     container_name: nova-web
     environment:
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-changeme}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - AGENT_API_URL=http://agent:8000
-      - DATABASE_URL=file:/app/data/nova.db
     volumes:
       - web-data:/app/data
     ports:
