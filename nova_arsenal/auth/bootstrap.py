@@ -5,14 +5,14 @@ from __future__ import annotations
 import logging
 import os
 
-from passlib.context import CryptContext
 from sqlalchemy import select
 
 from nova_arsenal.db.models import Subscription, SubscriptionTier, User, UserRole
 from nova_arsenal.db.session import get_session_factory
 
+from nova_arsenal.auth.passwords import get_password_hash
+
 logger = logging.getLogger(__name__)
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 async def ensure_bootstrap_admin() -> bool:
@@ -63,7 +63,7 @@ async def ensure_bootstrap_admin() -> bool:
         user = User(
             email=email,
             username=username,
-            hashed_password=_pwd_context.hash(password),
+            hashed_password=get_password_hash(password),
             role=UserRole.ADMIN,
             is_active=True,
         )
