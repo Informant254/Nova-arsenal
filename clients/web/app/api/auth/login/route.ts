@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_BASE = (process.env.AGENT_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  if (origin && origin !== request.nextUrl.origin) {
+    return NextResponse.json({ detail: 'Cross-site login rejected' }, { status: 403 });
+  }
+
   const payload = await request.json();
 
   const upstream = await fetch(API_BASE + '/api/auth/login', {
