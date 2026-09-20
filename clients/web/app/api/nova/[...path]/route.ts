@@ -108,24 +108,29 @@ async function proxy(request: NextRequest, path: string[]) {
   return response;
 }
 
-type RouteContext = { params: { path: string[] } };
+type RouteContext = { params: Promise<{ path: string[] }> };
+
+async function pathFrom(context: RouteContext) {
+  const params = await context.params;
+  return params.path;
+}
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  return proxy(request, context.params.path);
+  return proxy(request, await pathFrom(context));
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  return proxy(request, context.params.path);
+  return proxy(request, await pathFrom(context));
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
-  return proxy(request, context.params.path);
+  return proxy(request, await pathFrom(context));
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  return proxy(request, context.params.path);
+  return proxy(request, await pathFrom(context));
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
-  return proxy(request, context.params.path);
+  return proxy(request, await pathFrom(context));
 }
