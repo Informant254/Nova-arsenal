@@ -211,15 +211,24 @@ def _system_for_intent(intent: str) -> str:
 # ── LLM access ───────────────────────────────────────────────────────────────
 
 async def _resolve_llm():
-    """Return (multi_router_or_None, global_llm_router_or_None)."""
-    multi = get_router()
+    """Return the current multi-router and global router.
+
+    Always prefer the router from get_llm_router() so config/account reloads are
+    reflected immediately. The injected startup router remains only as a
+    backwards-compatible fallback.
+    """
     global_router = None
+    multi = None
     try:
         from nova_arsenal.llm.router import get_llm_router
 
         global_router = get_llm_router()
+        multi = global_router.multi_router
     except Exception as exc:  # noqa: BLE001
         logger.debug("global llm router unavailable: %s", exc)
+
+    if multi is None:
+        multi = get_router()
     return multi, global_router
 
 
