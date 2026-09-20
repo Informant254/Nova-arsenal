@@ -9,8 +9,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt
+from jwt.exceptions import InvalidTokenError
+from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
+from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,17 +67,33 @@ from nova_arsenal.db.models import (
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Argon2 is primary; bcrypt remains for transparent migration of legacy users.
+password_hash = PasswordHash((Argon2Hasher(), BcryptHasher()))
+DUMMY_PASSWORD_HASH = password_hash.hash("nova-auth-dummy-password")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a password against Argon2 or legacy bcrypt."""
+    try:
+        return password_hash.verify(plain_password, hashed_password)
+    except Exception:
+        return False
+
+
+def verify_and_upgrade_password(
+    plain_password: str,
+    hashed_password: str,
+) -> tuple[bool, str | None]:
+    """Verify and return an upgraded Argon2 hash when the stored hash is legacy."""
+    try:
+        return password_hash.verify_and_update(plain_password, hashed_password)
+    except Exception:
+        return False, None
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password."""
-    return pwd_context.hash(password)
+    """Hash a password using the current Argon2 policy."""
+    return password_hash.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -160,12 +179,26 @@ async def login(
     result = await db.execute(select(User).where(User.email == credentials.email))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(credentials.password, user.hashed_password):
+    if user:
+        valid_password, upgraded_hash = verify_and_upgrade_password(
+            credentials.password,
+            user.hashed_password,
+        )
+    else:
+        # Keep missing-user login work comparable to a real password check.
+        verify_password(credentials.password, DUMMY_PASSWORD_HASH)
+        valid_password, upgraded_hash = False, None
+
+    if not user or not valid_password:
         audit_login_failure(credentials.email, client_ip, "invalid_credentials")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    if upgraded_hash:
+        user.hashed_password = upgraded_hash
+        await db.flush()
 
     if not user.is_active:
         audit_login_failure(credentials.email, client_ip, "account_disabled")
@@ -215,7 +248,7 @@ async def refresh_token(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token type",
             )
-    except JWTError:
+    except InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
