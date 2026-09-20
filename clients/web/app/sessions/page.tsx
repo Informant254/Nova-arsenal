@@ -1,6 +1,7 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { novaFetch } from '@/lib/nova-api';
@@ -78,7 +79,11 @@ export default function SessionsPage() {
         ) : (
           <div className="space-y-3">
             {sessions.map((session) => (
-              <article key={session.session_id} className="panel p-5">
+              <Link
+                key={session.session_id}
+                href={'/sessions/' + encodeURIComponent(session.session_id)}
+                className="panel block p-5 transition hover:border-emerald-400/20 hover:bg-white/[0.05]"
+              >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -95,11 +100,12 @@ export default function SessionsPage() {
                       </p>
                     )}
                   </div>
-                  <div className="shrink-0 text-right text-xs text-zinc-500">
-                    {session.agents ? Object.keys(session.agents).length : 0} agents
+                  <div className="flex shrink-0 items-center gap-2 text-right text-xs text-zinc-500">
+                    <span>{session.agents ? Object.keys(session.agents).length : 0} agents</span>
+                    <ChevronRight size={15} className="text-zinc-700" />
                   </div>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         )}
