@@ -24,6 +24,17 @@ from nova_arsenal.db.models import (
 
 # ── Chat Session CRUD ─────────────────────────────────────────────────────────
 
+async def get_chat_session(
+    db: AsyncSession,
+    session_id: str,
+) -> ChatSession | None:
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.session_id == session_id)
+    )
+    return result.scalar_one_or_none()
+
+
+
 async def get_or_create_chat_session(
     db: AsyncSession,
     session_id: str | None = None,
@@ -31,11 +42,10 @@ async def get_or_create_chat_session(
     title: str = "New Chat",
 ) -> ChatSession:
     if session_id:
-        result = await db.execute(
-            select(ChatSession).where(ChatSession.session_id == session_id)
-        )
-        session = result.scalar_one_or_none()
+        session = await get_chat_session(db, session_id)
         if session:
+            if user_id is not None and session.user_id != user_id:
+                raise PermissionError("Chat session does not belong to this user")
             return session
 
     session = ChatSession(
@@ -88,12 +98,15 @@ async def get_chat_messages(
     return list(result.scalars().all())
 
 
-async def delete_chat_session(db: AsyncSession, session_id: str) -> bool:
-    result = await db.execute(
-        select(ChatSession).where(ChatSession.session_id == session_id)
-    )
-    session = result.scalar_one_or_none()
+async def delete_chat_session(
+    db: AsyncSession,
+    session_id: str,
+    user_id: int | None = None,
+) -> bool:
+    session = await get_chat_session(db, session_id)
     if not session:
+        return False
+    if user_id is not None and session.user_id != user_id:
         return False
     await db.delete(session)
     return True
@@ -321,7 +334,7 @@ async def update_entry_run_stats(
 
 
 __all__ = [
-    "get_or_create_chat_session", "add_chat_message",
+    "get_chat_session", "get_or_create_chat_session", "add_chat_message",
     "get_chat_messages", "delete_chat_session", "list_chat_sessions",
     "create_agent_run", "complete_agent_run", "get_agent_run_history",
     "persist_finding", "persist_findings_batch",
