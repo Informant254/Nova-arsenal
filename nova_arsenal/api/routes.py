@@ -42,7 +42,7 @@ router.include_router(memory_router)
 
 class RunAgentRequest(BaseModel):
     target: str
-    objective: str = "Find and exploit all critical vulnerabilities"
+    objective: str = "Assess security posture and identify high-risk vulnerabilities"
     max_steps: int = 40
     scope: list[str] | None = None
     sandbox_mode: str | None = None
@@ -342,7 +342,7 @@ async def get_agent(
 @router.post("/agents", status_code=status.HTTP_201_CREATED)
 async def create_agent(
     target: str,
-    objective: str = "Find and exploit all critical vulnerabilities",
+    objective: str = "Assess security posture and identify high-risk vulnerabilities",
     current_user: User = Depends(require_analyst),
     db: AsyncSession = Depends(get_db),
 ):
@@ -396,8 +396,12 @@ async def list_findings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List findings with optional filters."""
+    """List findings with optional filters, scoped to the current user."""
     query = select(Finding)
+    if current_user.role.value != "admin":
+        query = query.join(Agent, Finding.agent_id == Agent.id).where(
+            Agent.owner_id == current_user.id
+        )
 
     if agent_id:
         query = query.where(Finding.agent_id == agent_id)
@@ -429,9 +433,12 @@ async def get_finding(
     db: AsyncSession = Depends(get_db),
 ):
     """Get finding details."""
-    result = await db.execute(
-        select(Finding).where(Finding.id == finding_id)
-    )
+    query = select(Finding).where(Finding.id == finding_id)
+    if current_user.role.value != "admin":
+        query = query.join(Agent, Finding.agent_id == Agent.id).where(
+            Agent.owner_id == current_user.id
+        )
+    result = await db.execute(query)
     finding = result.scalar_one_or_none()
 
     if not finding:
@@ -465,9 +472,12 @@ async def verify_finding(
     """Mark a finding as verified."""
     from datetime import datetime, timezone
 
-    result = await db.execute(
-        select(Finding).where(Finding.id == finding_id)
-    )
+    query = select(Finding).where(Finding.id == finding_id)
+    if current_user.role.value != "admin":
+        query = query.join(Agent, Finding.agent_id == Agent.id).where(
+            Agent.owner_id == current_user.id
+        )
+    result = await db.execute(query)
     finding = result.scalar_one_or_none()
 
     if not finding:
@@ -489,8 +499,11 @@ async def list_scope(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all scope entries."""
-    result = await db.execute(select(Scope).where(Scope.is_active))
+    """List scope entries visible to the current user."""
+    query = select(Scope).where(Scope.is_active)
+    if current_user.role.value != "admin":
+        query = query.where(Scope.owner_id == current_user.id)
+    result = await db.execute(query)
     scopes = result.scalars().all()
 
     return {
@@ -539,9 +552,10 @@ async def remove_scope(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a target from scope."""
-    result = await db.execute(
-        select(Scope).where(Scope.id == scope_id)
-    )
+    query = select(Scope).where(Scope.id == scope_id)
+    if current_user.role.value != "admin":
+        query = query.where(Scope.owner_id == current_user.id)
+    result = await db.execute(query)
     scope = result.scalar_one_or_none()
 
     if not scope:
