@@ -37,6 +37,22 @@ class TestOAuthState:
         state = generate_oauth_state("github", "/dashboard")
         assert extract_redirect(state) == "/dashboard"
 
+    def test_state_preserves_redirect_with_colons_and_query(self):
+        from nova_arsenal.auth.oauth import extract_redirect, generate_oauth_state
+
+        redirect = "/callback?next=https://example.test:8443/path"
+        state = generate_oauth_state("github", redirect)
+        assert extract_redirect(state) == redirect
+
+    def test_state_expires(self, monkeypatch):
+        from nova_arsenal.auth import oauth
+
+        monkeypatch.setattr(oauth.time, "time", lambda: 1_000)
+        state = oauth.generate_oauth_state("github", "/dashboard")
+
+        monkeypatch.setattr(oauth.time, "time", lambda: 1_701)
+        assert not oauth.verify_oauth_state(state, "github")
+
 
 class TestPKCE:
     def test_generate_pkce(self):
@@ -231,3 +247,114 @@ class TestCleanup:
         from nova_arsenal.auth.cleanup import cleanup_expired_api_keys, start_cleanup_task
         assert callable(cleanup_expired_api_keys)
         assert callable(start_cleanup_task)
+
+
+# ── JWT / dependency regression tests ────────────────────────────────────────
+
+class TestJWTRegression:
+    def test_access_token_uses_string_subject(self):
+        import jwt
+        from nova_arsenal.auth.routes import create_access_token
+
+        with patch("nova_arsenal.auth.routes.get_config") as mock_cfg:
+            mock_cfg.return_value.auth.jwt_secret = "test-secret"
+            mock_cfg.return_value.auth.access_token_expire_minutes = 15
+            token = create_access_token(
+                {"sub": "42", "email": "test@example.com", "role": "analyst"}
+            )
+
+        payload = jwt.decode(token, "test-secret", algorithms=["HS256"])
+        assert payload["sub"] == "42"
+        assert isinstance(payload["sub"], str)
+
+    def test_current_user_declares_http_bearer_dependency(self):
+        import inspect
+
+        from fastapi.params import Depends
+        from nova_arsenal.auth.middleware import get_current_user
+
+        parameter = inspect.signature(get_current_user).parameters["credentials"]
+        assert isinstance(parameter.default, Depends)
+
+
+# ── Auth hardening regressions ───────────────────────────────────────────────
+
+class TestAuthHardening:
+    def test_pat_does_not_reuse_github_token(self, monkeypatch):
+        from nova_arsenal.auth.middleware import _configured_pat_token
+
+        monkeypatch.delenv("NOVA_PAT_TOKEN", raising=False)
+        monkeypatch.delenv("PAT_TOKEN", raising=False)
+        monkeypatch.setenv("GITHUB_TOKEN", "github-secret-that-is-not-a-nova-pat")
+
+        assert _configured_pat_token() == ""
+
+    def test_nova_pat_takes_precedence(self, monkeypatch):
+        from nova_arsenal.auth.middleware import _configured_pat_token
+
+        monkeypatch.setenv("PAT_TOKEN", "legacy-pat")
+        monkeypatch.setenv("NOVA_PAT_TOKEN", "nova-pat")
+
+        assert _configured_pat_token() == "nova-pat"
+
+    def test_pat_match_rejects_empty_values(self):
+        from nova_arsenal.auth.middleware import _pat_matches
+
+        assert not _pat_matches(None, "configured")
+        assert not _pat_matches("", "configured")
+        assert not _pat_matches("candidate", "")
+        assert _pat_matches("same-secret", "same-secret")
+        assert not _pat_matches("wrong-secret", "same-secret")
+
+    def test_refresh_token_body_model(self):
+        from nova_arsenal.auth.models import RefreshTokenRequest
+
+        request = RefreshTokenRequest(refresh_token="refresh-token-value")
+        assert request.refresh_token == "refresh-token-value"
+
+
+class TestPasswordHashMigration:
+    def test_new_passwords_use_argon2(self):
+        from nova_arsenal.auth.routes import get_password_hash, verify_password
+
+        hashed = get_password_hash("correct horse battery staple")
+        assert hashed.startswith("$argon2id$")
+        assert verify_password("correct horse battery staple", hashed)
+        assert not verify_password("wrong password", hashed)
+
+    def test_legacy_bcrypt_hash_is_upgraded(self):
+        from pwdlib import PasswordHash
+        from pwdlib.hashers.bcrypt import BcryptHasher
+
+        from nova_arsenal.auth.routes import verify_and_upgrade_password
+
+        legacy = PasswordHash((BcryptHasher(),)).hash("legacy-password")
+        valid, upgraded = verify_and_upgrade_password("legacy-password", legacy)
+
+        assert valid is True
+        assert upgraded is not None
+        assert upgraded.startswith("$argon2id$")
+
+    def test_invalid_hash_fails_closed(self):
+        from nova_arsenal.auth.routes import verify_and_upgrade_password, verify_password
+
+        assert verify_password("password", "not-a-valid-hash") is False
+        assert verify_and_upgrade_password("password", "not-a-valid-hash") == (False, None)
+
+
+class TestProductionSecretPolicy:
+    def test_production_rejects_missing_jwt_secret(self, monkeypatch):
+        from nova_arsenal.config import _resolve_jwt_secret
+
+        monkeypatch.setenv("NOVA_ENV", "production")
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+
+        with pytest.raises(RuntimeError, match="JWT_SECRET"):
+            _resolve_jwt_secret("")
+
+    def test_production_accepts_strong_jwt_secret(self, monkeypatch):
+        from nova_arsenal.config import _resolve_jwt_secret
+
+        monkeypatch.setenv("NOVA_ENV", "production")
+        value = "x" * 48
+        assert _resolve_jwt_secret(value) == value
