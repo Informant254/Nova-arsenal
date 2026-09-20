@@ -7,10 +7,9 @@ import os
 
 from sqlalchemy import select
 
+from nova_arsenal.auth.passwords import get_password_hash
 from nova_arsenal.db.models import Subscription, SubscriptionTier, User, UserRole
 from nova_arsenal.db.session import get_session_factory
-
-from nova_arsenal.auth.passwords import get_password_hash
 
 logger = logging.getLogger(__name__)
 
