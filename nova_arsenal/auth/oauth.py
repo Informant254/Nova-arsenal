@@ -4,14 +4,16 @@ Nova-Arsenal OAuth Provider Handlers
 Handles OAuth2 authorization code flow with PKCE for GitHub and Google.
 """
 
+import base64
 import hashlib
 import hmac
+import json
 import secrets
-import base64
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -43,44 +45,94 @@ class PKCEChallenge:
         return cls(code_verifier=code_verifier, code_challenge=code_challenge)
 
 
-def generate_oauth_state(provider: str, redirect: str = "", pkce: Optional[PKCEChallenge] = None) -> str:
-    """Generate a signed state token for OAuth flow.
+OAUTH_STATE_TTL_SECONDS = 600
+OAUTH_STATE_FUTURE_SKEW_SECONDS = 60
 
-    State format: provider:random:redirect:pkce_verifier:signature
-    """
+
+def _state_secret() -> str:
     config = get_config()
-    secret = config.auth.oauth.state_secret or config.auth.jwt_secret
-    verifier = pkce.code_verifier if pkce else ""
-    raw = f"{provider}:{secrets.token_hex(16)}:{redirect}:{verifier}"
-    sig = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()[:16]
-    return f"{raw}:{sig}"
+    return config.auth.oauth.state_secret or config.auth.jwt_secret
+
+
+def _encode_state_payload(payload: dict[str, Any]) -> str:
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    encoded = base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+    signature = hmac.new(
+        _state_secret().encode(),
+        encoded.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _decode_state_payload(state: str) -> Optional[dict[str, Any]]:
+    try:
+        encoded, signature = state.rsplit(".", 1)
+    except ValueError:
+        return None
+
+    expected = hmac.new(
+        _state_secret().encode(),
+        encoded.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        return None
+
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        raw = base64.urlsafe_b64decode(encoded + padding)
+        payload = json.loads(raw)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def generate_oauth_state(
+    provider: str,
+    redirect: str = "",
+    pkce: Optional[PKCEChallenge] = None,
+) -> str:
+    """Generate a signed, short-lived OAuth state token."""
+    return _encode_state_payload(
+        {
+            "provider": provider,
+            "nonce": secrets.token_urlsafe(24),
+            "redirect": redirect,
+            "verifier": pkce.code_verifier if pkce else "",
+            "iat": int(time.time()),
+        }
+    )
 
 
 def verify_oauth_state(state: str, provider: str) -> bool:
-    """Verify a signed OAuth state token."""
-    config = get_config()
-    secret = config.auth.oauth.state_secret or config.auth.jwt_secret
-    parts = state.split(":")
-    if len(parts) < 4:
+    """Verify signature, provider binding, and state freshness."""
+    payload = _decode_state_payload(state)
+    if not payload or payload.get("provider") != provider:
         return False
-    expected_sig = hmac.new(
-        secret.encode(), ":".join(parts[:-1]).encode(), hashlib.sha256
-    ).hexdigest()[:16]
-    return hmac.compare_digest(parts[-1], expected_sig) and parts[0] == provider
+
+    try:
+        issued_at = int(payload.get("iat"))
+    except (TypeError, ValueError):
+        return False
+
+    age = int(time.time()) - issued_at
+    return -OAUTH_STATE_FUTURE_SKEW_SECONDS <= age <= OAUTH_STATE_TTL_SECONDS
 
 
 def extract_redirect(state: str) -> str:
-    """Extract redirect URL from state token."""
-    parts = state.split(":")
-    return parts[2] if len(parts) >= 4 else ""
+    """Extract a redirect value from a validly signed state payload."""
+    payload = _decode_state_payload(state)
+    value = payload.get("redirect", "") if payload else ""
+    return value if isinstance(value, str) else ""
 
 
 def extract_pkce_verifier(state: str) -> Optional[str]:
-    """Extract PKCE code_verifier from state token."""
-    parts = state.split(":")
-    if len(parts) >= 5 and parts[3]:
-        return parts[3]
-    return None
+    """Extract the PKCE verifier from a validly signed state payload."""
+    payload = _decode_state_payload(state)
+    value = payload.get("verifier", "") if payload else ""
+    return value if isinstance(value, str) and value else None
 
 
 class BaseOAuthProvider(ABC):
