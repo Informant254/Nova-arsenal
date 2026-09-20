@@ -69,8 +69,14 @@ class LLMProvider(ABC):
             
         Yields:
             Generated text chunks
+
+        This abstract method intentionally contains a yield so Python and static
+        type checkers treat the contract as an async-generator function rather
+        than a coroutine that returns an async generator.
         """
-        pass
+        if False:
+            yield ""
+        raise NotImplementedError
 
     @abstractmethod
     async def health_check(self) -> bool:
