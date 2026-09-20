@@ -144,9 +144,9 @@ def _truncate_middle(text: str, limit: int) -> str:
     """Keep both ends of oversized content instead of silently dropping context."""
     if len(text) <= limit:
         return text
-    if limit <= 32:
-        return text[:limit]
     marker = "\n...[earlier content truncated]...\n"
+    if limit <= len(marker) + 2:
+        return text[:limit]
     remaining = limit - len(marker)
     head = int(remaining * 0.6)
     tail = remaining - head
