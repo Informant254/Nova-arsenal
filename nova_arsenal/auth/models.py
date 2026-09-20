@@ -53,6 +53,11 @@ class TokenPayload(BaseModel):
     type: str = "access"  # "access" or "refresh"
 
 
+class RefreshTokenRequest(BaseModel):
+    """Refresh request. Keep credentials in the request body, not the URL."""
+    refresh_token: str = Field(..., min_length=1)
+
+
 class PasswordChange(BaseModel):
     """Password change model."""
     current_password: str
