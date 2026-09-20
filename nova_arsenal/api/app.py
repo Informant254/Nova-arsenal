@@ -13,7 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from nova_arsenal.api.routes import router as api_router
 from nova_arsenal.api.routes_chat import router as chat_router
 from nova_arsenal.api.routes_chat import set_router as set_chat_router
-from nova_arsenal.api.websocket.events import router as ws_router
 from nova_arsenal.auth.rate_limit import RateLimitConfig, RateLimitMiddleware
 from nova_arsenal.auth.routes import router as auth_router
 from nova_arsenal.llm.multi_router import MultiProviderRouter
@@ -113,7 +112,6 @@ def create_app() -> FastAPI:
     # ── Routers ──────────────────────────────────────────────────────────────
     app.include_router(api_router)
     app.include_router(chat_router)
-    app.include_router(ws_router)
     app.include_router(auth_router)
     app.include_router(sessions_router)
 
