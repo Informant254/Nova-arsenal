@@ -14,19 +14,22 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nova_arsenal.auth.middleware import get_current_user
 from nova_arsenal.db import get_db
 from nova_arsenal.db.crud import (
     add_chat_message,
     delete_chat_session,
     get_chat_messages,
+    get_chat_session,
     get_or_create_chat_session,
     list_chat_sessions,
 )
+from nova_arsenal.db.models import User
 from nova_arsenal.db.session import get_session_factory
 from nova_arsenal.kali_blueprint import KaliBlueprint
 from nova_arsenal.llm.multi_router import MultiProviderRouter
@@ -78,6 +81,17 @@ class ChatResponse(BaseModel):
     metadata: dict | None = None
 
 
+async def _require_owned_chat_session(
+    db: AsyncSession,
+    session_id: str,
+    user_id: int,
+):
+    session = await get_chat_session(db, session_id)
+    if not session or session.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return session
+
+
 # ── Intent (light routing only — conversation is default) ────────────────────
 
 INTENT_PATTERNS = [
@@ -111,29 +125,30 @@ def classify_intent(message: str) -> str:
 
 # ── System prompts ───────────────────────────────────────────────────────────
 
-NOVA_CONVERSATION_SYSTEM_PROMPT = """You are Nova — a sharp, friendly autonomous security research assistant.
+NOVA_CONVERSATION_SYSTEM_PROMPT = """You are Nova — a sharp, friendly security research assistant.
 
-Talk like a knowledgeable colleague in a continuous chat (similar to ChatGPT / Claude / Grok):
-- Natural, clear, complete sentences. No robot template dumps unless asked.
+Talk like a knowledgeable colleague in a continuous chat:
+- Use natural, clear, complete sentences.
 - Remember the conversation thread and refer back to earlier messages.
-- Match the user's energy: casual when they are casual, precise when they go technical.
-- You can discuss anything they bring up — security is your specialty, but general questions are fine.
-- When they want action (scan, exploit, agent run), explain what you'll do, warn about authorization, and give concrete next steps or commands.
-- Never claim you already attacked a system unless tools actually ran and returned results.
-- Be honest about limits. Prefer ethical, authorized security work.
+- Match the user's energy while staying precise on technical subjects.
+- Security is your specialty, but general questions are fine.
+- Prefer explanation, code review, threat modeling, remediation, and non-destructive validation.
+- Treat any supplied target as context, never as proof of authorization.
+- Do not provide destructive commands, credential theft, malware, exploit payloads, or instructions that bypass authorization.
+- Never claim an action ran unless a tool actually ran and returned results.
+- Be honest about limits.
 
-You have deep knowledge of: pentesting, Kali tools, web/network/AD security, CTFs, coding, and threat modeling.
-If an LLM/backend is connected, reason carefully. If not, still be helpful with what you know.
+You have deep knowledge of defensive security, secure coding, web/network security concepts, CTF learning, and threat modeling.
 """
 
 NOVA_ACTION_SYSTEM_PROMPT = """You are Nova in action-assist mode inside a chat.
 
-The user wants something operational (scan, code, exploit, agent).
-- Stay conversational — do NOT reply with only raw JSON unless they explicitly ask for JSON.
-- Give a clear plan in plain language, then commands or code in fenced blocks.
+The user is asking for something operational.
+- Stay conversational and explain the goal and risks clearly.
+- Keep guidance non-destructive and defensive.
 - Treat a supplied target as context, not proof of authorization.
-- Keep tool execution and active testing gated behind explicit authorization context.
-- Prefer non-destructive analysis, validation, and defensive guidance before active actions.
+- Do not provide exploit payloads, malware, credential-theft steps, destructive commands, or instructions for bypassing access controls.
+- Prefer safe validation, remediation, code review, lab-only conceptual examples, and authorization checks.
 - Never claim an action ran unless a tool actually ran and returned results.
 """
 
@@ -363,31 +378,22 @@ def _local_respond(message: str, system_prompt: str) -> str:
 
     for tool_name, tool in bp.tools.items():
         if tool_name in msg_lower:
-            lines = [
-                f"**{tool.name}** — {tool.description}",
-                f"Category: {tool.category}",
-            ]
-            if tool.usage:
-                lines.append(f"Usage: `{tool.usage}`")
-            if tool.examples:
-                lines.append("\n**Examples:**")
-                for ex in tool.examples[:3]:
-                    lines.append(f"  `{ex}`")
-            lines.append(
-                "\n_Tip: connect an LLM (`nova-agent login --provider ollama` or ChatGPT OAuth) "
-                "for freer conversation._"
+            return (
+                f"**{tool.name}** — {tool.description}\n"
+                f"Category: {tool.category}\n\n"
+                "I can explain what this tool is for, how to interpret its output, "
+                "and how to use it safely in an authorized lab."
             )
-            return "\n".join(lines)
 
     if any(w in msg_lower for w in ("hello", "hi ", "hey", "good morning", "good evening")):
         return (
             "Hey — I'm **Nova**. Talk to me like you would any AI assistant.\n\n"
-            "I can chat about security, write code, explain tools, or help plan "
-            "authorized tests. Examples:\n"
+            "I can chat about security, review code, explain tools, and help with "
+            "defensive research. Examples:\n"
             "- “Explain SSRF simply”\n"
-            "- “How should I recon a web app?”\n"
-            "- “Draft an nmap command for top ports”\n"
-            "- “Sign me up for local Ollama” → run `nova-agent login --provider ollama`\n\n"
+            "- “Review this authentication design”\n"
+            "- “Help me interpret a vulnerability report”\n"
+            "- “How should I structure an authorized lab?”\n\n"
             "What are you working on?"
         )
 
@@ -395,9 +401,8 @@ def _local_respond(message: str, system_prompt: str) -> str:
         return (
             "I'm a conversational security research assistant.\n\n"
             "**Chat:** concepts, debugging, career, code review, CTF ideas\n"
-            "**Tools:** nmap, sqlmap, nuclei, hydra, Burp/Metasploit integration knowledge\n"
-            "**Agent modes:** autonomous scans, swarm, zero-day *candidate* pipeline "
-            "(authorized targets only)\n"
+            "**Tools:** conceptual guidance and output interpretation for common security tools\n"
+            "**Research:** threat modeling, secure coding, remediation, and authorized lab analysis\n"
             "**Backends:** ChatGPT/Codex OAuth, API keys, or local Ollama\n\n"
             "Just keep talking — no special command language required."
         )
@@ -405,9 +410,8 @@ def _local_respond(message: str, system_prompt: str) -> str:
     suggestions = bp.suggest_tools(message)
     if suggestions and any(k in msg_lower for k in ("tool", "scan", "test", "vuln")):
         return (
-            f"For that, common tools include: **{', '.join(suggestions[:6])}**.\n\n"
-            "Tell me more about the target and goal and I'll walk you through it. "
-            "For freer conversation, connect an LLM backend."
+            f"Relevant tools may include: **{', '.join(suggestions[:6])}**.\n\n"
+            "I can explain their purpose, compare them, or help interpret results from an authorized lab."
         )
 
     return (
@@ -426,11 +430,16 @@ def _local_respond(message: str, system_prompt: str) -> str:
 async def _stream_response(
     message: str,
     session_id: str,
+    user_id: int,
     target: str | None = None,
 ) -> AsyncGenerator[str, None]:
     async with get_session_factory()() as db:
         try:
-            session = await get_or_create_chat_session(db, session_id)
+            session = await get_or_create_chat_session(
+                db,
+                session_id,
+                user_id=user_id,
+            )
             session_id = session.session_id
 
             await add_chat_message(db, session_id, "user", message)
@@ -482,13 +491,22 @@ async def _stream_response(
 async def chat_send(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Send a message and get a full reply (non-streaming)."""
     session_id = request.session_id or str(uuid.uuid4())
-    session = await get_or_create_chat_session(db, session_id)
+    try:
+        session = await get_or_create_chat_session(
+            db,
+            session_id,
+            user_id=current_user.id,
+        )
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Chat session not found")
     session_id = session.session_id
 
     await add_chat_message(db, session_id, "user", request.message)
+    await db.commit()
 
     intent = classify_intent(request.message)
     system_prompt = _system_for_intent(intent)
@@ -506,6 +524,7 @@ async def chat_send(
         "suggestions": bp.suggest_tools(request.message)[:5],
     }
     await add_chat_message(db, session_id, "assistant", response, metadata)
+    await db.commit()
 
     return ChatResponse(
         reply=response,
@@ -516,11 +535,30 @@ async def chat_send(
 
 
 @router.post("/stream")
-async def chat_stream(request: ChatRequest):
-    """Streaming SSE chat — ChatGPT-style token delivery."""
+async def chat_stream(
+    request: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Streaming SSE chat — authenticated, user-owned conversation."""
     session_id = request.session_id or str(uuid.uuid4())
+    try:
+        session = await get_or_create_chat_session(
+            db,
+            session_id,
+            user_id=current_user.id,
+        )
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    await db.commit()
+
     return StreamingResponse(
-        _stream_response(request.message, session_id, request.target),
+        _stream_response(
+            request.message,
+            session.session_id,
+            current_user.id,
+            request.target,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -531,46 +569,66 @@ async def chat_stream(request: ChatRequest):
 
 
 @router.get("/sessions/{session_id}/history")
-async def chat_history(session_id: str, db: AsyncSession = Depends(get_db)):
+async def chat_history(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _require_owned_chat_session(db, session_id, current_user.id)
     messages = await get_chat_messages(db, session_id, limit=200)
     return {
         "session_id": session_id,
         "messages": [
-            {"role": m.role, "content": m.content, "created_at": str(getattr(m, "created_at", ""))}
-            for m in messages
+            {
+                "role": message.role,
+                "content": message.content,
+                "created_at": str(getattr(message, "timestamp", "")),
+            }
+            for message in messages
         ],
     }
 
 
 @router.get("/sessions")
-async def chat_sessions(db: AsyncSession = Depends(get_db)):
-    sessions = await list_chat_sessions(db)
-    return {
-        "sessions": [
-            {
-                "session_id": s.session_id,
-                "created_at": str(getattr(s, "created_at", "")),
-                "updated_at": str(getattr(s, "updated_at", "")),
-            }
-            for s in sessions
-        ]
-    }
+async def chat_sessions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    sessions = await list_chat_sessions(db, user_id=current_user.id)
+    return {"sessions": sessions}
 
 
 @router.delete("/sessions/{session_id}")
-async def chat_delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
-    await delete_chat_session(db, session_id)
+async def chat_delete_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    deleted = await delete_chat_session(
+        db,
+        session_id,
+        user_id=current_user.id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    await db.commit()
     return {"status": "deleted", "session_id": session_id}
 
 
 @router.get("/tools/suggest")
-async def tools_suggest(q: str = ""):
+async def tools_suggest(
+    q: str = "",
+    _current_user: User = Depends(get_current_user),
+):
     bp = get_blueprint()
     return {"suggestions": bp.suggest_tools(q)[:10]}
 
 
 @router.get("/tools/search")
-async def tools_search(q: str = ""):
+async def tools_search(
+    q: str = "",
+    _current_user: User = Depends(get_current_user),
+):
     bp = get_blueprint()
     q_l = q.lower()
     hits = []
