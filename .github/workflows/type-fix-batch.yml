@@ -20,7 +20,7 @@ jobs:
           cache: pip
       - name: Install package and development tools
         run: pip install -e ".[dev]"
-      - name: Resolve final two type-check errors
+      - name: Resolve final type-check issues
         shell: bash
         run: |
           set -e
@@ -38,6 +38,12 @@ jobs:
                   (
                       "                        f\"bash {f.name}\", working_dir, timeout\n",
                       "                        f\"bash {f.name}\", working_dir, timeout or self.timeout\n",
+                  ),
+              ],
+              "pyproject.toml": [
+                  (
+                      'venvPath = "."\nvenv = ".venv"\n',
+                      "",
                   ),
               ],
           }
