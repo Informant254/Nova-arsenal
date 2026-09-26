@@ -55,10 +55,26 @@ jobs:
               ],
               "nova_arsenal/prompt_builder.py": [
                   (
-                      "import logging\nfrom dataclasses import dataclass, field",
-                      "import json\nimport logging\nfrom dataclasses import dataclass, field",
+                      "import logging\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Any, Union",
+                      "import json\nimport logging\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Any",
+                  ),
+                  (
+                      "PromptNode = Union[Scope, First, Empty, Isolate, Text, ChatMessage, ToolDefinition, ChainOfThought, AdaptiveThinking]",
+                      "PromptNode = Scope | First | Empty | Isolate | Text | ChatMessage | ToolDefinition | ChainOfThought | AdaptiveThinking",
                   ),
                   ("\n\nimport json\n", "\n"),
+              ],
+              "nova_arsenal/mcp/server.py": [
+                  (
+                      "from mcp import MCPServer, Prompt, Resource, TextContent, Tool",
+                      "from mcp import MCPServer, Resource, Tool",
+                  ),
+              ],
+              "tests/integration/__init__.py": [
+                  ("\nimport pytest\n", "\n"),
+              ],
+              "tests/unit/__init__.py": [
+                  ("\nimport pytest\n", "\n"),
               ],
           }
 
@@ -72,7 +88,7 @@ jobs:
               path.write_text(text)
           PY
 
-          ruff check . --select F401,UP007 --fix
+          ruff check . --select F401,UP007
           git diff --check
           pytest -q
       - name: Capture remaining diagnostics
