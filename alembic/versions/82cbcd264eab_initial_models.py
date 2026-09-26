@@ -1,7 +1,7 @@
 """initial models
 
 Revision ID: 82cbcd264eab
-Revises: 
+Revises:
 Create Date: 2026-06-26 14:01:55.160020
 
 """

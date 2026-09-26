@@ -25,7 +25,7 @@ class AgentState:
 class NovaAgent:
     """
     Autonomous security research agent.
-    
+
     Can operate in two modes:
     1. Basic mode (existing): plan/step/reflect for manual use
     2. Autonomous mode: delegates to AgentRunner for full autonomy
@@ -111,7 +111,7 @@ class NovaAgent:
     ) -> dict[str, Any]:
         """
         Run the fully autonomous agent loop.
-        
+
         This delegates to AgentRunner for the complete cycle:
         LLM reasoning → tool selection → command execution → result analysis → iteration
         """

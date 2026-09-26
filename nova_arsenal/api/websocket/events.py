@@ -89,7 +89,7 @@ manager = ConnectionManager()
 async def agent_websocket(websocket: WebSocket, agent_id: int):
     """
     WebSocket endpoint for real-time agent updates.
-    
+
     Events:
         - agent_started: Agent began execution
         - agent_completed: Agent finished

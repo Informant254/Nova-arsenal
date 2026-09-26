@@ -203,10 +203,10 @@ async def get_current_user(
 def require_role(*roles: UserRole):
     """
     Require specific roles for access.
-    
+
     Args:
         roles: Allowed roles
-        
+
     Returns:
         Dependency function
     """

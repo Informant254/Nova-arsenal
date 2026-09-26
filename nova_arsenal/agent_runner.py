@@ -146,7 +146,7 @@ EventCallback = Callable[[str, dict[str, Any]], Coroutine[Any, Any, None]]
 class AgentRunner:
     """
     Fully autonomous security research agent.
-    
+
     Runs the complete loop:
     LLM reasoning → tool selection → command execution → result analysis → iteration
     """
@@ -805,16 +805,16 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
     def _build_priority_prompt(self) -> RenderResult:
         """Build a priority-scoped system prompt (Cursor-inspired).
-        
+
         High-priority sections (always included):
         - Role and identity
         - Target and scope
         - Core rules (including Read-First enforcement)
-        
+
         Medium-priority (included if space allows):
         - Phase persona augmentation
         - Tool knowledge
-        
+
         Low-priority (trimmed first when over token limit):
         - Extended context
         - Action history

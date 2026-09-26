@@ -38,7 +38,7 @@ class ResilientAgentConfig:
 
 class ResilientNovaAgent(NovaAgent):
     """Autonomous agent with resilience patterns.
-    
+
     Extends NovaAgent with:
     - Timeout guards preventing hung operations
     - Circuit breaker preventing cascading failures
@@ -56,7 +56,7 @@ class ResilientNovaAgent(NovaAgent):
         config: ResilientAgentConfig | None = None,
     ) -> None:
         """Initialize resilient agent.
-        
+
         Args:
             target: Target to scan
             objective: Agent objective
@@ -100,7 +100,7 @@ class ResilientNovaAgent(NovaAgent):
         error: str | None = None,
     ) -> None:
         """Record a step with optional error.
-        
+
         Args:
             action: Action taken
             result: Action result
@@ -123,13 +123,13 @@ class ResilientNovaAgent(NovaAgent):
         sandbox_mode: str | None = None,
     ) -> dict[str, Any]:
         """Run agent with timeout and error handling.
-        
+
         Args:
             scope: Target scope
             llm_complete: LLM completion function
             on_event: Event callback
             sandbox_mode: Sandbox mode
-            
+
         Returns:
             Execution result
         """

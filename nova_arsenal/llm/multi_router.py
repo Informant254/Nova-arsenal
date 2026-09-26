@@ -261,7 +261,7 @@ def classify_task(prompt: str) -> TaskCategory:
 class MultiProviderRouter:
     """
     Sakana Fugu-style multi-provider orchestrator.
-    
+
     Classifies tasks and routes to the best provider based on:
     - Task category (code, security, reasoning, etc.)
     - Provider strengths

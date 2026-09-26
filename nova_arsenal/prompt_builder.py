@@ -35,7 +35,7 @@ TOKEN_CHAR_ESTIMATE = 4  # ~4 chars per token for rough estimation
 @dataclass
 class Scope:
     """A priority-scoped section of the prompt.
-    
+
     If absolute_priority (or priority) is set, it takes precedence over
     relative_priority. relative_priority is relative to the parent's priority
     (should be negative to make content lower priority than parent).
@@ -54,7 +54,7 @@ class Scope:
 @dataclass
 class First:
     """Mutually exclusive children - renders the first whose priority >= cutoff.
-    
+
     Children must be Scope nodes. The first child with absolute_priority >= cutoff
     is rendered; others are skipped.
     """
@@ -130,7 +130,7 @@ class AdaptiveThinking:
 @dataclass
 class ChainOfThought:
     """A structured chain-of-thought block (Qwythos-style).
-    
+
     Forces the model to produce reasoning in three distinct blocks:
     <hypothesis>, <verification>, <conclusion>.
     Each block must be substantive.
@@ -379,7 +379,7 @@ def _render_with_level(
     tokenizer: Any | None,
 ) -> tuple[str | None, int, list[ChatMessage] | None, list[ToolDefinition] | None]:
     """Render prompt content including all scopes with priority >= level.
-    
+
     Returns (text, empty_tokens, chat_messages, tool_definitions).
     """
     text_parts: list[str] = []
@@ -523,10 +523,10 @@ def render(
     tokenizer: Any | None = None,
 ) -> tuple[str | None, int, list[ChatMessage] | None, list[ToolDefinition] | None]:
     """Render prompt with priority-based token budget fitting.
-    
+
     Uses binary search (like Priompt's renderBinarySearch) to find the
     priority cutoff that produces the most content within token_limit.
-    
+
     Returns (text, tokens_reserved, chat_messages, tool_definitions).
     """
     # Collect all priority levels
@@ -605,7 +605,7 @@ class RenderResult:
 
 class PromptBuilder:
     """High-level builder for priority-based prompts.
-    
+
     Usage:
         result = PromptBuilder(token_limit=8000).render(
             [
@@ -693,7 +693,7 @@ def cot_block(
     force_conclusion: bool = True,
 ) -> ChainOfThought:
     """Create a Qwythos-style structured chain-of-thought block.
-    
+
     Forces the model to produce reasoning in hypothesis→verification→conclusion format.
     """
     return ChainOfThought(

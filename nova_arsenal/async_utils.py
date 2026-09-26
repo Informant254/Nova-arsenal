@@ -101,15 +101,15 @@ async def async_timeout(
     operation_name: str = "operation",
 ) -> T:
     """Execute coroutine with timeout guard.
-    
+
     Args:
         coro: Coroutine to execute
         timeout_seconds: Maximum execution time
         operation_name: Name for logging
-        
+
     Returns:
         Result of coroutine
-        
+
     Raises:
         AsyncTimeoutError: If timeout exceeded
     """
@@ -142,17 +142,17 @@ async def async_retry(
     **kwargs: Any,
 ) -> T:
     """Execute async function with retry logic.
-    
+
     Args:
         func: Async function to execute
         config: Retry configuration
         operation_name: Name for logging
         *args: Positional arguments for func
         **kwargs: Keyword arguments for func
-        
+
     Returns:
         Result of function
-        
+
     Raises:
         Last exception if all retries exhausted
     """
@@ -207,7 +207,7 @@ class ResourceTracker:
 
     def check_limits(self) -> tuple:
         """Check if any resource limits exceeded.
-        
+
         Returns:
             (is_within_limits, message)
         """

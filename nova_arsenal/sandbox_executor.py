@@ -55,7 +55,7 @@ class ExecResult:
 class SandboxExecutor:
     """
     Executes commands inside the Kali Linux sandbox.
-    
+
     Modes:
     - docker: Uses docker exec to run in nova-sandbox container
     - ssh: Uses SSH to connect to the sandbox

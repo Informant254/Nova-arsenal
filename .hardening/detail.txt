@@ -1,0 +1,241 @@
+# Nova-Arsenal hardening detail
+
+Ruff diagnostics: 28
+
+- E402 /home/runner/work/Nova-arsenal/Nova-arsenal/alembic/env.py:12 [none] Module level import not at top of file
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:534 [unsafe] Local variable `recon_tools` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:628 [unsafe] Local variable `strategy` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:210 [unsafe] Local variable `capacity` is assigned to but never used
+- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/cleanup.py:25 [unsafe] Avoid equality comparisons to `True`; use `ApiKey.is_active:` for truth checks
+- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py:82 [unsafe] Avoid equality comparisons to `True`; use `ApiKey.is_active:` for truth checks
+- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py:290 [unsafe] Avoid equality comparisons to `True`; use `User.is_active:` for truth checks
+- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py:608 [unsafe] Avoid equality comparisons to `True`; use `ApiKey.is_active:` for truth checks
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/cli.py:438 [unsafe] Local variable `sub` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/context/compression.py:329 [unsafe] Local variable `word_set` is assigned to but never used
+- E741 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/data_generation/core.py:400 [none] Ambiguous variable name: `l`
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/attack_chaining.py:245 [unsafe] Local variable `terminal_node` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/safe_engine.py:295 [unsafe] Local variable `evidence` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/intelligence/osint_chain.py:333 [unsafe] Local variable `loop` is assigned to but never used
+- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [none] `mcp.Prompt` imported but unused; consider using `importlib.util.find_spec` to test for availability
+- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [none] `mcp.TextContent` imported but unused; consider using `importlib.util.find_spec` to test for availability
+- UP007 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:143 [none] Use `X | Y` for type annotations
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:564 [unsafe] Local variable `best_text` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:565 [unsafe] Local variable `best_empty` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:566 [unsafe] Local variable `best_chats` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:567 [unsafe] Local variable `best_tools` is assigned to but never used
+- E402 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:706 [none] Module level import not at top of file
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/ransomware/emulator.py:269 [unsafe] Local variable `file_hash` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/streaming/realtime.py:317 [unsafe] Local variable `event_json` is assigned to but never used
+- E741 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/training/glm_agentic_rl.py:331 [none] Ambiguous variable name: `l`
+- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/integration/__init__.py:6 [none] `pytest` imported but unused
+- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/unit/__init__.py:6 [none] `pytest` imported but unused
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/unit/test_byok.py:124 [unsafe] Local variable `catalog` is assigned to but never used
+
+## BasedPyright
+Errors: 186
+Warnings: 3
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py (58)
+- L131 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "id" of type "int" in function "__init__" "Column[int]" is not assignable to "int"
+- L132 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "email" of type "EmailStr" in function "__init__" "Column[str]" is not assignable to "str"
+- L133 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "username" of type "str" in function "__init__" "Column[str]" is not assignable to "str"
+- L135 [reportArgumentType] Argument of type "Column[bool]" cannot be assigned to parameter "is_active" of type "bool" in function "__init__" "Column[bool]" is not assignable to "bool"
+- L136 [reportArgumentType] Argument of type "Column[datetime]" cannot be assigned to parameter "created_at" of type "datetime" in function "__init__" "Column[datetime]" is not assignable to "datetime"
+- L154 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "hashed_password" of type "str" in function "verify_and_upgrade_password" "Column[str]" is not assignable to "str"
+- L169 [reportAttributeAccessIssue] Cannot assign to attribute "hashed_password" for class "User" Expression of type "str" cannot be assigned to attribute "hashed_password" of class "User" "str" is not assignable to "Column[str]"
+- L172 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[bool]" Method __bool__ for type "Column[bool]" returns type "NoReturn" rather than "bool"
+- L179 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "audit_login_success" "Column[int]" is not assignable to "int"
+- L179 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "email" of type "str" in function "audit_login_success" "Column[str]" is not assignable to "str"
+- L228 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable 
+- L228 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable 
+- L237 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[bool]" Method __bool__ for type "Column[bool]" returns type "NoReturn" rather than "bool"
+- L260 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "id" of type "int" in function "__init__" "Column[int]" is not assignable to "int"
+- L261 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "email" of type "EmailStr" in function "__init__" "Column[str]" is not assignable to "str"
+- L262 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "username" of type "str" in function "__init__" "Column[str]" is not assignable to "str"
+- L264 [reportArgumentType] Argument of type "Column[bool]" cannot be assigned to parameter "is_active" of type "bool" in function "__init__" "Column[bool]" is not assignable to "bool"
+- L265 [reportArgumentType] Argument of type "Column[datetime]" cannot be assigned to parameter "created_at" of type "datetime" in function "__init__" "Column[datetime]" is not assignable to "datetime"
+- L286 [reportGeneralTypeIssues] Invalid conditional operand of type "ColumnElement[bool] | bool" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L299 [reportAttributeAccessIssue] Cannot assign to attribute "role" for class "User" Expression of type "UserRole" cannot be assigned to attribute "role" of class "User" "UserRole" is not assignable to "Column[str]"
+- L303 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "id" of type "int" in function "__init__" "Column[int]" is not assignable to "int"
+- L304 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "email" of type "EmailStr" in function "__init__" "Column[str]" is not assignable to "str"
+- L305 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "username" of type "str" in function "__init__" "Column[str]" is not assignable to "str"
+- L307 [reportArgumentType] Argument of type "Column[bool]" cannot be assigned to parameter "is_active" of type "bool" in function "__init__" "Column[bool]" is not assignable to "bool"
+- L308 [reportArgumentType] Argument of type "Column[datetime]" cannot be assigned to parameter "created_at" of type "datetime" in function "__init__" "Column[datetime]" is not assignable to "datetime"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py (29)
+- L83 [reportAttributeAccessIssue] Cannot access attribute "health_check" for class "MultiProviderRouter" Attribute "health_check" is unknown
+- L90 [reportAttributeAccessIssue] Cannot access attribute "byok_status" for class "MultiProviderRouter" Attribute "byok_status" is unknown
+- L324 [reportGeneralTypeIssues] Invalid conditional operand of type "Any | ColumnElement[bool]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L339 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
+- L340 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
+- L396 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "int" "None" is not assignable to "int"
+- L397 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "str" "None" is not assignable to "str"
+- L464 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
+- L491 [reportAttributeAccessIssue] Cannot assign to attribute "verified" for class "Finding" Expression of type "Literal[True]" cannot be assigned to attribute "verified" of class "Finding" "Literal[True]" is not assignable to "Column[bool]"
+- L492 [reportAttributeAccessIssue] Cannot assign to attribute "verified_at" for class "Finding" Expression of type "datetime" cannot be assigned to attribute "verified_at" of class "Finding" "datetime" is not assignable to "Column[datetime]"
+- L528 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "str" "None" is not assignable to "str"
+- L569 [reportAttributeAccessIssue] Cannot assign to attribute "is_active" for class "Scope" Expression of type "Literal[False]" cannot be assigned to attribute "is_active" of class "Scope" "Literal[False]" is not assignable to "Column[bool]"
+- L591 [reportGeneralTypeIssues] Invalid conditional operand of type "Any | ColumnElement[bool]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L609 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "Agent" Expression of type "Literal[AgentStatus.RUNNING]" cannot be assigned to attribute "status" of class "Agent" "Literal[AgentStatus.RUNNING]" is not assignable to "Column[str]"
+- L610 [reportAttributeAccessIssue] Cannot assign to attribute "started_at" for class "Agent" Expression of type "datetime" cannot be assigned to attribute "started_at" of class "Agent" "datetime" is not assignable to "Column[datetime]"
+- L621 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "Agent" Expression of type "Literal[AgentStatus.COMPLETED, AgentStatus.FAILED]" cannot be assigned to attribute "status" of class "Agent" Type "Literal[AgentStatus.COMPLETED, AgentStatus.FAILED]" is not assignable 
+- L622 [reportAttributeAccessIssue] Cannot assign to attribute "completed_at" for class "Agent" Expression of type "datetime" cannot be assigned to attribute "completed_at" of class "Agent" "datetime" is not assignable to "Column[datetime]"
+- L633 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "run_id" of type "int" in function "complete_agent_run" "Column[int]" is not assignable to "int"
+- L642 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "Agent" Expression of type "Literal[AgentStatus.FAILED]" cannot be assigned to attribute "status" of class "Agent" "Literal[AgentStatus.FAILED]" is not assignable to "Column[str]"
+- L645 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "run_id" of type "int" in function "complete_agent_run" "Column[int]" is not assignable to "int"
+- L696 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "target" of type "str" in function "create_runner" "Column[str]" is not assignable to "str"
+- L697 [reportArgumentType] Argument of type "Column[str] | Literal['Find vulnerabilities']" cannot be assigned to parameter "objective" of type "str" in function "create_runner" Type "Column[str] | Literal['Find vulnerabilities']" is not assignable to type "str" "Column[str]" is not ass
+- L698 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "max_steps" of type "int" in function "create_runner" "Column[int]" is not assignable to "int"
+- L739 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
+- L740 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "s" of type "str | bytes | bytearray" in function "loads" Type "Column[str]" is not assignable to type "str | bytes | bytearray" "Column[str]" is not assignable to "str" "Column[str]" is not assign
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/db/crud.py (23)
+- L47 [reportGeneralTypeIssues] Invalid conditional operand of type "ColumnElement[bool] | Literal[False]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L81 [reportAttributeAccessIssue] Cannot assign to attribute "updated_at" for class "ChatSession" Expression of type "datetime" cannot be assigned to attribute "updated_at" of class "ChatSession" "datetime" is not assignable to "Column[datetime]"
+- L82 [reportGeneralTypeIssues] Invalid conditional operand of type "ColumnElement[bool] | bool" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L82 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[str]" Method __bool__ for type "Column[str]" returns type "NoReturn" rather than "bool"
+- L85 [reportAttributeAccessIssue] Cannot assign to attribute "title" for class "ChatSession" Expression of type "str" cannot be assigned to attribute "title" of class "ChatSession" "str" is not assignable to "Column[str]"
+- L116 [reportGeneralTypeIssues] Invalid conditional operand of type "ColumnElement[bool] | Literal[False]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L183 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "AgentRunResult" Expression of type "str" cannot be assigned to attribute "status" of class "AgentRunResult" "str" is not assignable to "Column[str]"
+- L184 [reportAttributeAccessIssue] Cannot assign to attribute "steps_taken" for class "AgentRunResult" Expression of type "int" cannot be assigned to attribute "steps_taken" of class "AgentRunResult" "int" is not assignable to "Column[int]"
+- L185 [reportAttributeAccessIssue] Cannot assign to attribute "total_findings" for class "AgentRunResult" Expression of type "int" cannot be assigned to attribute "total_findings" of class "AgentRunResult" "int" is not assignable to "Column[int]"
+- L186 [reportAttributeAccessIssue] Cannot assign to attribute "summary" for class "AgentRunResult" Expression of type "str | None" cannot be assigned to attribute "summary" of class "AgentRunResult" Type "str | None" is not assignable to type "Column[str]" "str" is not assignable to "Column[str
+- L187 [reportAttributeAccessIssue] Cannot assign to attribute "result_json" for class "AgentRunResult" Expression of type "str | None" cannot be assigned to attribute "result_json" of class "AgentRunResult" Type "str | None" is not assignable to type "Column[str]" "str" is not assignable to "Co
+- L188 [reportAttributeAccessIssue] Cannot assign to attribute "completed_at" for class "AgentRunResult" Expression of type "datetime" cannot be assigned to attribute "completed_at" of class "AgentRunResult" "datetime" is not assignable to "Column[datetime]"
+- L297 [reportAttributeAccessIssue] Cannot assign to attribute "cron" for class "ScheduleEntryModel" Expression of type "str" cannot be assigned to attribute "cron" of class "ScheduleEntryModel" "str" is not assignable to "Column[str]"
+- L298 [reportAttributeAccessIssue] Cannot assign to attribute "target" for class "ScheduleEntryModel" Expression of type "str" cannot be assigned to attribute "target" of class "ScheduleEntryModel" "str" is not assignable to "Column[str]"
+- L299 [reportAttributeAccessIssue] Cannot assign to attribute "task_type" for class "ScheduleEntryModel" Expression of type "str" cannot be assigned to attribute "task_type" of class "ScheduleEntryModel" "str" is not assignable to "Column[str]"
+- L300 [reportAttributeAccessIssue] Cannot assign to attribute "objective" for class "ScheduleEntryModel" Expression of type "str | None" cannot be assigned to attribute "objective" of class "ScheduleEntryModel" Type "str | None" is not assignable to type "Column[str]" "str" is not assignable to
+- L301 [reportAttributeAccessIssue] Cannot assign to attribute "max_steps" for class "ScheduleEntryModel" Expression of type "int" cannot be assigned to attribute "max_steps" of class "ScheduleEntryModel" "int" is not assignable to "Column[int]"
+- L302 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "ScheduleEntryModel" Expression of type "str" cannot be assigned to attribute "status" of class "ScheduleEntryModel" "str" is not assignable to "Column[str]"
+- L303 [reportAttributeAccessIssue] Cannot assign to attribute "updated_at" for class "ScheduleEntryModel" Expression of type "datetime" cannot be assigned to attribute "updated_at" of class "ScheduleEntryModel" "datetime" is not assignable to "Column[datetime]"
+- L341 [reportAttributeAccessIssue] Cannot assign to attribute "run_count" for class "ScheduleEntryModel" Expression of type "int" cannot be assigned to attribute "run_count" of class "ScheduleEntryModel" "int" is not assignable to "Column[int]"
+- L342 [reportAttributeAccessIssue] Cannot assign to attribute "last_result" for class "ScheduleEntryModel" Expression of type "str | None" cannot be assigned to attribute "last_result" of class "ScheduleEntryModel" Type "str | None" is not assignable to type "Column[str]" "str" is not assignabl
+- L344 [reportAttributeAccessIssue] Cannot assign to attribute "next_run" for class "ScheduleEntryModel" Expression of type "datetime" cannot be assigned to attribute "next_run" of class "ScheduleEntryModel" "datetime" is not assignable to "Column[datetime]"
+- L345 [reportAttributeAccessIssue] Cannot assign to attribute "updated_at" for class "ScheduleEntryModel" Expression of type "datetime" cannot be assigned to attribute "updated_at" of class "ScheduleEntryModel" "datetime" is not assignable to "Column[datetime]"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py (13)
+- L90 [reportGeneralTypeIssues] Invalid conditional operand of type "ColumnElement[bool] | Literal[True]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L443 [reportAssignmentType] Type "Column[str]" is not assignable to declared type "str" "Column[str]" is not assignable to "str"
+- L502 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "get_or_create_chat_session" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assig
+- L508 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "add_chat_message" "Column[str]" is not assignable to "str"
+- L516 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "get_chat_messages" "Column[str]" is not assignable to "str"
+- L526 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "add_chat_message" "Column[str]" is not assignable to "str"
+- L531 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "__init__" "Column[str]" is not assignable to "str"
+- L549 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "get_or_create_chat_session" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assig
+- L558 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "_stream_response" "Column[str]" is not assignable to "str"
+- L559 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "_stream_response" "Column[int]" is not assignable to "int"
+- L577 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "_require_owned_chat_session" "Column[int]" is not assignable to "int"
+- L597 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "list_chat_sessions" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assignable to
+- L610 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "delete_chat_session" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assignable t
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py (10)
+- L1258 [reportAttributeAccessIssue] Cannot assign to attribute "_burp_issues" for class "AgentRunner*" "list[BurpIssue]" is not assignable to "list[dict[str, Any]]" Type parameter "_T@list" is invariant, but "BurpIssue" is not the same as "dict[str, Any]" Consider switching from "list" to "Seque
+- L1265 [reportAttributeAccessIssue] Cannot access attribute "name" for class "dict[str, Any]" Attribute "name" is unknown
+- L1266 [reportAttributeAccessIssue] Cannot access attribute "severity" for class "dict[str, Any]" Attribute "severity" is unknown
+- L1267 [reportAttributeAccessIssue] Cannot access attribute "description" for class "dict[str, Any]" Attribute "description" is unknown
+- L1268 [reportAttributeAccessIssue] Cannot access attribute "evidence" for class "dict[str, Any]" Attribute "evidence" is unknown
+- L1269 [reportAttributeAccessIssue] Cannot access attribute "url" for class "dict[str, Any]" Attribute "url" is unknown
+- L1270 [reportAttributeAccessIssue] Cannot access attribute "remediation" for class "dict[str, Any]" Attribute "remediation" is unknown
+- L1418 [reportCallIssue] Argument missing for parameter "severity"
+- L1425 [reportCallIssue] Argument missing for parameter "results"
+- L1430 [reportPossiblyUnboundVariable] "stats" is possibly unbound
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py (10)
+- L93 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime] | ColumnElement[bool]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
+- L101 [reportAttributeAccessIssue] Cannot assign to attribute "last_used_at" for class "ApiKey" Expression of type "datetime" cannot be assigned to attribute "last_used_at" of class "ApiKey" "datetime" is not assignable to "Column[datetime]"
+- L109 [reportCallIssue] No overloads for "get" match the provided arguments
+- L109 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "key" of type "SubscriptionTier" in function "get" "Column[str]" is not assignable to "SubscriptionTier"
+- L111 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "audit_quota_exceeded" "Column[int]" is not assignable to "int"
+- L116 [reportAttributeAccessIssue] Cannot assign to attribute "api_calls_used" for class "Subscription" Expression of type "ColumnElement[int]" cannot be assigned to attribute "api_calls_used" of class "Subscription" "ColumnElement[int]" is not assignable to "Column[int]"
+- L118 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "audit_api_key_used" "Column[int]" is not assignable to "int"
+- L118 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "key_prefix" of type "str" in function "audit_api_key_used" "Column[str]" is not assignable to "str"
+- L123 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[bool]" Method __bool__ for type "Column[bool]" returns type "NoReturn" rather than "bool"
+- L194 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[bool]" Method __bool__ for type "Column[bool]" returns type "NoReturn" rather than "bool"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py (9)
+- L9 [reportAttributeAccessIssue] "MCPServer" is unknown import symbol
+- L9 [reportAttributeAccessIssue] "Prompt" is unknown import symbol
+- L9 [reportAttributeAccessIssue] "Resource" is unknown import symbol
+- L9 [reportAttributeAccessIssue] "TextContent" is unknown import symbol
+- L9 [reportAttributeAccessIssue] "Tool" is unknown import symbol
+- L417 [reportPossiblyUnboundVariable] "Tool" is possibly unbound
+- L425 [reportPossiblyUnboundVariable] "Resource" is possibly unbound
+- L431 [reportPossiblyUnboundVariable] "MCPServer" is possibly unbound
+- L438 [reportOptionalMemberAccess] "run" is not a known attribute of "None"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/swarm.py (5)
+- L217 [reportArgumentType] Argument of type "dict[str, str]" cannot be assigned to parameter "value" of type "dict[str, int]" in function "__setitem__" "dict[str, str]" is not assignable to "dict[str, int]" Type parameter "_VT@dict" is invariant, but "str" is not the same as "int" Consi
+- L219 [reportGeneralTypeIssues] "BaseException" is not iterable "__iter__" method not defined
+- L265 [reportArgumentType] Argument of type "dict[str, str]" cannot be assigned to parameter "value" of type "dict[str, int]" in function "__setitem__" "dict[str, str]" is not assignable to "dict[str, int]" Type parameter "_VT@dict" is invariant, but "str" is not the same as "int" Consi
+- L267 [reportGeneralTypeIssues] "BaseException" is not iterable "__iter__" method not defined
+- L286 [reportGeneralTypeIssues] "BaseException" is not iterable "__iter__" method not defined
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/data_generation/core.py (4)
+- L401 [reportArgumentType] Argument of type "list[int]" cannot be assigned to parameter "items" of type "list[tuple[Any, ...]]" in function "weighted_sample" "list[int]" is not assignable to "list[tuple[Any, ...]]" Type parameter "_T@list" is invariant, but "int" is not the same as "tup
+- L581 [reportCallIssue] No overloads for "open" match the provided arguments
+- L581 [reportArgumentType] Argument of type "Path | None" cannot be assigned to parameter "file" of type "FileDescriptorOrPath" in function "open" Type "Path | None" is not assignable to type "FileDescriptorOrPath" Type "None" is not assignable to type "FileDescriptorOrPath" "None" is n
+- L589 [reportMissingImports] Import "pandas" could not be resolved
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py (3)
+- L15 [reportMissingImports] Import "torch" could not be resolved
+- L16 [reportMissingImports] Import "torch.nn" could not be resolved
+- L17 [reportMissingImports] Import "torch.nn.functional" could not be resolved
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/llm/__init__.py (3)
+- L5 [reportUnsupportedDunderAll] "LLMRouter" is specified in __all__ but is not present in module
+- L5 [reportUnsupportedDunderAll] "get_llm_router" is specified in __all__ but is not present in module
+- L5 [reportUnsupportedDunderAll] "MultiProviderRouter" is specified in __all__ but is not present in module
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/oauth.py (2)
+- L117 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable 
+- L117 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable 
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/incremental/engine.py (2)
+- L136 [reportArgumentType] Argument of type "dict[str, str | dict[str, str]]" cannot be assigned to parameter "value" of type "dict[str, str]" in function "__setitem__" "dict[str, str | dict[str, str]]" is not assignable to "dict[str, str]" Type parameter "_VT@dict" is invariant, but "s
+- L218 [reportArgumentType] Argument of type "Literal[1, 2, 3, 4, 5]" cannot be assigned to parameter "value" of type "str" in function "__setitem__" Type "Literal[1, 2, 3, 4, 5]" is not assignable to type "str" "Literal[1]" is not assignable to "str"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/llm/multi_router.py (2)
+- L414 [reportPossiblyUnboundVariable] "started" is possibly unbound
+- L461 [reportPossiblyUnboundVariable] "started" is possibly unbound
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/optimizers/muon.py (2)
+- L17 [reportMissingImports] Import "torch" could not be resolved
+- L18 [reportMissingImports] Import "torch.optim.optimizer" could not be resolved
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/skills/session_memory.py (2)
+- L176 [reportReturnType] Type "int | None" is not assignable to return type "int" Type "int | None" is not assignable to type "int" "None" is not assignable to "int"
+- L290 [reportReturnType] Type "int | None" is not assignable to return type "int" Type "int | None" is not assignable to type "int" "None" is not assignable to "int"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/training/glm_agentic_rl.py (2)
+- L543 [reportArgumentType] Argument of type "list[AgenticTaskType]" cannot be assigned to parameter "value" of type "int" in function "__setitem__" "list[AgenticTaskType]" is not assignable to "int"
+- L544 [reportArgumentType] Argument of type "dict[AgenticTaskType, dict[str, int]]" cannot be assigned to parameter "value" of type "int" in function "__setitem__" "dict[AgenticTaskType, dict[str, int]]" is not assignable to "int"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/zeroday/pipeline.py (2)
+- L387 [reportArgumentType] Argument of type "Unknown | list[Unknown] | Literal[0]" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Unknown | list[Unknown] | Literal[0]" is not assignable to type "ConvertibleToInt" Type "list[Unknown]" is not as
+- L387 [reportArgumentType] Argument of type "Unknown | list[Unknown] | Literal[0]" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Unknown | list[Unknown] | Literal[0]" is not assignable to type "ConvertibleToInt" Type "list[Unknown]" is not as
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/async_utils.py (1)
+- L180 [reportGeneralTypeIssues] Invalid exception class or object "None" does not derive from BaseException
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/cleanup.py (1)
+- L21 [reportAttributeAccessIssue] "async_session" is unknown import symbol
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/rate_limit.py (1)
+- L28 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "float" "None" is not assignable to "float"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/attack_chaining.py (1)
+- L364 [reportGeneralTypeIssues] "Never" is not awaitable
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/ransomware/emulator.py (1)
+- L146 [reportAttributeAccessIssue] Cannot assign to attribute "start_time" for class "RansomwareAction" Attribute "start_time" is unknown
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/safety/controller.py (1)
+- L122 [reportGeneralTypeIssues] Expected class but received "(obj: object, /) -> TypeIs[(...) -> object]"
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sandbox_executor.py (1)
+- L159 [reportAttributeAccessIssue] Cannot access attribute "execute_local" for class "SandboxExecutor*" Attribute "execute_local" is unknown
+
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sessions/runtime.py (1)
+- L233 [reportArgumentType] Argument of type "SubAgentResult | BaseException" cannot be assigned to parameter "value" of type "SubAgentResult" in function "__setitem__" Type "SubAgentResult | BaseException" is not assignable to type "SubAgentResult" "BaseException" is not assignable to "
+
