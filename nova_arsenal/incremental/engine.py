@@ -202,7 +202,7 @@ class IncrementalTester:
 
         for delta in deltas:
             priority = self._delta_to_priority(delta)
-            tests_for_delta = [
+            tests_for_delta: list[dict[str, Any]] = [
                 t for t in all_tests
                 if self._test_applies_to_delta(t, delta)
             ]

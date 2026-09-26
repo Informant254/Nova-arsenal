@@ -157,7 +157,7 @@ class SandboxExecutor:
                 f.flush()
                 try:
                     result = await self._execute_local(
-                        f"bash {f.name}", working_dir, timeout
+                        f"bash {f.name}", working_dir, timeout or self.timeout
                     )
                 finally:
                     os.unlink(f.name)

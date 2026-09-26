@@ -109,5 +109,3 @@ exclude_lines = [
 [tool.basedpyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.10"
-venvPath = "."
-venv = ".venv"

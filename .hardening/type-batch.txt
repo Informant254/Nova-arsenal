@@ -1,7 +1,4 @@
 # Targeted type-fix batch
 
-Errors: 2
+Errors: 0
 Warnings: 0
-
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/incremental/engine.py:219 [reportArgumentType] Argument of type "Literal[1, 2, 3, 4, 5]" cannot be assigned to parameter "value" of type "str" in function "__setitem__" Type "Literal[1, 2, 3, 4, 5]" is not assignable to type "str" "Literal[1]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sandbox_executor.py:160 [reportArgumentType] Argument of type "int | None" cannot be assigned to parameter "timeout" of type "int" in function "_execute_local" Type "int | None" is not assignable to type "int" "None" is not assignable to "int"
