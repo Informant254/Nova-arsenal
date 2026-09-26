@@ -287,7 +287,7 @@ async def update_user_role(
         admin_count_result = await db.execute(
             select(func.count(User.id)).where(
                 User.role == UserRole.ADMIN,
-                User.is_active == True,
+                User.is_active.is_(True),
             )
         )
         if int(admin_count_result.scalar_one()) <= 1:
@@ -605,7 +605,7 @@ async def list_api_keys(
     result = await db.execute(
         select(ApiKey).where(
             ApiKey.user_id == current_user.id,
-            ApiKey.is_active == True,
+            ApiKey.is_active.is_(True),
         )
     )
     keys = result.scalars().all()

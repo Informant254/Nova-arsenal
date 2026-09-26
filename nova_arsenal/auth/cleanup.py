@@ -22,7 +22,7 @@ async def cleanup_expired_api_keys():
         async with async_session() as db:
             result = await db.execute(
                 select(ApiKey).where(
-                    ApiKey.is_active == True,
+                    ApiKey.is_active.is_(True),
                     ApiKey.expires_at.isnot(None),
                     ApiKey.expires_at < datetime.now(timezone.utc),
                 )

@@ -79,7 +79,7 @@ async def get_current_user(
         result = await db.execute(
             select(ApiKey).where(
                 ApiKey.key_hash == key_hash,
-                ApiKey.is_active == True,
+                ApiKey.is_active.is_(True),
             )
         )
         api_key = result.scalar_one_or_none()

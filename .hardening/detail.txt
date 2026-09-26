@@ -1,38 +1,28 @@
 # Nova-Arsenal hardening detail
 
-Ruff diagnostics: 28
+Ruff diagnostics: 18
 
-- E402 /home/runner/work/Nova-arsenal/Nova-arsenal/alembic/env.py:12 [none] Module level import not at top of file
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:534 [unsafe] Local variable `recon_tools` is assigned to but never used
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:628 [unsafe] Local variable `strategy` is assigned to but never used
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:210 [unsafe] Local variable `capacity` is assigned to but never used
-- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/cleanup.py:25 [unsafe] Avoid equality comparisons to `True`; use `ApiKey.is_active:` for truth checks
-- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py:82 [unsafe] Avoid equality comparisons to `True`; use `ApiKey.is_active:` for truth checks
-- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py:290 [unsafe] Avoid equality comparisons to `True`; use `User.is_active:` for truth checks
-- E712 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py:608 [unsafe] Avoid equality comparisons to `True`; use `ApiKey.is_active:` for truth checks
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/cli.py:438 [unsafe] Local variable `sub` is assigned to but never used
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/context/compression.py:329 [unsafe] Local variable `word_set` is assigned to but never used
-- E741 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/data_generation/core.py:400 [none] Ambiguous variable name: `l`
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/attack_chaining.py:245 [unsafe] Local variable `terminal_node` is assigned to but never used
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/safe_engine.py:295 [unsafe] Local variable `evidence` is assigned to but never used
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/intelligence/osint_chain.py:333 [unsafe] Local variable `loop` is assigned to but never used
-- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [none] `mcp.Prompt` imported but unused; consider using `importlib.util.find_spec` to test for availability
-- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [none] `mcp.TextContent` imported but unused; consider using `importlib.util.find_spec` to test for availability
-- UP007 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:143 [none] Use `X | Y` for type annotations
-- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:564 [unsafe] Local variable `best_text` is assigned to but never used
-- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:565 [unsafe] Local variable `best_empty` is assigned to but never used
-- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:566 [unsafe] Local variable `best_chats` is assigned to but never used
-- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:567 [unsafe] Local variable `best_tools` is assigned to but never used
-- E402 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:706 [none] Module level import not at top of file
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:563 [unsafe] Local variable `best_text` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:564 [unsafe] Local variable `best_empty` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:565 [unsafe] Local variable `best_chats` is assigned to but never used
+- F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:566 [unsafe] Local variable `best_tools` is assigned to but never used
+- E402 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py:705 [none] Module level import not at top of file
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/ransomware/emulator.py:269 [unsafe] Local variable `file_hash` is assigned to but never used
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/streaming/realtime.py:317 [unsafe] Local variable `event_json` is assigned to but never used
-- E741 /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/training/glm_agentic_rl.py:331 [none] Ambiguous variable name: `l`
-- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/integration/__init__.py:6 [none] `pytest` imported but unused
-- F401 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/unit/__init__.py:6 [none] `pytest` imported but unused
+- I001 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/integration/__init__.py:3 [safe] Import block is un-sorted or un-formatted
+- I001 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/unit/__init__.py:3 [safe] Import block is un-sorted or un-formatted
 - F841 /home/runner/work/Nova-arsenal/Nova-arsenal/tests/unit/test_byok.py:124 [unsafe] Local variable `catalog` is assigned to but never used
 
 ## BasedPyright
-Errors: 186
+Errors: 184
 Warnings: 3
 
 ### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py (58)
@@ -153,11 +143,9 @@ Warnings: 3
 - L123 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[bool]" Method __bool__ for type "Column[bool]" returns type "NoReturn" rather than "bool"
 - L194 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[bool]" Method __bool__ for type "Column[bool]" returns type "NoReturn" rather than "bool"
 
-### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py (9)
+### /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py (7)
 - L9 [reportAttributeAccessIssue] "MCPServer" is unknown import symbol
-- L9 [reportAttributeAccessIssue] "Prompt" is unknown import symbol
 - L9 [reportAttributeAccessIssue] "Resource" is unknown import symbol
-- L9 [reportAttributeAccessIssue] "TextContent" is unknown import symbol
 - L9 [reportAttributeAccessIssue] "Tool" is unknown import symbol
 - L417 [reportPossiblyUnboundVariable] "Tool" is possibly unbound
 - L425 [reportPossiblyUnboundVariable] "Resource" is possibly unbound

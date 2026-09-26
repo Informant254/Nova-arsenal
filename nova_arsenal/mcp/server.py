@@ -6,7 +6,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 try:
-    from mcp import MCPServer, Prompt, Resource, TextContent, Tool
+    from mcp import MCPServer, Resource, Tool
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False

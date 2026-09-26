@@ -328,7 +328,7 @@ class DPAwareRouter:
         avg_load = sum(loads) / len(loads)
         if avg_load == 0:
             return False
-        max_deviation = max(abs(l - avg_load) / avg_load for l in loads)
+        max_deviation = max(abs(load - avg_load) / avg_load for load in loads)
         return max_deviation > self.config.rebalance_threshold
 
     def rebalance(self) -> None:

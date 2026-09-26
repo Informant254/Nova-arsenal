@@ -397,7 +397,7 @@ def sample_difficulty(
     dist: dict[int, float],
 ) -> int:
     levels = list(dist.keys())
-    weights = [dist[l] for l in levels]
+    weights = [dist[level] for level in levels]
     return weighted_sample(levels, weights, rng)
 
 
