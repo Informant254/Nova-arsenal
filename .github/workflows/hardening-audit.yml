@@ -23,10 +23,5 @@ jobs:
         run: ruff check .
       - name: Tests
         run: pytest -q
-      - name: BasedPyright snapshot
-        shell: bash
-        run: |
-          set +e
-          basedpyright nova_arsenal/
-          echo "Type-check snapshot is informational during hardening."
-          exit 0
+      - name: BasedPyright
+        run: basedpyright nova_arsenal/
