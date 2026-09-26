@@ -326,7 +326,7 @@ class ContentCompressor:
 
         text_lower = text.lower()
         words = text_lower.split()
-        word_set = set(words)
+        _word_set = set(words)
 
         security_terms = [
             "cve", "vulnerability", "exploit", "attack", "breach",

@@ -531,7 +531,7 @@ class AgentRunner:
 
     async def _execute_recon(self) -> None:
         """Execute reconnaissance commands."""
-        recon_tools = self.blueprint.get_tools_by_category("recon")
+        _recon_tools = self.blueprint.get_tools_by_category("recon")
 
         # Start with DNS/subdomain enumeration
         recon_commands = [
@@ -625,7 +625,7 @@ class AgentRunner:
         scan_context = self._get_scan_results()
 
         # Use tool selection intelligence to decide strategy
-        strategy = await self._generate_strategy()
+        _strategy = await self._generate_strategy()
         detected_services = set(self._detected_services.keys())
 
         # Map detected services to relevant attack chains

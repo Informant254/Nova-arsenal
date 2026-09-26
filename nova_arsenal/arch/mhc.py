@@ -207,7 +207,7 @@ class AnticipatoryRouter(nn.Module):
         adjusted_logits = logits + 0.1 * conflict_logits.tanh()
 
         if expert_counts is not None:
-            capacity = int(L * self.capacity_factor)
+            _capacity = int(L * self.capacity_factor)
             expert_counts_flat = expert_counts.view(-1, self.num_experts)
             adjusted_logits = adjusted_logits - 0.01 * expert_counts_flat
 

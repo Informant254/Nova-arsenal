@@ -330,7 +330,7 @@ class OsintChain:
         result.summary = "\n".join(summary_parts)
 
     async def _run(self, command: str) -> str:
-        loop = asyncio.get_event_loop()
+        _loop = asyncio.get_event_loop()
         try:
             proc = await asyncio.create_subprocess_shell(
                 command,

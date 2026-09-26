@@ -266,7 +266,7 @@ class RansomwareEmulator:
         for ext in extensions:
             for i in range(10):
                 fake_path = f"/simulated/{target}/file_{i}{ext}"
-                file_hash = hashlib.sha256(fake_path.encode()).hexdigest()
+                _file_hash = hashlib.sha256(fake_path.encode()).hexdigest()
                 file_count += 1
 
         evidence = f"Simulated encryption of {file_count} files (hash-only, no modification)"

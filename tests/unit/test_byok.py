@@ -121,5 +121,5 @@ class TestConfigByok:
         assert status["primary"]["has_key"] is True
         assert "anthropic" in status["env_keys_detected"]
         # Never leak full key
-        catalog = {p["provider"]: p for p in status["provider_catalog"]}
+        _catalog = {p["provider"]: p for p in status["provider_catalog"]}
         assert "sk-ant-live" not in str(status)

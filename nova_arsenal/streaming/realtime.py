@@ -314,7 +314,7 @@ class RealTimeStreamer:
 
     async def _broadcast(self, event: StreamEvent) -> None:
         """Broadcast an event to all matching subscribers."""
-        event_json = event.to_json()
+        _event_json = event.to_json()
         disconnected: list[str] = []
 
         for sid, subscriber in self._subscribers.items():

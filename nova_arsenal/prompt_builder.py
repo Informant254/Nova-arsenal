@@ -16,6 +16,7 @@ Qwythos enhancements:
 - CoT node type that forces structured reasoning in agent responses
 - Integration with data_generation.COT_FRAMEWORK
 """
+import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
@@ -544,10 +545,10 @@ def render(
     exclusive_lower = -1
     inclusive_upper = len(sorted_levels) - 1
 
-    best_text = None
-    best_empty = 0
-    best_chats = None
-    best_tools = None
+    _best_text = None
+    _best_empty = 0
+    _best_chats = None
+    _best_tools = None
 
     while exclusive_lower < inclusive_upper - 1:
         mid_idx = (exclusive_lower + inclusive_upper) // 2
@@ -560,10 +561,10 @@ def render(
             exclusive_lower = mid_idx
         else:
             inclusive_upper = mid_idx
-            best_text = text
-            best_empty = empty
-            best_chats = chats
-            best_tools = tools
+            _best_text = text
+            _best_empty = empty
+            _best_chats = chats
+            _best_tools = tools
 
     # Final render with the chosen cutoff
     final_text, final_empty, final_chats, final_tools = _render_with_level(
@@ -700,6 +701,3 @@ def cot_block(
         force_verification=force_verification,
         force_conclusion=force_conclusion,
     )
-
-
-import json

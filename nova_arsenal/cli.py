@@ -435,7 +435,7 @@ def _session_main(argv: list[str]) -> None:
         prog="nova-agent session",
         description="Run concurrent sub-agents under one work session",
     )
-    sub = parser.add_subparsers(dest="cmd")
+    _sub = parser.add_subparsers(dest="cmd")
 
     # `nova-agent session --goal ...`  OR  `nova-agent sessions`
     if argv and argv[0] == "sessions":
