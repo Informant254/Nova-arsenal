@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nova_arsenal.db.models import (
@@ -24,6 +24,17 @@ from nova_arsenal.db.models import (
 
 # ── Chat Session CRUD ─────────────────────────────────────────────────────────
 
+async def get_chat_session(
+    db: AsyncSession,
+    session_id: str,
+) -> ChatSession | None:
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.session_id == session_id)
+    )
+    return result.scalar_one_or_none()
+
+
+
 async def get_or_create_chat_session(
     db: AsyncSession,
     session_id: str | None = None,
@@ -31,11 +42,10 @@ async def get_or_create_chat_session(
     title: str = "New Chat",
 ) -> ChatSession:
     if session_id:
-        result = await db.execute(
-            select(ChatSession).where(ChatSession.session_id == session_id)
-        )
-        session = result.scalar_one_or_none()
+        session = await get_chat_session(db, session_id)
         if session:
+            if user_id is not None and session.user_id != user_id:
+                raise PermissionError("Chat session does not belong to this user")
             return session
 
     session = ChatSession(
@@ -64,9 +74,14 @@ async def add_chat_message(
     )
     db.add(msg)
 
-    await db.execute(
-        select(ChatSession).where(ChatSession.session_id == session_id)
-    )
+    session = await get_chat_session(db, session_id)
+    if session:
+        session.updated_at = datetime.now(timezone.utc)
+        if role == "user" and (not session.title or session.title == "New Chat"):
+            compact = " ".join((content or "").split())
+            if compact:
+                session.title = compact[:80] + ("…" if len(compact) > 80 else "")
+
     await db.flush()
     await db.refresh(msg)
     return msg
@@ -88,12 +103,15 @@ async def get_chat_messages(
     return list(result.scalars().all())
 
 
-async def delete_chat_session(db: AsyncSession, session_id: str) -> bool:
-    result = await db.execute(
-        select(ChatSession).where(ChatSession.session_id == session_id)
-    )
-    session = result.scalar_one_or_none()
+async def delete_chat_session(
+    db: AsyncSession,
+    session_id: str,
+    user_id: int | None = None,
+) -> bool:
+    session = await get_chat_session(db, session_id)
     if not session:
+        return False
+    if user_id is not None and session.user_id != user_id:
         return False
     await db.delete(session)
     return True
@@ -109,16 +127,23 @@ async def list_chat_sessions(
         query = query.where(ChatSession.user_id == user_id)
     result = await db.execute(query.limit(limit))
     sessions = result.scalars().all()
-    return [
-        {
-            "session_id": s.session_id,
-            "title": s.title,
-            "created_at": s.created_at.isoformat(),
-            "updated_at": s.updated_at.isoformat(),
-            "message_count": len(s.messages) if s.messages else 0,
-        }
-        for s in sessions
-    ]
+    rows: list[dict[str, Any]] = []
+    for session in sessions:
+        count_result = await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.session_id == session.session_id
+            )
+        )
+        rows.append(
+            {
+                "session_id": session.session_id,
+                "title": session.title,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+                "message_count": int(count_result.scalar_one()),
+            }
+        )
+    return rows
 
 
 # ── Agent Run Result CRUD ────────────────────────────────────────────────────
@@ -321,7 +346,7 @@ async def update_entry_run_stats(
 
 
 __all__ = [
-    "get_or_create_chat_session", "add_chat_message",
+    "get_chat_session", "get_or_create_chat_session", "add_chat_message",
     "get_chat_messages", "delete_chat_session", "list_chat_sessions",
     "create_agent_run", "complete_agent_run", "get_agent_run_history",
     "persist_finding", "persist_findings_batch",

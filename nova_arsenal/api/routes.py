@@ -42,7 +42,7 @@ router.include_router(memory_router)
 
 class RunAgentRequest(BaseModel):
     target: str
-    objective: str = "Find and exploit all critical vulnerabilities"
+    objective: str = "Assess security posture and identify high-risk vulnerabilities"
     max_steps: int = 40
     scope: list[str] | None = None
     sandbox_mode: str | None = None
@@ -71,7 +71,9 @@ async def health_check():
 
 
 @router.get("/health/detailed")
-async def detailed_health_check():
+async def detailed_health_check(
+    _current_user: User = Depends(get_current_user),
+):
     """Detailed health check with component status."""
     from nova_arsenal.llm import get_llm_router
 
@@ -89,7 +91,9 @@ async def detailed_health_check():
 
 
 @router.get("/llm/status")
-async def llm_byok_status():
+async def llm_byok_status(
+    _current_user: User = Depends(get_current_user),
+):
     """
     Show which LLM providers are configured (bring-your-own-key).
 
@@ -101,8 +105,29 @@ async def llm_byok_status():
     return get_llm_router().byok_status()
 
 
+@router.get("/llm/routing")
+async def llm_routing_status(
+    _current_user: User = Depends(get_current_user),
+):
+    """Return non-secret runtime routing telemetry for the dashboard."""
+    from nova_arsenal.llm.router import get_llm_router
+
+    llm_router = get_llm_router()
+    stats = llm_router.get_routing_stats()
+    history = []
+    multi = llm_router.multi_router
+    if multi:
+        history = multi.get_routing_history()[-20:]
+    return {
+        **stats,
+        "recent_routes": history,
+    }
+
+
 @router.post("/llm/reload")
-async def llm_reload_config():
+async def llm_reload_config(
+    _current_user: User = Depends(require_analyst),
+):
     """Reload .env / settings.yaml and re-initialize the LLM router."""
     from nova_arsenal.config import reload_config
     from nova_arsenal.llm.router import get_llm_router, reset_llm_router
@@ -134,7 +159,9 @@ class LlmAccountLoginRequest(BaseModel):
 
 
 @router.get("/llm/accounts")
-async def llm_list_accounts():
+async def llm_list_accounts(
+    _current_user: User = Depends(get_current_user),
+):
     """List signed-in AI accounts + local LLM discovery — no secrets."""
     from nova_arsenal.llm.account_auth import account_status
 
@@ -142,7 +169,9 @@ async def llm_list_accounts():
 
 
 @router.get("/llm/local")
-async def llm_local_status():
+async def llm_local_status(
+    _current_user: User = Depends(get_current_user),
+):
     """Discover local Ollama / OpenAI-compatible servers."""
     from nova_arsenal.llm.local_llm import local_llm_status
 
@@ -150,7 +179,10 @@ async def llm_local_status():
 
 
 @router.post("/llm/accounts/login")
-async def llm_account_login(body: LlmAccountLoginRequest):
+async def llm_account_login(
+    body: LlmAccountLoginRequest,
+    _current_user: User = Depends(require_analyst),
+):
     """
     Sign in with ChatGPT/Codex OAuth, local Ollama, Claude/Codex tokens, or Google OAuth.
 
@@ -210,7 +242,9 @@ async def llm_account_login(body: LlmAccountLoginRequest):
 
 
 @router.post("/llm/accounts/import")
-async def llm_account_import():
+async def llm_account_import(
+    _current_user: User = Depends(require_analyst),
+):
     """Import credentials from local Claude Code / Codex / Cursor installs."""
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
@@ -222,7 +256,10 @@ async def llm_account_import():
 
 
 @router.delete("/llm/accounts/{provider}")
-async def llm_account_logout(provider: str):
+async def llm_account_logout(
+    provider: str,
+    _current_user: User = Depends(require_analyst),
+):
     """Remove a stored AI account login."""
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
@@ -305,7 +342,7 @@ async def get_agent(
 @router.post("/agents", status_code=status.HTTP_201_CREATED)
 async def create_agent(
     target: str,
-    objective: str = "Find and exploit all critical vulnerabilities",
+    objective: str = "Assess security posture and identify high-risk vulnerabilities",
     current_user: User = Depends(require_analyst),
     db: AsyncSession = Depends(get_db),
 ):
@@ -359,8 +396,12 @@ async def list_findings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List findings with optional filters."""
+    """List findings with optional filters, scoped to the current user."""
     query = select(Finding)
+    if current_user.role.value != "admin":
+        query = query.join(Agent, Finding.agent_id == Agent.id).where(
+            Agent.owner_id == current_user.id
+        )
 
     if agent_id:
         query = query.where(Finding.agent_id == agent_id)
@@ -392,9 +433,12 @@ async def get_finding(
     db: AsyncSession = Depends(get_db),
 ):
     """Get finding details."""
-    result = await db.execute(
-        select(Finding).where(Finding.id == finding_id)
-    )
+    query = select(Finding).where(Finding.id == finding_id)
+    if current_user.role.value != "admin":
+        query = query.join(Agent, Finding.agent_id == Agent.id).where(
+            Agent.owner_id == current_user.id
+        )
+    result = await db.execute(query)
     finding = result.scalar_one_or_none()
 
     if not finding:
@@ -428,9 +472,12 @@ async def verify_finding(
     """Mark a finding as verified."""
     from datetime import datetime, timezone
 
-    result = await db.execute(
-        select(Finding).where(Finding.id == finding_id)
-    )
+    query = select(Finding).where(Finding.id == finding_id)
+    if current_user.role.value != "admin":
+        query = query.join(Agent, Finding.agent_id == Agent.id).where(
+            Agent.owner_id == current_user.id
+        )
+    result = await db.execute(query)
     finding = result.scalar_one_or_none()
 
     if not finding:
@@ -452,8 +499,11 @@ async def list_scope(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all scope entries."""
-    result = await db.execute(select(Scope).where(Scope.is_active))
+    """List scope entries visible to the current user."""
+    query = select(Scope).where(Scope.is_active)
+    if current_user.role.value != "admin":
+        query = query.where(Scope.owner_id == current_user.id)
+    result = await db.execute(query)
     scopes = result.scalars().all()
 
     return {
@@ -502,9 +552,10 @@ async def remove_scope(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a target from scope."""
-    result = await db.execute(
-        select(Scope).where(Scope.id == scope_id)
-    )
+    query = select(Scope).where(Scope.id == scope_id)
+    if current_user.role.value != "admin":
+        query = query.where(Scope.owner_id == current_user.id)
+    result = await db.execute(query)
     scope = result.scalar_one_or_none()
 
     if not scope:
