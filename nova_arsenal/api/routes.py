@@ -24,19 +24,17 @@ from nova_arsenal.db.crud import (
     persist_findings_batch,
 )
 from nova_arsenal.db.models import Agent, AgentStatus, Finding, Scope, User
+from nova_arsenal.skills.api_routes import router as skills_router
+from nova_arsenal.skills.memory_api_routes import router as memory_router
 
 router = APIRouter(prefix="/api")
 
 # Skills marketplace — platform connectors (HackerOne, HackTheBox, ...)
 # and Nova's target-recommendation reasoning endpoint.
-from nova_arsenal.skills.api_routes import router as skills_router  # noqa: E402
-
 router.include_router(skills_router)
 
 # Persistent per-user memory (recap, target history, preferences) and
 # the self-authoring skill review workflow (approve/reject).
-from nova_arsenal.skills.memory_api_routes import router as memory_router  # noqa: E402
-
 router.include_router(memory_router)
 
 
@@ -1030,3 +1028,4 @@ async def ctf_stats():
 
     solver = CtfSolver()
     return solver.get_stats()
+

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -399,7 +399,7 @@ def load_config(config_path: str | None = None) -> NovaConfig:
     # Agent
     agent_raw = dict(data.get("agent") or {})
     # Filter unknown fields
-    agent_fields = {f.name for f in AgentConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    agent_fields = {config_field.name for config_field in fields(AgentConfig)}
     agent = AgentConfig(**{k: v for k, v in agent_raw.items() if k in agent_fields})
 
     # LLM from YAML then enrich with env BYOK
@@ -421,24 +421,24 @@ def load_config(config_path: str | None = None) -> NovaConfig:
 
     # Security / logging / database / auth
     sec_raw = data.get("security") or {}
-    sec_fields = {f.name for f in SecurityConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    sec_fields = {config_field.name for config_field in fields(SecurityConfig)}
     security = SecurityConfig(**{k: v for k, v in sec_raw.items() if k in sec_fields})
 
     log_raw = data.get("logging") or {}
-    log_fields = {f.name for f in LoggingConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    log_fields = {config_field.name for config_field in fields(LoggingConfig)}
     logging_cfg = LoggingConfig(**{k: v for k, v in log_raw.items() if k in log_fields})
     if os.getenv("LOG_LEVEL"):
         logging_cfg.level = os.getenv("LOG_LEVEL", logging_cfg.level)
 
     db_raw = data.get("database") or {}
-    db_fields = {f.name for f in DatabaseConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    db_fields = {config_field.name for config_field in fields(DatabaseConfig)}
     database = DatabaseConfig(**{k: v for k, v in db_raw.items() if k in db_fields})
     if os.getenv("DATABASE_URL"):
         database.url = os.getenv("DATABASE_URL", database.url)
 
     auth_raw = data.get("auth") or {}
     oauth_raw = auth_raw.get("oauth") or {}
-    oauth_fields = {f.name for f in OAuthConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    oauth_fields = {config_field.name for config_field in fields(OAuthConfig)}
     oauth = OAuthConfig(**{k: v for k, v in oauth_raw.items() if k in oauth_fields})
     auth = AuthConfig(
         jwt_secret=_resolve_jwt_secret(auth_raw.get("jwt_secret") or ""),
@@ -495,3 +495,4 @@ def reload_config(config_path: str | None = None) -> NovaConfig:
     except Exception:  # noqa: BLE001
         pass
     return _config
+
