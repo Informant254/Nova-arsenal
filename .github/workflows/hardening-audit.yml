@@ -29,7 +29,10 @@ jobs:
 
           replacements = {
               "nova_arsenal/agent_runner.py": [
-                  ("        recon_tools = self.blueprint.get_tools_by_category(\"recon\")", "        _recon_tools = self.blueprint.get_tools_by_category(\"recon\")"),
+                  (
+                      "        recon_tools = self.blueprint.get_tools_by_category(\"recon\")\n\n        # Start with DNS/subdomain enumeration",
+                      "        _recon_tools = self.blueprint.get_tools_by_category(\"recon\")\n\n        # Start with DNS/subdomain enumeration",
+                  ),
                   ("        strategy = await self._generate_strategy()", "        _strategy = await self._generate_strategy()"),
               ],
               "nova_arsenal/arch/mhc.py": [
