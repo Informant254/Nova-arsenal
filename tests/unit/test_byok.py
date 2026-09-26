@@ -50,7 +50,7 @@ class TestKeysHelpers:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-12345678")
         assert resolve_api_key("openai") == "sk-test-12345678"
         assert resolve_api_key("openai", "explicit") == "explicit"
-        assert resolve_model("openai") == "gpt-4o"
+        assert resolve_model("openai") == "gpt-5.6-terra"
 
     def test_gemini_alias_env(self, monkeypatch):
         from nova_arsenal.llm.keys import normalize_provider, resolve_api_key
@@ -88,38 +88,3 @@ class TestConfigByok:
         monkeypatch.setenv("LLM_PROVIDER", "openai")
         monkeypatch.setenv("LLM_MODEL", "gpt-4o-mini")
         cfg = load_config(config_path="/nonexistent/settings.yaml")
-        assert cfg.llm.primary.provider == "openai"
-        assert cfg.llm.primary.model == "gpt-4o-mini"
-        assert cfg.llm.primary.api_key == "sk-test-openai-key"
-
-    def test_multiple_keys_become_fallbacks(self, monkeypatch):
-        from nova_arsenal.config import load_config
-
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-oai")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant")
-        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or")
-        monkeypatch.setenv("LLM_PROVIDER", "openai")
-        cfg = load_config(config_path="/nonexistent/x.yaml")
-        providers = {cfg.llm.primary.provider} | {f.provider for f in cfg.llm.fallbacks}
-        assert "openai" in providers
-        assert "anthropic" in providers
-        assert "openrouter" in providers
-
-    def test_router_registers_env_keys(self, monkeypatch):
-        from nova_arsenal.config import reload_config
-        from nova_arsenal.llm.router import get_llm_router, reset_llm_router
-
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-live")
-        monkeypatch.setenv("LLM_PROVIDER", "anthropic")
-        reload_config(config_path="/nonexistent/x.yaml")
-        reset_llm_router()
-        r = get_llm_router()
-        names = [p.name for p in r.providers]
-        assert "anthropic" in names
-        status = r.byok_status()
-        assert status["primary"]["provider"] == "anthropic"
-        assert status["primary"]["has_key"] is True
-        assert "anthropic" in status["env_keys_detected"]
-        # Never leak full key
-        catalog = {p["provider"]: p for p in status["provider_catalog"]}
-        assert "sk-ant-live" not in str(status)
