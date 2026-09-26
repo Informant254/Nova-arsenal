@@ -1,4 +1,4 @@
-name: Hardening Gate
+name: Hardening Format Cleanup
 
 on:
   push:
@@ -6,22 +6,40 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  format-and-verify:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
           cache: pip
       - name: Install package and development tools
         run: pip install -e ".[dev]"
-      - name: Ruff
-        run: ruff check .
-      - name: Tests
+      - name: Apply Ruff formatting
+        run: ruff format .
+      - name: Verify lint and formatting
+        run: |
+          ruff check .
+          ruff format --check .
+          python -m compileall -q nova_arsenal tests
+      - name: Run tests
         run: pytest -q
-      - name: BasedPyright
+      - name: Run type checking
         run: basedpyright nova_arsenal/
+      - name: Commit verified formatting
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No formatting changes"
+          else
+            git commit -m "style(hardening): apply verified Ruff formatting"
+            git push
+          fi
