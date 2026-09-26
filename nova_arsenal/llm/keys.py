@@ -10,13 +10,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass(frozen=True)
 class ProviderKeySpec:
     name: str
-    env_keys: Tuple[str, ...]  # first non-empty wins
+    env_keys: tuple[str, ...]  # first non-empty wins
     default_model: str
     default_url: str = ""
     # Optional alternate env for model override
@@ -24,7 +23,7 @@ class ProviderKeySpec:
 
 
 # Canonical provider → key env mapping
-PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
+PROVIDER_SPECS: dict[str, ProviderKeySpec] = {
     "openai": ProviderKeySpec(
         name="openai",
         env_keys=("OPENAI_API_KEY", "CODEX_API_KEY"),
@@ -98,7 +97,7 @@ PROVIDER_SPECS: Dict[str, ProviderKeySpec] = {
 }
 
 # Aliases users might set as LLM_PROVIDER
-PROVIDER_ALIASES: Dict[str, str] = {
+PROVIDER_ALIASES: dict[str, str] = {
     "gpt": "openai",
     "chatgpt": "openai",
     "codex": "openai",
@@ -158,7 +157,9 @@ def resolve_model(provider: str, explicit: str = "") -> str:
         return explicit
     # Global LLM_MODEL wins when provider matches LLM_PROVIDER or primary unset
     global_model = os.getenv("LLM_MODEL", "").strip() or os.getenv("NOVA_LLM_MODEL", "").strip()
-    preferred = normalize_provider(os.getenv("LLM_PROVIDER", "") or os.getenv("NOVA_LLM_PROVIDER", ""))
+    preferred = normalize_provider(
+        os.getenv("LLM_PROVIDER", "") or os.getenv("NOVA_LLM_PROVIDER", "")
+    )
     prov = normalize_provider(provider)
     if global_model and (not preferred or preferred == prov):
         return global_model
@@ -185,9 +186,9 @@ def resolve_url(provider: str, explicit: str = "") -> str:
     return (spec.default_url if spec else "") or explicit
 
 
-def env_providers_with_keys() -> List[str]:
+def env_providers_with_keys() -> list[str]:
     """List cloud providers that have API keys present in the environment."""
-    found: List[str] = []
+    found: list[str] = []
     for name, spec in PROVIDER_SPECS.items():
         if name in {"ollama", "local"}:
             continue
@@ -196,7 +197,7 @@ def env_providers_with_keys() -> List[str]:
     return found
 
 
-def preferred_provider_from_env() -> Optional[str]:
+def preferred_provider_from_env() -> str | None:
     raw = os.getenv("LLM_PROVIDER", "").strip() or os.getenv("NOVA_LLM_PROVIDER", "").strip()
     if raw:
         return normalize_provider(raw)
@@ -216,9 +217,9 @@ def preferred_provider_from_env() -> Optional[str]:
     return None
 
 
-def provider_status_snapshot() -> List[Dict[str, object]]:
+def provider_status_snapshot() -> list[dict[str, object]]:
     """Non-secret status for UI /health."""
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
     for name, spec in PROVIDER_SPECS.items():
         requires_key = name not in {"ollama", "local"}
         key = resolve_api_key(name) if requires_key else ""
@@ -261,7 +262,7 @@ def _is_placeholder(value: str) -> bool:
     return False
 
 
-def load_dotenv_files() -> List[str]:
+def load_dotenv_files() -> list[str]:
     """
     Load .env files if present. Uses python-dotenv when installed; otherwise a
     minimal parser. Returns list of files loaded.
@@ -280,7 +281,7 @@ def load_dotenv_files() -> List[str]:
             os.path.join(os.path.dirname(cwd), ".env"),
         ]
     )
-    loaded: List[str] = []
+    loaded: list[str] = []
     seen = set()
     for path in candidates:
         ap = os.path.abspath(path)

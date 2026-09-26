@@ -4,21 +4,13 @@ Nova-Arsenal Database Models
 SQLAlchemy models for storing agents, findings, users, and scope.
 """
 
+from __future__ import annotations
+
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Enum,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-)
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -63,21 +55,32 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    username = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.ANALYST)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.ANALYST)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
-    # Relationships
-    agents = relationship("Agent", back_populates="owner")
-    findings_verified = relationship("Finding", back_populates="verifier")
-    oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")
-    subscription = relationship("Subscription", back_populates="user", uselist=False)
-    api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
+    agents: Mapped[list[Agent]] = relationship("Agent", back_populates="owner")
+    findings_verified: Mapped[list[Finding]] = relationship("Finding", back_populates="verifier")
+    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(
+        "OAuthAccount", back_populates="user", cascade="all, delete-orphan"
+    )
+    subscription: Mapped[Subscription | None] = relationship(
+        "Subscription", back_populates="user", uselist=False
+    )
+    api_keys: Mapped[list[ApiKey]] = relationship(
+        "ApiKey", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.username}>"
@@ -88,17 +91,19 @@ class OAuthAccount(Base):
 
     __tablename__ = "oauth_accounts"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    provider = Column(Enum(OAuthProvider), nullable=False)
-    provider_user_id = Column(String(255), nullable=False)
-    provider_email = Column(String(255))
-    access_token = Column(String(1024))
-    refresh_token = Column(String(1024))
-    expires_at = Column(DateTime)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    provider: Mapped[OAuthProvider] = mapped_column(Enum(OAuthProvider), nullable=False)
+    provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider_email: Mapped[str | None] = mapped_column(String(255))
+    access_token: Mapped[str | None] = mapped_column(String(1024))
+    refresh_token: Mapped[str | None] = mapped_column(String(1024))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
-    user = relationship("User", back_populates="oauth_accounts")
+    user: Mapped[User] = relationship("User", back_populates="oauth_accounts")
 
     def __repr__(self) -> str:
         return f"<OAuthAccount {self.provider.value}:{self.provider_user_id}>"
@@ -109,17 +114,23 @@ class Subscription(Base):
 
     __tablename__ = "subscriptions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
-    api_calls_limit = Column(Integer, default=100)
-    api_calls_used = Column(Integer, default=0)
-    api_calls_reset_at = Column(DateTime)
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    expires_at = Column(DateTime, nullable=True)
-    is_active = Column(Boolean, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, unique=True
+    )
+    tier: Mapped[SubscriptionTier] = mapped_column(
+        Enum(SubscriptionTier), default=SubscriptionTier.FREE
+    )
+    api_calls_limit: Mapped[int] = mapped_column(Integer, default=100)
+    api_calls_used: Mapped[int] = mapped_column(Integer, default=0)
+    api_calls_reset_at: Mapped[datetime | None] = mapped_column(DateTime)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    user = relationship("User", back_populates="subscription")
+    user: Mapped[User] = relationship("User", back_populates="subscription")
 
     def __repr__(self) -> str:
         return f"<Subscription {self.tier.value} user={self.user_id}>"
@@ -130,17 +141,19 @@ class ApiKey(Base):
 
     __tablename__ = "api_keys"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    key_prefix = Column(String(8), nullable=False)
-    key_hash = Column(String(255), nullable=False)
-    name = Column(String(100), default="default")
-    is_active = Column(Boolean, default=True)
-    last_used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    expires_at = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), default="default")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user = relationship("User", back_populates="api_keys")
+    user: Mapped[User] = relationship("User", back_populates="api_keys")
 
     def __repr__(self) -> str:
         return f"<ApiKey {self.key_prefix}... user={self.user_id}>"
@@ -151,23 +164,28 @@ class Agent(Base):
 
     __tablename__ = "agents"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    target = Column(String(500), nullable=False)
-    objective = Column(Text)
-    status = Column(Enum(AgentStatus), default=AgentStatus.IDLE)
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    config = Column(Text)  # JSON string
-    max_steps = Column(Integer, default=40)
-    current_step = Column(Integer, default=0)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    target: Mapped[str] = mapped_column(String(500), nullable=False)
+    objective: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[AgentStatus] = mapped_column(Enum(AgentStatus), default=AgentStatus.IDLE)
+    owner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    config: Mapped[str | None] = mapped_column(Text)
+    max_steps: Mapped[int] = mapped_column(Integer, default=40)
+    current_step: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
-    # Relationships
-    owner = relationship("User", back_populates="agents")
-    findings = relationship("Finding", back_populates="agent")
+    owner: Mapped[User | None] = relationship("User", back_populates="agents")
+    findings: Mapped[list[Finding]] = relationship("Finding", back_populates="agent")
 
     def __repr__(self) -> str:
         return f"<Agent {self.name} targeting {self.target}>"
@@ -178,29 +196,31 @@ class Finding(Base):
 
     __tablename__ = "findings"
 
-    id = Column(Integer, primary_key=True, index=True)
-    agent_id = Column(Integer, ForeignKey("agents.id"))
-    title = Column(String(500), nullable=False)
-    severity = Column(Enum(FindingSeverity))
-    description = Column(Text)
-    evidence = Column(Text)
-    endpoint = Column(String(500))
-    cwe_id = Column(String(50))
-    cvss_score = Column(Float)
-    verified = Column(Boolean, default=False)
-    false_positive = Column(Boolean, default=False)
-    remediation = Column(Text)
-    references = Column(Text)  # JSON string
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    verified_at = Column(DateTime)
-    verified_by = Column(Integer, ForeignKey("users.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("agents.id"))
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    severity: Mapped[FindingSeverity | None] = mapped_column(Enum(FindingSeverity))
+    description: Mapped[str | None] = mapped_column(Text)
+    evidence: Mapped[str | None] = mapped_column(Text)
+    endpoint: Mapped[str | None] = mapped_column(String(500))
+    cwe_id: Mapped[str | None] = mapped_column(String(50))
+    cvss_score: Mapped[float | None] = mapped_column(Float)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    false_positive: Mapped[bool] = mapped_column(Boolean, default=False)
+    remediation: Mapped[str | None] = mapped_column(Text)
+    references: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    verified_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
-    # Relationships
-    agent = relationship("Agent", back_populates="findings")
-    verifier = relationship("User", back_populates="findings_verified")
+    agent: Mapped[Agent | None] = relationship("Agent", back_populates="findings")
+    verifier: Mapped[User | None] = relationship("User", back_populates="findings_verified")
 
     def __repr__(self) -> str:
-        return f"<Finding {self.title} [{self.severity.value}]>"
+        severity = self.severity.value if self.severity is not None else "unknown"
+        return f"<Finding {self.title} [{severity}]>"
 
 
 class Scope(Base):
@@ -208,13 +228,15 @@ class Scope(Base):
 
     __tablename__ = "scope"
 
-    id = Column(Integer, primary_key=True, index=True)
-    target = Column(String(500), nullable=False)
-    description = Column(String(500))
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    is_active = Column(Boolean, default=True)
-    is_wildcard = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    target: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500))
+    owner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_wildcard: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     def __repr__(self) -> str:
         return f"<Scope {self.target}>"
@@ -225,15 +247,25 @@ class ChatSession(Base):
 
     __tablename__ = "chat_sessions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(36), unique=True, index=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    title = Column(String(255), default="New Chat")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(String(36), unique=True, index=True, nullable=False)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), default="New Chat")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
-    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan",
-                            order_by="ChatMessage.timestamp")
+    messages: Mapped[list[ChatMessage]] = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.timestamp",
+    )
 
     def __repr__(self) -> str:
         return f"<ChatSession {self.session_id}>"
@@ -244,14 +276,18 @@ class ChatMessage(Base):
 
     __tablename__ = "chat_messages"
 
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(36), ForeignKey("chat_sessions.session_id"), nullable=False)
-    role = Column(String(20), nullable=False)
-    content = Column(Text, nullable=False)
-    metadata_json = Column(Text)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_sessions.session_id"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[str | None] = mapped_column(Text)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
 
-    session = relationship("ChatSession", back_populates="messages")
+    session: Mapped[ChatSession] = relationship("ChatSession", back_populates="messages")
 
     def __repr__(self) -> str:
         return f"<ChatMessage {self.role}:{self.content[:50]}>"
@@ -262,20 +298,26 @@ class ScheduleEntryModel(Base):
 
     __tablename__ = "schedule_entries"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, index=True, nullable=False)
-    cron = Column(String(100), nullable=False)
-    target = Column(String(500), nullable=False)
-    task_type = Column(String(100), default="security_scan")
-    objective = Column(Text)
-    max_steps = Column(Integer, default=40)
-    status = Column(String(20), default="active")
-    run_count = Column(Integer, default=0)
-    last_run = Column(DateTime, nullable=True)
-    last_result = Column(Text)
-    next_run = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    cron: Mapped[str] = mapped_column(String(100), nullable=False)
+    target: Mapped[str] = mapped_column(String(500), nullable=False)
+    task_type: Mapped[str] = mapped_column(String(100), default="security_scan")
+    objective: Mapped[str | None] = mapped_column(Text)
+    max_steps: Mapped[int] = mapped_column(Integer, default=40)
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    run_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_result: Mapped[str | None] = mapped_column(Text)
+    next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     def __repr__(self) -> str:
         return f"<ScheduleEntryModel {self.name}>"
@@ -286,17 +328,19 @@ class AgentRunResult(Base):
 
     __tablename__ = "agent_run_results"
 
-    id = Column(Integer, primary_key=True, index=True)
-    agent_id = Column(Integer, ForeignKey("agents.id"), nullable=False)
-    status = Column(String(20), default="running")
-    steps_taken = Column(Integer, default=0)
-    total_findings = Column(Integer, default=0)
-    summary = Column(Text)
-    result_json = Column(Text)
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(Integer, ForeignKey("agents.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="running")
+    steps_taken: Mapped[int] = mapped_column(Integer, default=0)
+    total_findings: Mapped[int] = mapped_column(Integer, default=0)
+    summary: Mapped[str | None] = mapped_column(Text)
+    result_json: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    agent = relationship("Agent")
+    agent: Mapped[Agent] = relationship("Agent")
 
     def __repr__(self) -> str:
         return f"<AgentRunResult agent={self.agent_id} status={self.status}>"
@@ -304,4 +348,5 @@ class AgentRunResult(Base):
 
 class ChatSessionMessage(Base):
     """Alias for ChatMessage for backwards compatibility."""
+
     __abstract__ = True

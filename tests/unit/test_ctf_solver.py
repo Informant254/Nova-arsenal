@@ -1,7 +1,6 @@
 """Tests for CTF Solver module."""
 
-import pytest
-from nova_arsenal.ctf_solver import CtfSolver, ChallengeType, CtfFlag, CtfChallenge
+from nova_arsenal.ctf_solver import ChallengeType, CtfFlag, CtfSolver
 
 
 class TestCtfSolver:
@@ -14,7 +13,9 @@ class TestCtfSolver:
 
     def test_classify_web(self):
         solver = CtfSolver()
-        ctype = solver.classify_challenge("Web Exploitation", "SQL injection in login", "http://ctf.example.com")
+        ctype = solver.classify_challenge(
+            "Web Exploitation", "SQL injection in login", "http://ctf.example.com"
+        )
         assert ctype == ChallengeType.WEB
 
     def test_classify_crypto(self):

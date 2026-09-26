@@ -1,7 +1,6 @@
 """Training configurations ported from NexRL recipe system."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -10,6 +9,7 @@ class GRPOConfig:
 
     Ported from NexRL's self_hosted.yaml and common.yaml recipes.
     """
+
     total_train_steps: int = 200
     save_freq: int = 0
 
@@ -53,6 +53,7 @@ class OPDConfig:
 
     Ported from NexRL's self_hosted_opd and weaver_opd recipes.
     """
+
     total_train_steps: int = 1000
     save_freq: int = 100
 
@@ -84,11 +85,12 @@ class OPDConfig:
 @dataclass
 class TrainingConfig:
     """Top-level training configuration."""
+
     grpo: GRPOConfig = field(default_factory=GRPOConfig)
     opd: OPDConfig = field(default_factory=OPDConfig)
     experiment_name: str = "nova-grpo-experiment"
     data_path: str = ""
-    data_files: List[str] = field(default_factory=list)
+    data_files: list[str] = field(default_factory=list)
     judge_mode: str = "rule"
     output_dir: str = "/workspace/training"
     log_freq: int = 10

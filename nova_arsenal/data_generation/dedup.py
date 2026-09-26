@@ -9,19 +9,18 @@ Two-pass approach:
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def word_trigrams(text: str) -> Set[str]:
+def word_trigrams(text: str) -> set[str]:
     words = text.split()
     if len(words) < 3:
         return {w.lower() for w in words}
-    return {" ".join(words[i:i+3]).lower() for i in range(len(words) - 2)}
+    return {" ".join(words[i : i + 3]).lower() for i in range(len(words) - 2)}
 
 
-def jaccard_similarity(a: Set[str], b: Set[str]) -> float:
+def jaccard_similarity(a: set[str], b: set[str]) -> float:
     if not a and not b:
         return 1.0
     intersection = a & b
@@ -36,10 +35,10 @@ def normalize_prompt(text: str) -> str:
 
 
 def exact_dedup(
-    entries: List[Dict],
+    entries: list[dict],
     prompt_key: str = "prompt",
-) -> Tuple[List[Dict], int]:
-    seen: Set[str] = set()
+) -> tuple[list[dict], int]:
+    seen: set[str] = set()
     kept = []
     dupe_count = 0
     for entry in entries:
@@ -53,14 +52,14 @@ def exact_dedup(
 
 
 def semantic_dedup(
-    entries: List[Dict],
+    entries: list[dict],
     threshold: float = 0.6,
     prompt_key: str = "prompt",
-) -> Tuple[List[Dict], int]:
+) -> tuple[list[dict], int]:
     if len(entries) < 2:
         return entries, 0
 
-    trigrams: List[Set[str]] = []
+    trigrams: list[set[str]] = []
     for entry in entries:
         text = entry.get(prompt_key, "").lower()
         trigrams.append(word_trigrams(text))
@@ -85,10 +84,10 @@ def semantic_dedup(
 
 
 def run_dedup_pipeline(
-    entries: List[Dict],
+    entries: list[dict],
     threshold: float = 0.6,
     prompt_key: str = "prompt",
-) -> Tuple[List[Dict], int, int]:
+) -> tuple[list[dict], int, int]:
     deduped, exact = exact_dedup(entries, prompt_key)
     if exact:
         logger.info(f"Exact dedup: removed {exact} duplicates")
@@ -104,11 +103,11 @@ def run_dedup_pipeline(
 
 def dedup_file(
     input_path: Path,
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
     threshold: float = 0.6,
 ) -> Path:
     entries = []
-    with open(input_path, "r", encoding="utf-8") as f:
+    with open(input_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:

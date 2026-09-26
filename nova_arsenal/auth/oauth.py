@@ -11,9 +11,9 @@ import json
 import secrets
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
@@ -28,8 +28,8 @@ class OAuthUserInfo:
     email: str
     username: str
     access_token: str
-    refresh_token: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    refresh_token: str | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass
@@ -66,7 +66,7 @@ def _encode_state_payload(payload: dict[str, Any]) -> str:
     return f"{encoded}.{signature}"
 
 
-def _decode_state_payload(state: str) -> Optional[dict[str, Any]]:
+def _decode_state_payload(state: str) -> dict[str, Any] | None:
     try:
         encoded, signature = state.rsplit(".", 1)
     except ValueError:
@@ -93,7 +93,7 @@ def _decode_state_payload(state: str) -> Optional[dict[str, Any]]:
 def generate_oauth_state(
     provider: str,
     redirect: str = "",
-    pkce: Optional[PKCEChallenge] = None,
+    pkce: PKCEChallenge | None = None,
 ) -> str:
     """Generate a signed, short-lived OAuth state token."""
     return _encode_state_payload(
@@ -113,8 +113,11 @@ def verify_oauth_state(state: str, provider: str) -> bool:
     if not payload or payload.get("provider") != provider:
         return False
 
+    issued_at_value = payload.get("iat")
+    if issued_at_value is None:
+        return False
     try:
-        issued_at = int(payload.get("iat"))
+        issued_at = int(issued_at_value)
     except (TypeError, ValueError):
         return False
 
@@ -129,7 +132,7 @@ def extract_redirect(state: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-def extract_pkce_verifier(state: str) -> Optional[str]:
+def extract_pkce_verifier(state: str) -> str | None:
     """Extract the PKCE verifier from a validly signed state payload."""
     payload = _decode_state_payload(state)
     value = payload.get("verifier", "") if payload else ""
@@ -138,16 +141,13 @@ def extract_pkce_verifier(state: str) -> Optional[str]:
 
 class BaseOAuthProvider(ABC):
     @abstractmethod
-    def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
-        ...
+    def get_authorize_url(self, state: str, code_challenge: str | None = None) -> str: ...
 
     @abstractmethod
-    async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
-        ...
+    async def exchange_code(self, code: str, code_verifier: str | None = None) -> OAuthUserInfo: ...
 
     @abstractmethod
-    def provider_name(self) -> str:
-        ...
+    def provider_name(self) -> str: ...
 
 
 class GitHubOAuthProvider(BaseOAuthProvider):
@@ -166,7 +166,7 @@ class GitHubOAuthProvider(BaseOAuthProvider):
     def provider_name(self) -> str:
         return "github"
 
-    def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
+    def get_authorize_url(self, state: str, code_challenge: str | None = None) -> str:
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.redirect_uri,
@@ -178,7 +178,7 @@ class GitHubOAuthProvider(BaseOAuthProvider):
             params["code_challenge_method"] = "S256"
         return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
 
-    async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
+    async def exchange_code(self, code: str, code_verifier: str | None = None) -> OAuthUserInfo:
         data = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -197,7 +197,9 @@ class GitHubOAuthProvider(BaseOAuthProvider):
             token_data = token_resp.json()
 
             if "error" in token_data:
-                raise ValueError(f"GitHub OAuth error: {token_data.get('error_description', token_data['error'])}")
+                raise ValueError(
+                    f"GitHub OAuth error: {token_data.get('error_description', token_data['error'])}"
+                )
 
             access_token = token_data["access_token"]
 
@@ -245,7 +247,7 @@ class GoogleOAuthProvider(BaseOAuthProvider):
     def provider_name(self) -> str:
         return "google"
 
-    def get_authorize_url(self, state: str, code_challenge: Optional[str] = None) -> str:
+    def get_authorize_url(self, state: str, code_challenge: str | None = None) -> str:
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.redirect_uri,
@@ -259,7 +261,7 @@ class GoogleOAuthProvider(BaseOAuthProvider):
             params["code_challenge_method"] = "S256"
         return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
 
-    async def exchange_code(self, code: str, code_verifier: Optional[str] = None) -> OAuthUserInfo:
+    async def exchange_code(self, code: str, code_verifier: str | None = None) -> OAuthUserInfo:
         data = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -279,7 +281,9 @@ class GoogleOAuthProvider(BaseOAuthProvider):
             token_data = token_resp.json()
 
             if "error" in token_data:
-                raise ValueError(f"Google OAuth error: {token_data.get('error_description', token_data['error'])}")
+                raise ValueError(
+                    f"Google OAuth error: {token_data.get('error_description', token_data['error'])}"
+                )
 
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")

@@ -11,8 +11,9 @@ import hashlib
 import logging
 import re
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +54,33 @@ _HIGH_YIELD_SERVICES = {
 }
 
 _DANGEROUS_PATH_HINTS = (
-    "upload", "import", "export", "parse", "xml", "svg", "pdf", "zip",
-    "admin", "debug", "internal", "graphql", "rpc", "deserialize",
-    "eval", "exec", "shell", "cmd", "webhook", "callback", "proxy",
-    "file", "path", "template", "render", "preview", "convert",
+    "upload",
+    "import",
+    "export",
+    "parse",
+    "xml",
+    "svg",
+    "pdf",
+    "zip",
+    "admin",
+    "debug",
+    "internal",
+    "graphql",
+    "rpc",
+    "deserialize",
+    "eval",
+    "exec",
+    "shell",
+    "cmd",
+    "webhook",
+    "callback",
+    "proxy",
+    "file",
+    "path",
+    "template",
+    "render",
+    "preview",
+    "convert",
 )
 
 _VERSION_RE = re.compile(
@@ -76,10 +100,10 @@ class SurfaceEndpoint:
     path: str = ""
     version: str = ""
     banner: str = ""
-    technologies: List[str] = field(default_factory=list)
-    params: List[str] = field(default_factory=list)
-    methods: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    technologies: list[str] = field(default_factory=list)
+    params: list[str] = field(default_factory=list)
+    methods: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     priority: float = 0.0
     blast_radius: float = 0.0
     fuzz_affinity: float = 0.0
@@ -91,7 +115,7 @@ class SurfaceEndpoint:
         raw = f"{self.target}|{self.service}|{self.port}|{self.path}|{self.version}"
         return hashlib.sha1(raw.encode()).hexdigest()[:12]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "surface_id": self.surface_id,
             "target": self.target,
@@ -118,15 +142,15 @@ class SurfaceMap:
     """Ranked attack surface for a target."""
 
     target: str
-    endpoints: List[SurfaceEndpoint] = field(default_factory=list)
+    endpoints: list[SurfaceEndpoint] = field(default_factory=list)
     elapsed_ms: float = 0.0
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
     @property
-    def top(self) -> List[SurfaceEndpoint]:
+    def top(self) -> list[SurfaceEndpoint]:
         return sorted(self.endpoints, key=lambda e: e.priority, reverse=True)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "endpoint_count": len(self.endpoints),
@@ -155,14 +179,14 @@ class AttackSurfaceMapper:
     def map(
         self,
         target: str,
-        services: Optional[Dict[str, Any]] = None,
-        endpoints: Optional[Sequence[Dict[str, Any]]] = None,
-        technologies: Optional[Sequence[str]] = None,
-        findings: Optional[Sequence[Dict[str, Any]]] = None,
+        services: dict[str, Any] | None = None,
+        endpoints: Sequence[dict[str, Any]] | None = None,
+        technologies: Sequence[str] | None = None,
+        findings: Sequence[dict[str, Any]] | None = None,
     ) -> SurfaceMap:
         t0 = time.perf_counter()
-        mapped: List[SurfaceEndpoint] = []
-        notes: List[str] = []
+        mapped: list[SurfaceEndpoint] = []
+        notes: list[str] = []
 
         services = services or {}
         technologies = list(technologies or [])
@@ -200,7 +224,7 @@ class AttackSurfaceMapper:
             self._score(ep)
 
         # Dedup by surface_id, keep highest priority
-        by_id: Dict[str, SurfaceEndpoint] = {}
+        by_id: dict[str, SurfaceEndpoint] = {}
         for ep in mapped:
             prev = by_id.get(ep.surface_id)
             if prev is None or ep.priority > prev.priority:
@@ -235,8 +259,8 @@ class AttackSurfaceMapper:
         svc_name: str,
         meta: Any,
         technologies: Sequence[str],
-    ) -> List[SurfaceEndpoint]:
-        results: List[SurfaceEndpoint] = []
+    ) -> list[SurfaceEndpoint]:
+        results: list[SurfaceEndpoint] = []
         name = str(svc_name).lower().strip()
 
         if isinstance(meta, list):
@@ -298,7 +322,7 @@ class AttackSurfaceMapper:
     def _from_endpoint_dict(
         self,
         target: str,
-        ep: Dict[str, Any],
+        ep: dict[str, Any],
         technologies: Sequence[str],
     ) -> SurfaceEndpoint:
         return SurfaceEndpoint(
@@ -319,8 +343,8 @@ class AttackSurfaceMapper:
 
     def _boost_from_finding(
         self,
-        endpoints: List[SurfaceEndpoint],
-        finding: Dict[str, Any],
+        endpoints: list[SurfaceEndpoint],
+        finding: dict[str, Any],
     ) -> None:
         text = " ".join(
             str(finding.get(k, ""))
@@ -338,7 +362,9 @@ class AttackSurfaceMapper:
         path_l = (ep.path or "").lower()
         danger_hits = sum(1 for h in _DANGEROUS_PATH_HINTS if h in path_l)
         param_boost = min(3.0, 0.4 * len(ep.params))
-        method_boost = 0.5 if any(m.upper() in {"POST", "PUT", "PATCH"} for m in ep.methods) else 0.0
+        method_boost = (
+            0.5 if any(m.upper() in {"POST", "PUT", "PATCH"} for m in ep.methods) else 0.0
+        )
         tech_boost = min(2.0, 0.25 * len(ep.technologies))
 
         version_factor = 1.0
@@ -366,7 +392,9 @@ class AttackSurfaceMapper:
         if any(t in {"upload", "parser", "file"} for t in ep.tags):
             fuzz += 1.5
 
-        priority = (base + danger_hits * 1.5 + param_boost + method_boost + tech_boost) * version_factor
+        priority = (
+            base + danger_hits * 1.5 + param_boost + method_boost + tech_boost
+        ) * version_factor
         priority += blast * 0.3 + fuzz * 0.2
         priority *= 0.85 + 0.3 * ep.novelty_prior
 

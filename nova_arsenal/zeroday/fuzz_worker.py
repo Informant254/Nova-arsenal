@@ -15,9 +15,10 @@ import os
 import re
 import shutil
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any
 
 from .crash_triage import CrashReport
 from .fuzz_orchestrator import FuzzCampaign, FuzzEngine, FuzzJob
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # engine -> candidate binary names on PATH
-_ENGINE_BINARIES: Dict[str, List[str]] = {
+_ENGINE_BINARIES: dict[str, list[str]] = {
     FuzzEngine.FFUF.value: ["ffuf"],
     FuzzEngine.AFLPP.value: ["afl-fuzz", "afl-fuzz++"],
     FuzzEngine.HONGGFUZZ.value: ["honggfuzz"],
@@ -45,7 +46,7 @@ class EngineStatus:
     version: str = ""
     note: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "engine": self.engine,
             "available": self.available,
@@ -61,16 +62,16 @@ class LiveJobResult:
     engine: str
     status: str  # ran | skipped_missing | planned | timeout | error | finished
     command: str = ""
-    returncode: Optional[int] = None
+    returncode: int | None = None
     stdout: str = ""
     stderr: str = ""
     elapsed_ms: float = 0.0
     crashes_found: int = 0
-    crash_paths: List[str] = field(default_factory=list)
-    artifacts: Dict[str, Any] = field(default_factory=dict)
+    crash_paths: list[str] = field(default_factory=list)
+    artifacts: dict[str, Any] = field(default_factory=dict)
     note: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "job_id": self.job_id,
             "engine": self.engine,
@@ -90,11 +91,11 @@ class LiveJobResult:
 @dataclass
 class LiveCampaignResult:
     target: str
-    engines: List[EngineStatus] = field(default_factory=list)
-    jobs: List[LiveJobResult] = field(default_factory=list)
-    crashes: List[CrashReport] = field(default_factory=list)
+    engines: list[EngineStatus] = field(default_factory=list)
+    jobs: list[LiveJobResult] = field(default_factory=list)
+    crashes: list[CrashReport] = field(default_factory=list)
     elapsed_ms: float = 0.0
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
     @property
     def ran_count(self) -> int:
@@ -104,7 +105,7 @@ class LiveCampaignResult:
     def skipped_count(self) -> int:
         return sum(1 for j in self.jobs if j.status == "skipped_missing")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "engines": [e.to_dict() for e in self.engines],
@@ -134,7 +135,7 @@ class LiveFuzzWorker:
         workers: int = 4,
         default_timeout: int = 60,
         output_dir: str = "./fuzz_out",
-        only_engines: Optional[Sequence[str]] = None,
+        only_engines: Sequence[str] | None = None,
         prefer_short_runs: bool = True,
     ) -> None:
         self.authorized = authorized
@@ -145,13 +146,13 @@ class LiveFuzzWorker:
         self.only_engines = set(only_engines) if only_engines else None
         # Cap long-running fuzzers so orchestration stays responsive
         self.prefer_short_runs = prefer_short_runs
-        self._engine_cache: Optional[Dict[str, EngineStatus]] = None
+        self._engine_cache: dict[str, EngineStatus] | None = None
 
-    def detect_engines(self, force: bool = False) -> Dict[str, EngineStatus]:
+    def detect_engines(self, force: bool = False) -> dict[str, EngineStatus]:
         if self._engine_cache is not None and not force:
             return self._engine_cache
 
-        status: Dict[str, EngineStatus] = {}
+        status: dict[str, EngineStatus] = {}
         for engine, bins in _ENGINE_BINARIES.items():
             if engine == FuzzEngine.BOOFUZZ.value:
                 available = self._python_module_available("boofuzz")
@@ -198,11 +199,11 @@ class LiveFuzzWorker:
         self._engine_cache = status
         return status
 
-    def filter_runnable(self, campaign: FuzzCampaign) -> tuple[List[FuzzJob], List[FuzzJob]]:
+    def filter_runnable(self, campaign: FuzzCampaign) -> tuple[list[FuzzJob], list[FuzzJob]]:
         """Split jobs into (runnable, skipped)."""
         engines = self.detect_engines()
-        runnable: List[FuzzJob] = []
-        skipped: List[FuzzJob] = []
+        runnable: list[FuzzJob] = []
+        skipped: list[FuzzJob] = []
         for job in campaign.jobs:
             if self.only_engines and job.engine not in self.only_engines:
                 skipped.append(job)
@@ -229,12 +230,12 @@ class LiveFuzzWorker:
         campaign: FuzzCampaign,
         dry_run: bool = True,
         max_jobs: int = 16,
-        job_timeout: Optional[int] = None,
+        job_timeout: int | None = None,
     ) -> LiveCampaignResult:
         t0 = time.perf_counter()
         engines = self.detect_engines()
-        notes: List[str] = []
-        results: List[LiveJobResult] = []
+        notes: list[str] = []
+        results: list[LiveJobResult] = []
 
         if not dry_run and not self.authorized:
             return LiveCampaignResult(
@@ -258,8 +259,7 @@ class LiveFuzzWorker:
                     engine=job.engine,
                     status="skipped_missing",
                     command=job.command,
-                    note=(eng.note if eng else "engine unavailable")
-                    or "filtered by only_engines",
+                    note=(eng.note if eng else "engine unavailable") or "filtered by only_engines",
                 )
             )
 
@@ -279,8 +279,8 @@ class LiveFuzzWorker:
                     )
                 )
             notes.append(
-                f"Dry-run: {sum(1 for r in results if r.status=='planned')} runnable, "
-                f"{sum(1 for r in results if r.status=='skipped_missing')} skipped"
+                f"Dry-run: {sum(1 for r in results if r.status == 'planned')} runnable, "
+                f"{sum(1 for r in results if r.status == 'skipped_missing')} skipped"
             )
             return LiveCampaignResult(
                 target=campaign.target,
@@ -295,14 +295,12 @@ class LiveFuzzWorker:
             timeout = min(timeout, 90)
 
         sem = asyncio.Semaphore(self.workers)
-        live_results = await asyncio.gather(
-            *[self._run_job(job, timeout, sem) for job in runnable]
-        )
+        live_results = await asyncio.gather(*[self._run_job(job, timeout, sem) for job in runnable])
         results.extend(live_results)
 
         crashes = self.collect_crashes(campaign.target, results)
         notes.append(
-            f"Live run complete: {sum(1 for r in live_results if r.status in {'ran','finished','timeout'})} executed, "
+            f"Live run complete: {sum(1 for r in live_results if r.status in {'ran', 'finished', 'timeout'})} executed, "
             f"{len(crashes)} crash artifacts"
         )
         return LiveCampaignResult(
@@ -318,9 +316,9 @@ class LiveFuzzWorker:
         self,
         target: str,
         job_results: Sequence[LiveJobResult],
-    ) -> List[CrashReport]:
-        crashes: List[CrashReport] = []
-        seen: Set[str] = set()
+    ) -> list[CrashReport]:
+        crashes: list[CrashReport] = []
+        seen: set[str] = set()
 
         # Scan known output locations
         out = Path(self.output_dir)
@@ -332,7 +330,7 @@ class LiveFuzzWorker:
             "**/queue/id*",
         ]
         # Prefer explicit crash dirs from AFL
-        paths: List[Path] = []
+        paths: list[Path] = []
         if out.exists():
             for pat in patterns:
                 paths.extend(out.glob(pat))
@@ -363,7 +361,9 @@ class LiveFuzzWorker:
                     engine=self._guess_engine(path),
                     signal="UNKNOWN",
                     stack_trace="",
-                    reproducer=data[:200].hex() if self._looks_binary(data) else data.decode(errors="replace")[:500],
+                    reproducer=data[:200].hex()
+                    if self._looks_binary(data)
+                    else data.decode(errors="replace")[:500],
                     stderr="",
                     target=target,
                     metadata={"path": str(path)},
@@ -426,12 +426,14 @@ class LiveFuzzWorker:
                         stdout_b, stderr_b = b"", b""
                     status = "timeout"
                     rc = None
-                    note = f"Stopped after {timeout}s (fuzzers are long-running; artifacts may remain)"
+                    note = (
+                        f"Stopped after {timeout}s (fuzzers are long-running; artifacts may remain)"
+                    )
 
                 stdout = stdout_b.decode(errors="replace") if stdout_b else ""
                 stderr = stderr_b.decode(errors="replace") if stderr_b else ""
                 crash_paths = self._discover_job_crashes(job)
-                artifacts: Dict[str, Any] = {}
+                artifacts: dict[str, Any] = {}
                 if job.engine == FuzzEngine.FFUF.value:
                     artifacts.update(self._load_ffuf_json(job))
 
@@ -492,17 +494,29 @@ class LiveFuzzWorker:
             fallback.write_text(
                 "\n".join(
                     [
-                        "admin", "api", "login", "upload", "backup", "config",
-                        "debug", "test", "v1", "v2", "graphql", "health",
-                        "robots.txt", "swagger", "internal",
+                        "admin",
+                        "api",
+                        "login",
+                        "upload",
+                        "backup",
+                        "config",
+                        "debug",
+                        "test",
+                        "v1",
+                        "v2",
+                        "graphql",
+                        "health",
+                        "robots.txt",
+                        "swagger",
+                        "internal",
                     ]
                 )
                 + "\n"
             )
         return cmd.replace(wl, str(fallback))
 
-    def _discover_job_crashes(self, job: FuzzJob) -> List[str]:
-        paths: List[str] = []
+    def _discover_job_crashes(self, job: FuzzJob) -> list[str]:
+        paths: list[str] = []
         out = Path(self.output_dir)
         if job.engine == FuzzEngine.AFLPP.value:
             m = re.search(r"-o\s+(\S+)", job.command)
@@ -512,7 +526,7 @@ class LiveFuzzWorker:
                     paths.append(str(p))
         return paths
 
-    def _load_ffuf_json(self, job: FuzzJob) -> Dict[str, Any]:
+    def _load_ffuf_json(self, job: FuzzJob) -> dict[str, Any]:
         m = re.search(r"-o\s+(\S+)", job.command)
         if not m:
             return {}

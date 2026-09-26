@@ -10,7 +10,7 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from nova_skills import SkillLibrary, BUILTIN_SKILLS
+from nova_skills import BUILTIN_SKILLS
 
 
 class TestSkillLibrary:

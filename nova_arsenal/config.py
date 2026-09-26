@@ -11,9 +11,9 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -36,10 +36,10 @@ _EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
 
 def _is_production_environment() -> bool:
     value = (
-        os.getenv("NOVA_ENV", "")
-        or os.getenv("ENVIRONMENT", "")
-        or os.getenv("ENV", "")
-    ).strip().lower()
+        (os.getenv("NOVA_ENV", "") or os.getenv("ENVIRONMENT", "") or os.getenv("ENV", ""))
+        .strip()
+        .lower()
+    )
     return value in {"prod", "production"}
 
 
@@ -87,7 +87,7 @@ class LLMProviderConfig:
     api_key: str = ""
     timeout: int = 120
 
-    def resolved(self) -> "LLMProviderConfig":
+    def resolved(self) -> LLMProviderConfig:
         """Return a copy with env-resolved key/model/url."""
         prov = normalize_provider(self.provider)
         return LLMProviderConfig(
@@ -102,7 +102,7 @@ class LLMProviderConfig:
 @dataclass
 class LLMConfig:
     primary: LLMProviderConfig = field(default_factory=LLMProviderConfig)
-    fallbacks: List[LLMProviderConfig] = field(default_factory=list)
+    fallbacks: list[LLMProviderConfig] = field(default_factory=list)
     routing_strategy: str = "balanced"
     fallback_threshold: int = 3
     max_retries: int = 3
@@ -111,9 +111,9 @@ class LLMConfig:
 @dataclass
 class SecurityConfig:
     permission_profile: str = "scoped"
-    blocked_patterns: List[str] = field(default_factory=list)
-    allowed_tools: List[str] = field(default_factory=list)
-    blocked_hosts: List[str] = field(default_factory=list)
+    blocked_patterns: list[str] = field(default_factory=list)
+    allowed_tools: list[str] = field(default_factory=list)
+    blocked_hosts: list[str] = field(default_factory=list)
     strict_mode: bool = False
 
 
@@ -163,7 +163,7 @@ class NovaConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
-    scope: List[str] = field(default_factory=list)
+    scope: list[str] = field(default_factory=list)
 
 
 def _resolve_env_vars(value: str) -> str:
@@ -189,7 +189,7 @@ def _process_config(data: Any) -> Any:
     return data
 
 
-def _provider_from_dict(raw: Dict[str, Any]) -> LLMProviderConfig:
+def _provider_from_dict(raw: dict[str, Any]) -> LLMProviderConfig:
     # Filter unknown keys so older/newer YAML stays compatible
     allowed = {"provider", "model", "url", "api_key", "timeout"}
     cleaned = {k: v for k, v in (raw or {}).items() if k in allowed}
@@ -197,7 +197,7 @@ def _provider_from_dict(raw: Dict[str, Any]) -> LLMProviderConfig:
     return cfg.resolved()
 
 
-def _account_preferred_primary() -> Optional[LLMProviderConfig]:
+def _account_preferred_primary() -> LLMProviderConfig | None:
     """If user registered local LLM or OAuth account as preferred, use it."""
     try:
         from nova_arsenal.llm.account_auth import get_account_store
@@ -238,7 +238,11 @@ def _account_preferred_primary() -> Optional[LLMProviderConfig]:
             if not acc:
                 continue
             meta = acc.meta or {}
-            if meta.get("prefer_as_primary") or meta.get("subscription_auth") or acc.auth_type == "oauth":
+            if (
+                meta.get("prefer_as_primary")
+                or meta.get("subscription_auth")
+                or acc.auth_type == "oauth"
+            ):
                 if acc.access_token and not acc.is_expired():
                     return _cfg_for(name, acc)
     except Exception:  # noqa: BLE001
@@ -246,7 +250,7 @@ def _account_preferred_primary() -> Optional[LLMProviderConfig]:
     return None
 
 
-def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
+def _auto_llm_from_env(existing: LLMConfig | None = None) -> LLMConfig:
     """
     Build / enrich LLM config from environment + account store.
 
@@ -316,7 +320,7 @@ def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
                     ).resolved()
 
     # Build fallbacks: keep YAML fallbacks (resolved) + any env keys not already listed
-    fallbacks: List[LLMProviderConfig] = []
+    fallbacks: list[LLMProviderConfig] = []
     seen = {primary.provider}
 
     for fb in base.fallbacks or []:
@@ -360,7 +364,7 @@ def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
     )
 
 
-def load_config(config_path: Optional[str] = None) -> NovaConfig:
+def load_config(config_path: str | None = None) -> NovaConfig:
     """
     Load configuration from a YAML file + environment.
 
@@ -372,7 +376,7 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
     if loaded_env:
         logger.info("Loaded env files: %s", ", ".join(loaded_env))
 
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
     path = config_path
     if path is None:
         # Search common locations
@@ -395,7 +399,7 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
     # Agent
     agent_raw = dict(data.get("agent") or {})
     # Filter unknown fields
-    agent_fields = {f.name for f in AgentConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    agent_fields = {config_field.name for config_field in fields(AgentConfig)}
     agent = AgentConfig(**{k: v for k, v in agent_raw.items() if k in agent_fields})
 
     # LLM from YAML then enrich with env BYOK
@@ -407,7 +411,9 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
     yaml_llm = LLMConfig(
         primary=_provider_from_dict(primary_raw) if primary_raw else LLMProviderConfig(),
         fallbacks=[_provider_from_dict(fb) for fb in fallbacks_raw if isinstance(fb, dict)],
-        routing_strategy=str(routing.get("strategy") or llm_raw.get("routing_strategy") or "balanced"),
+        routing_strategy=str(
+            routing.get("strategy") or llm_raw.get("routing_strategy") or "balanced"
+        ),
         fallback_threshold=int(routing.get("fallback_threshold") or 3),
         max_retries=int(routing.get("max_retries") or 3),
     )
@@ -415,24 +421,24 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
 
     # Security / logging / database / auth
     sec_raw = data.get("security") or {}
-    sec_fields = {f.name for f in SecurityConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    sec_fields = {config_field.name for config_field in fields(SecurityConfig)}
     security = SecurityConfig(**{k: v for k, v in sec_raw.items() if k in sec_fields})
 
     log_raw = data.get("logging") or {}
-    log_fields = {f.name for f in LoggingConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    log_fields = {config_field.name for config_field in fields(LoggingConfig)}
     logging_cfg = LoggingConfig(**{k: v for k, v in log_raw.items() if k in log_fields})
     if os.getenv("LOG_LEVEL"):
         logging_cfg.level = os.getenv("LOG_LEVEL", logging_cfg.level)
 
     db_raw = data.get("database") or {}
-    db_fields = {f.name for f in DatabaseConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    db_fields = {config_field.name for config_field in fields(DatabaseConfig)}
     database = DatabaseConfig(**{k: v for k, v in db_raw.items() if k in db_fields})
     if os.getenv("DATABASE_URL"):
         database.url = os.getenv("DATABASE_URL", database.url)
 
     auth_raw = data.get("auth") or {}
     oauth_raw = auth_raw.get("oauth") or {}
-    oauth_fields = {f.name for f in OAuthConfig.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    oauth_fields = {config_field.name for config_field in fields(OAuthConfig)}
     oauth = OAuthConfig(**{k: v for k, v in oauth_raw.items() if k in oauth_fields})
     auth = AuthConfig(
         jwt_secret=_resolve_jwt_secret(auth_raw.get("jwt_secret") or ""),
@@ -467,7 +473,7 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
 
 
 # Global config singleton
-_config: Optional[NovaConfig] = None
+_config: NovaConfig | None = None
 
 
 def get_config() -> NovaConfig:
@@ -478,7 +484,7 @@ def get_config() -> NovaConfig:
     return _config
 
 
-def reload_config(config_path: Optional[str] = None) -> NovaConfig:
+def reload_config(config_path: str | None = None) -> NovaConfig:
     """Reload configuration from file + env (also resets LLM router if imported)."""
     global _config
     _config = load_config(config_path)

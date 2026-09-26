@@ -17,32 +17,38 @@ import asyncio
 import json
 import logging
 import traceback
-from datetime import datetime, timezone
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any
 
-from nova_arsenal.code_generator import CodeGenerator, CodeLanguage, GeneratedCode
-from nova_arsenal.kali_blueprint import KaliBlueprint
-from nova_arsenal.sandbox_executor import ExecResult, SandboxExecutor, create_executor
-from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy, ValidationResult
+from nova_arsenal.code_generator import CodeGenerator
+from nova_arsenal.correlation import Correlator
+from nova_arsenal.crypto import Cipher, KeyManager
+from nova_arsenal.ctf_solver import CtfSolver
 
 # API integrations (lazy-imported to avoid hard deps)
-from nova_arsenal.integrations import MetasploitRPC, BurpAPI, NmapParser, SQLmapAPI
-from nova_arsenal.intelligence import ToolSelector, CveResearch
+from nova_arsenal.integrations import BurpAPI, MetasploitRPC, NmapParser, SQLmapAPI
+from nova_arsenal.integrations.burp_api import BurpIssue
+from nova_arsenal.intelligence import CveResearch, ToolSelector
 from nova_arsenal.intelligence.self_optimizer import SelfOptimizer
-from nova_arsenal.correlation import Correlator
+from nova_arsenal.kali_blueprint import KaliBlueprint
+from nova_arsenal.payload_generator import PayloadGenerator
 from nova_arsenal.persona_manager import PersonaManager
-from nova_arsenal.payload_generator import PayloadGenerator, PayloadType, PayloadLanguage
-from nova_arsenal.scheduler import NovaScheduler, ScheduleEntry, CronExpression
-from nova_arsenal.ctf_solver import CtfSolver, ChallengeType
-from nova_arsenal.crypto import KeyManager, Cipher
 from nova_arsenal.prompt_builder import (
-    PromptBuilder, Scope, Text, system_message, user_message,
-    RenderResult, adaptive_thinking_block, ThinkingProfile,
+    PromptBuilder,
+    RenderResult,
+    Scope,
+    Text,
+    ThinkingProfile,
+    adaptive_thinking_block,
 )
+from nova_arsenal.sandbox_executor import ExecResult, SandboxExecutor, create_executor
+from nova_arsenal.scheduler import NovaScheduler, ScheduleEntry
+from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy
 from nova_arsenal.tool_definitions import (
-    ToolSchema, NOVA_SECURITY_TOOLS, tools_to_openai_format,
+    NOVA_SECURITY_TOOLS,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,16 +56,17 @@ logger = logging.getLogger(__name__)
 
 class AgentPhase(Enum):
     """Current phase of the agent."""
+
     INIT = "init"
     PLANNING = "planning"
     RECONNAISSANCE = "reconnaissance"
     SCANNING = "scanning"
     EXPLOITATION = "exploitation"
     POST_EXPLOITATION = "post_exploitation"
-    INTEGRATION = "integration"       # API-driven tool integrations (MSF, Burp, SQLmap)
-    CORRELATION = "correlation"       # Cross-tool result correlation
-    COMPLIANCE = "compliance"         # Compliance mapping (PCI DSS, SOC 2, etc.)
-    CTF_SOLVING = "ctf_solving"       # CTF challenge solving mode
+    INTEGRATION = "integration"  # API-driven tool integrations (MSF, Burp, SQLmap)
+    CORRELATION = "correlation"  # Cross-tool result correlation
+    COMPLIANCE = "compliance"  # Compliance mapping (PCI DSS, SOC 2, etc.)
+    CTF_SOLVING = "ctf_solving"  # CTF challenge solving mode
     REPORTING = "reporting"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -67,6 +74,7 @@ class AgentPhase(Enum):
 
 class ActionType(Enum):
     """Types of actions the agent can take."""
+
     EXECUTE_COMMAND = "execute_command"
     EXECUTE_TOOL = "execute_tool"
     WRITE_AND_RUN_CODE = "write_and_run_code"
@@ -81,17 +89,18 @@ class ActionType(Enum):
 @dataclass
 class AgentAction:
     """An action taken by the agent."""
+
     step: int
     phase: AgentPhase
     action_type: ActionType
     description: str
     command: str = ""
-    result: Optional[ExecResult] = None
+    result: ExecResult | None = None
     analysis: str = ""
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     duration_ms: float = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "step": self.step,
             "phase": self.phase.value,
@@ -109,6 +118,7 @@ class AgentAction:
 @dataclass
 class Finding:
     """A security finding discovered by the agent."""
+
     title: str
     severity: str
     description: str
@@ -120,7 +130,7 @@ class Finding:
     tool_used: str = ""
     raw_output: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "title": self.title,
             "severity": self.severity,
@@ -135,13 +145,13 @@ class Finding:
 
 
 # Type for event callbacks
-EventCallback = Callable[[str, Dict[str, Any]], Coroutine[Any, Any, None]]
+EventCallback = Callable[[str, dict[str, Any]], Coroutine[Any, Any, None]]
 
 
 class AgentRunner:
     """
     Fully autonomous security research agent.
-    
+
     Runs the complete loop:
     LLM reasoning → tool selection → command execution → result analysis → iteration
     """
@@ -152,11 +162,11 @@ class AgentRunner:
         objective: str = "Find and exploit all critical vulnerabilities",
         max_steps: int = 40,
         reflect_every: int = 5,
-        scope: Optional[List[str]] = None,
-        executor: Optional[SandboxExecutor] = None,
-        llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
-        on_event: Optional[EventCallback] = None,
-        integrations: Optional[Dict[str, Dict[str, Any]]] = None,
+        scope: list[str] | None = None,
+        executor: SandboxExecutor | None = None,
+        llm_complete: Callable[..., Coroutine[Any, Any, str]] | None = None,
+        on_event: EventCallback | None = None,
+        integrations: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.target = target
         self.objective = objective
@@ -211,16 +221,16 @@ class AgentRunner:
         self._prompt_builder = PromptBuilder(token_limit=8000)
         self._read_first_enabled = True
         self._thinking_profile = ThinkingProfile.DEFAULT
-        self._thinking_enabled: Optional[bool] = None
+        self._thinking_enabled: bool | None = None
 
         # Scheduler (cron-based recurring scans)
         self.scheduler = NovaScheduler()
 
         # API-driven integrations (configured via integrations dict)
         integrations = integrations or {}
-        self.msf_rpc: Optional[MetasploitRPC] = None
-        self.burp_api: Optional[BurpAPI] = None
-        self.sqlmap_api: Optional[SQLmapAPI] = None
+        self.msf_rpc: MetasploitRPC | None = None
+        self.burp_api: BurpAPI | None = None
+        self.sqlmap_api: SQLmapAPI | None = None
         self.nmap_parser = NmapParser()
 
         msf_config = integrations.get("metasploit", {})
@@ -246,32 +256,33 @@ class AgentRunner:
         # State
         self._step = 0
         self._phase = AgentPhase.INIT
-        self._actions: List[AgentAction] = []
-        self._findings: List[Finding] = []
-        self._context: List[Dict[str, str]] = []
+        self._actions: list[AgentAction] = []
+        self._findings: list[Finding] = []
+        self._context: list[dict[str, str]] = []
         self._running = False
-        self._error: Optional[str] = None
+        self._error: str | None = None
 
         # Detected services (populated during scanning)
-        self._detected_services: Dict[str, List[int]] = {}
+        self._detected_services: dict[str, list[int]] = {}
 
         # Integration artifacts
-        self._burp_issues: List[Dict[str, Any]] = []
-        self._msf_results: List[Dict[str, Any]] = []
-        self._sqlmap_results: List[Dict[str, Any]] = []
+        self._burp_issues: list[BurpIssue] = []
+        self._msf_results: list[dict[str, Any]] = []
+        self._sqlmap_results: list[dict[str, Any]] = []
 
         # Correlation result
-        self._correlation_result: Optional[Any] = None
+        self._correlation_result: Any | None = None
 
     # ── Public API ──────────────────────────────────────────────────────────
 
-    async def run(self) -> Dict[str, Any]:
+    async def run(self) -> dict[str, Any]:
         """Execute the full autonomous agent loop."""
         self._running = True
         start_time = datetime.now(timezone.utc)
 
         # Register scheduler callback if scheduler has entries
         if self.scheduler.list_entries():
+
             async def scheduler_callback(entry: ScheduleEntry) -> Any:
                 logger.info(f"Scheduler triggered: {entry.name} -> {entry.target}")
                 runner = AgentRunner(
@@ -284,6 +295,7 @@ class AgentRunner:
                 )
                 result = await runner.run()
                 from nova_arsenal.scheduler import ScheduleRunResult
+
                 return ScheduleRunResult(
                     entry_name=entry.name,
                     start_time=start_time,
@@ -292,15 +304,19 @@ class AgentRunner:
                     findings_count=result["findings_count"],
                     summary=f"{result['findings_count']} findings in {result['steps_taken']} steps",
                 )
+
             self.scheduler.add_callback(scheduler_callback)
             await self.scheduler.start()
 
         try:
-            await self._emit("agent_started", {
-                "target": self.target,
-                "objective": self.objective,
-                "max_steps": self.max_steps,
-            })
+            await self._emit(
+                "agent_started",
+                {
+                    "target": self.target,
+                    "objective": self.objective,
+                    "max_steps": self.max_steps,
+                },
+            )
 
             # Phase 1: Initialize and plan
             await self._set_phase(AgentPhase.PLANNING)
@@ -346,11 +362,14 @@ class AgentRunner:
             await self._set_phase(AgentPhase.COMPLETED)
             elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
 
-            await self._emit("agent_completed", {
-                "steps": self._step,
-                "findings": len(self._findings),
-                "elapsed_seconds": elapsed,
-            })
+            await self._emit(
+                "agent_completed",
+                {
+                    "steps": self._step,
+                    "findings": len(self._findings),
+                    "elapsed_seconds": elapsed,
+                },
+            )
 
             return {
                 "status": "completed",
@@ -427,7 +446,7 @@ class AgentRunner:
         """Stop the agent."""
         self._running = False
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "phase": self._phase.value,
@@ -470,7 +489,9 @@ class AgentRunner:
         has_sqlmap = self.sqlmap_api is not None
         if has_msf or has_burp or has_sqlmap:
             if has_msf:
-                plan_sections.append("- Metasploit RPC: module execution based on detected services")
+                plan_sections.append(
+                    "- Metasploit RPC: module execution based on detected services"
+                )
             if has_burp:
                 plan_sections.append("- Burp Suite REST: active scanning + issue collection")
             if has_sqlmap:
@@ -482,7 +503,9 @@ class AgentRunner:
         # Phase 4: Exploitation
         plan_sections.append("### Phase 4: Exploitation")
         if detected_services:
-            svcs = [f"{svc}:{','.join(map(str, ports))}" for svc, ports in detected_services.items()]
+            svcs = [
+                f"{svc}:{','.join(map(str, ports))}" for svc, ports in detected_services.items()
+            ]
             plan_sections.append(f"Detected services: {', '.join(svcs)}")
             plan_sections.append("- Tool-selection intelligence picks optimal exploit tools")
             for svc in detected_services:
@@ -526,15 +549,15 @@ class AgentRunner:
 
     async def _execute_recon(self) -> None:
         """Execute reconnaissance commands."""
-        recon_tools = self.blueprint.get_tools_by_category("recon")
+        _recon_tools = self.blueprint.get_tools_by_category("recon")
 
         # Start with DNS/subdomain enumeration
         recon_commands = [
             f"subfinder -d {self.target} -silent -o /workspace/subs.txt 2>/dev/null || echo 'subfinder not available'",
-            f"cat /workspace/subs.txt 2>/dev/null | head -50 || echo 'No subdomains found yet'",
+            "cat /workspace/subs.txt 2>/dev/null | head -50 || echo 'No subdomains found yet'",
             f"nmap -sn {self.target} -oN /workspace/ping_scan.txt 2>/dev/null || echo 'nmap ping scan done'",
             f"nmap -sV -sC --top-ports 1000 {self.target} -oN /workspace/nmap_quick.txt 2>/dev/null || echo 'quick scan done'",
-            f"httpx -l /workspace/subs.txt -silent -sc -title 2>/dev/null | head -30 || echo 'httpx probe done'",
+            "httpx -l /workspace/subs.txt -silent -sc -title 2>/dev/null | head -30 || echo 'httpx probe done'",
         ]
 
         # Add theHarvester for passive recon
@@ -569,16 +592,20 @@ class AgentRunner:
 
         # Add service-specific scanning based on detected services
         if "http" in self._detected_services or "https" in self._detected_services:
-            scan_commands.extend([
-                f"dirsearch -u http://{self.target} -w /usr/share/wordlists/dirb/common.txt -t 10 2>/dev/null | head -40 || echo 'dirsearch done'",
-                f"nuclei -u http://{self.target} -as -json 2>/dev/null | head -50 || echo 'nuclei automated done'",
-            ])
+            scan_commands.extend(
+                [
+                    f"dirsearch -u http://{self.target} -w /usr/share/wordlists/dirb/common.txt -t 10 2>/dev/null | head -40 || echo 'dirsearch done'",
+                    f"nuclei -u http://{self.target} -as -json 2>/dev/null | head -50 || echo 'nuclei automated done'",
+                ]
+            )
 
         if "smb" in self._detected_services:
-            scan_commands.extend([
-                f"enum4linux -a {self.target} 2>/dev/null | head -80 || echo 'enum4linux done'",
-                f"smbclient -L //{self.target} -N 2>/dev/null || echo 'smbclient done'",
-            ])
+            scan_commands.extend(
+                [
+                    f"enum4linux -a {self.target} 2>/dev/null | head -80 || echo 'enum4linux done'",
+                    f"smbclient -L //{self.target} -N 2>/dev/null || echo 'smbclient done'",
+                ]
+            )
 
         if "mysql" in self._detected_services:
             scan_commands.append(
@@ -620,7 +647,7 @@ class AgentRunner:
         scan_context = self._get_scan_results()
 
         # Use tool selection intelligence to decide strategy
-        strategy = await self._generate_strategy()
+        _strategy = await self._generate_strategy()
         detected_services = set(self._detected_services.keys())
 
         # Map detected services to relevant attack chains
@@ -661,30 +688,39 @@ class AgentRunner:
 
         # Phase 3: Service-specific exploitation commands
         if "smb" in detected_services:
-            exploit_commands.extend([
-                f"crackmapexec smb {self.target} -u 'guest' -p '' --shares 2>/dev/null | head -30 || echo 'smb enumeration done'",
-                f"nmap --script smb-vuln-* -p 445 {self.target} 2>/dev/null | head -30 || echo 'smb vuln scan done'",
-            ])
+            exploit_commands.extend(
+                [
+                    f"crackmapexec smb {self.target} -u 'guest' -p '' --shares 2>/dev/null | head -30 || echo 'smb enumeration done'",
+                    f"nmap --script smb-vuln-* -p 445 {self.target} 2>/dev/null | head -30 || echo 'smb vuln scan done'",
+                ]
+            )
 
         if "http" in detected_services or "https" in detected_services:
-            exploit_commands.extend([
-                f"nuclei -u http://{self.target} -tags exploit,rce -json 2>/dev/null | head -20 || echo 'exploit scan done'",
-                f"sqlmap -u http://{self.target} --batch --random-agent 2>/dev/null | head -30 || echo 'sqlmap scan done'",
-            ])
+            exploit_commands.extend(
+                [
+                    f"nuclei -u http://{self.target} -tags exploit,rce -json 2>/dev/null | head -20 || echo 'exploit scan done'",
+                    f"sqlmap -u http://{self.target} --batch --random-agent 2>/dev/null | head -30 || echo 'sqlmap scan done'",
+                ]
+            )
 
         if "ssh" in detected_services:
-            exploit_commands.extend([
-                f"hydra -l root -P /usr/share/wordlists/rockyou.txt {self.target} ssh -t 4 2>/dev/null | head -20 || echo 'ssh brute force done'",
-            ])
+            exploit_commands.extend(
+                [
+                    f"hydra -l root -P /usr/share/wordlists/rockyou.txt {self.target} ssh -t 4 2>/dev/null | head -20 || echo 'ssh brute force done'",
+                ]
+            )
 
         # Generate payloads for potential exploitation
         payloads = self.payload_generator.generate_chain("LHOST", 4444)
         if payloads:
             logger.info(f"Generated {len(payloads)} payloads for exploitation phase")
-            await self._emit("payloads_generated", {
-                "count": len(payloads),
-                "payloads": [p.to_dict() for p in payloads[:3]],
-            })
+            await self._emit(
+                "payloads_generated",
+                {
+                    "count": len(payloads),
+                    "payloads": [p.to_dict() for p in payloads[:3]],
+                },
+            )
 
         if not exploit_commands:
             # Fall back to LLM-based exploitation suggestions
@@ -693,8 +729,8 @@ class AgentRunner:
 {scan_context}
 
 Available Kali tools for exploitation:
-{chr(10).join(f'- {t.name}: {t.description}' for t in self.blueprint.get_tools_by_category('exploitation'))}
-{chr(10).join(f'- {t.name}: {t.description}' for t in self.blueprint.get_tools_by_category('web_exploit'))}
+{chr(10).join(f"- {t.name}: {t.description}" for t in self.blueprint.get_tools_by_category("exploitation"))}
+{chr(10).join(f"- {t.name}: {t.description}" for t in self.blueprint.get_tools_by_category("web_exploit"))}
 
 Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
@@ -719,9 +755,9 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
     async def _execute_post_exploitation(self) -> None:
         """Post-exploitation: gather more info, pivot, extract data."""
         post_commands = [
-            f"cat /workspace/nmap_full.txt 2>/dev/null | head -100 || echo 'reading scan results'",
-            f"ls -la /workspace/ 2>/dev/null || echo 'listing workspace'",
-            f"id && uname -a && whoami 2>/dev/null || echo 'system info'",
+            "cat /workspace/nmap_full.txt 2>/dev/null | head -100 || echo 'reading scan results'",
+            "ls -la /workspace/ 2>/dev/null || echo 'listing workspace'",
+            "id && uname -a && whoami 2>/dev/null || echo 'system info'",
         ]
 
         for cmd in post_commands:
@@ -731,7 +767,7 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
     # ── Core Execution ──────────────────────────────────────────────────────
 
-    async def _execute_and_analyze(self, command: str, phase: AgentPhase) -> Optional[AgentAction]:
+    async def _execute_and_analyze(self, command: str, phase: AgentPhase) -> AgentAction | None:
         """Execute a command and analyze the result."""
         self._step += 1
         await self._set_phase(phase)
@@ -800,16 +836,16 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
     def _build_priority_prompt(self) -> RenderResult:
         """Build a priority-scoped system prompt (Cursor-inspired).
-        
+
         High-priority sections (always included):
         - Role and identity
         - Target and scope
         - Core rules (including Read-First enforcement)
-        
+
         Medium-priority (included if space allows):
         - Phase persona augmentation
         - Tool knowledge
-        
+
         Low-priority (trimmed first when over token limit):
         - Extended context
         - Action history
@@ -818,14 +854,16 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
         persona_aug = self.persona_manager.get_system_prompt_augmentation(self._phase.value)
 
         read_first_rule = (
-            "BEFORE making any edit, ALWAYS read the relevant file first. "
-            "Never edit a file you haven't read."
-        ) if self._read_first_enabled else ""
+            (
+                "BEFORE making any edit, ALWAYS read the relevant file first. "
+                "Never edit a file you haven't read."
+            )
+            if self._read_first_enabled
+            else ""
+        )
 
         # Tool definitions as prompt context
-        tool_descriptions = "\n".join(
-            f"- {t.name}: {t.description}" for t in NOVA_SECURITY_TOOLS
-        )
+        tool_descriptions = "\n".join(f"- {t.name}: {t.description}" for t in NOVA_SECURITY_TOOLS)
 
         # Adaptive Thinking block (Nex-N2 style)
         thinking_block = adaptive_thinking_block(
@@ -834,17 +872,34 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
         )
 
         tree = [
-            Scope(absolute_priority=0, name="identity", children=[
-                Text(f"You are Nova, an elite autonomous security researcher operating in Kali Linux.\n\n"),
-            ]),
-            Scope(absolute_priority=0, name="adaptive_thinking", children=[
-                thinking_block,
-            ]),
-            Scope(absolute_priority=0, name="target", children=[
-                Text(f"TARGET: {self.target}\nSCOPE: {', '.join(self.scope)}\n\n"),
-            ]),
-            Scope(absolute_priority=-100, name="rules", children=[
-                Text(f"""RULES:
+            Scope(
+                absolute_priority=0,
+                name="identity",
+                children=[
+                    Text(
+                        "You are Nova, an elite autonomous security researcher operating in Kali Linux.\n\n"
+                    ),
+                ],
+            ),
+            Scope(
+                absolute_priority=0,
+                name="adaptive_thinking",
+                children=[
+                    thinking_block,
+                ],
+            ),
+            Scope(
+                absolute_priority=0,
+                name="target",
+                children=[
+                    Text(f"TARGET: {self.target}\nSCOPE: {', '.join(self.scope)}\n\n"),
+                ],
+            ),
+            Scope(
+                absolute_priority=-100,
+                name="rules",
+                children=[
+                    Text(f"""RULES:
 1. Always validate commands before execution
 2. Stay within the defined scope
 3. Document all findings with evidence
@@ -854,19 +909,36 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 {read_first_rule}
 
 """),
-            ]),
-            Scope(absolute_priority=-500, name="persona", children=[
-                Text(f"{persona_aug}\n\n"),
-            ]),
-            Scope(absolute_priority=-1000, name="tool_knowledge", children=[
-                Text(f"AVAILABLE NOVA TOOLS:\n{tool_descriptions}\n\n"),
-            ]),
-            Scope(absolute_priority=-2000, name="kali_knowledge", children=[
-                Text(f"KALI LINUX KNOWLEDGE:\n{self.blueprint.get_full_context()}\n\n"),
-            ]),
-            Scope(absolute_priority=-5000, name="context", children=[
-                Text(f"CURRENT CONTEXT:\n{self._format_context()}"),
-            ]),
+                ],
+            ),
+            Scope(
+                absolute_priority=-500,
+                name="persona",
+                children=[
+                    Text(f"{persona_aug}\n\n"),
+                ],
+            ),
+            Scope(
+                absolute_priority=-1000,
+                name="tool_knowledge",
+                children=[
+                    Text(f"AVAILABLE NOVA TOOLS:\n{tool_descriptions}\n\n"),
+                ],
+            ),
+            Scope(
+                absolute_priority=-2000,
+                name="kali_knowledge",
+                children=[
+                    Text(f"KALI LINUX KNOWLEDGE:\n{self.blueprint.get_full_context()}\n\n"),
+                ],
+            ),
+            Scope(
+                absolute_priority=-5000,
+                name="context",
+                children=[
+                    Text(f"CURRENT CONTEXT:\n{self._format_context()}"),
+                ],
+            ),
         ]
 
         return self._prompt_builder.render(tree)
@@ -892,7 +964,7 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 Recent actions:
 {self._format_context()}
 
-- {instruction if instruction else 'Decide the next action to take toward the objective.'}
+- {instruction if instruction else "Decide the next action to take toward the objective."}
 
 Respond with a JSON object:
 {{
@@ -935,7 +1007,9 @@ Respond with a JSON object:
 
         # Finding analysis
         if "analyze" in prompt_lower:
-            return "Analysis: Command executed successfully. No critical findings detected in output."
+            return (
+                "Analysis: Command executed successfully. No critical findings detected in output."
+            )
 
         # Default: suggest a tool from the blueprint
         tools = self.blueprint.suggest_tools(prompt)
@@ -971,7 +1045,8 @@ Respond with a JSON object:
         except (json.JSONDecodeError, KeyError):
             # Fallback: extract command from text
             import re
-            cmd_match = re.search(r'```(?:bash|sh)?\n(.*?)```', response, re.DOTALL)
+
+            cmd_match = re.search(r"```(?:bash|sh)?\n(.*?)```", response, re.DOTALL)
             if cmd_match:
                 return AgentAction(
                     step=self._step,
@@ -1026,7 +1101,7 @@ Analysis:"""
             import re
 
             # Match patterns like "80/tcp open http" or "445/tcp open microsoft-ds"
-            port_pattern = r'(\d+)/(tcp|udp)\s+open\s+(\S+)'
+            port_pattern = r"(\d+)/(tcp|udp)\s+open\s+(\S+)"
             for match in re.finditer(port_pattern, output):
                 port = int(match.group(1))
                 proto = match.group(2)
@@ -1034,11 +1109,18 @@ Analysis:"""
 
                 # Normalize service names
                 svc_map = {
-                    "http": "http", "https": "https", "http-proxy": "http",
-                    "microsoft-ds": "smb", "netbios-ssn": "smb", "smb": "smb",
-                    "ms-wbt-server": "rdp", "rdp": "rdp",
-                    "kerberos-sec": "kerberos", "kpasswd": "kerberos",
-                    "postgresql": "postgresql", "ms-sql-s": "mssql",
+                    "http": "http",
+                    "https": "https",
+                    "http-proxy": "http",
+                    "microsoft-ds": "smb",
+                    "netbios-ssn": "smb",
+                    "smb": "smb",
+                    "ms-wbt-server": "rdp",
+                    "rdp": "rdp",
+                    "kerberos-sec": "kerberos",
+                    "kpasswd": "kerberos",
+                    "postgresql": "postgresql",
+                    "ms-sql-s": "mssql",
                 }
                 normalized = svc_map.get(service, service)
 
@@ -1083,32 +1165,43 @@ Analysis:"""
             version = await self._get_service_version(service, port)
             result = await self.cve_research.research(service, version, port)
             if result.cves:
-                logger.info(f"CVE research for {service} ({version}): {len(result.cves)} matches, exploit={'yes' if result.has_exploit else 'no'}")
+                logger.info(
+                    f"CVE research for {service} ({version}): {len(result.cves)} matches, exploit={'yes' if result.has_exploit else 'no'}"
+                )
                 await self._emit("cve_research", result.to_dict())
                 for cve in result.cves:
-                    severity = cve.severity if cve.severity in ("critical", "high", "medium", "low") else "medium"
-                    self._findings.append(Finding(
-                        title=f"[CVE] {cve.cve_id}: {cve.description[:100]}",
-                        severity=severity,
-                        description=cve.description,
-                        evidence=f"Exploit available: {cve.exploit_source}" if cve.exploit_available else "No public exploit",
-                        remediation=cve.remediation or f"Upgrade {service} to patched version",
-                        tool_used="cve_research",
-                    ))
+                    severity = (
+                        cve.severity
+                        if cve.severity in ("critical", "high", "medium", "low")
+                        else "medium"
+                    )
+                    self._findings.append(
+                        Finding(
+                            title=f"[CVE] {cve.cve_id}: {cve.description[:100]}",
+                            severity=severity,
+                            description=cve.description,
+                            evidence=f"Exploit available: {cve.exploit_source}"
+                            if cve.exploit_available
+                            else "No public exploit",
+                            remediation=cve.remediation or f"Upgrade {service} to patched version",
+                            tool_used="cve_research",
+                        )
+                    )
 
     async def _get_service_version(self, service: str, port: int) -> str:
         """Extract version string for a detected service from action results."""
         import re
+
         service_lower = service.lower()
         for action in self._actions:
             if not action.result or not action.result.output:
                 continue
             output = action.result.output.lower()
             if service_lower in output:
-                version_match = re.search(rf'{re.escape(service_lower)}\s+(\d+[\d.\w]+)', output)
+                version_match = re.search(rf"{re.escape(service_lower)}\s+(\d+[\d.\w]+)", output)
                 if version_match:
                     return version_match.group(1)
-                port_match = re.search(rf'{port}/tcp\s+open\s+\S+\s+(.+?)$', output, re.MULTILINE)
+                port_match = re.search(rf"{port}/tcp\s+open\s+\S+\s+(.+?)$", output, re.MULTILINE)
                 if port_match:
                     return port_match.group(1).strip()
         return f"{service} (version unknown)"
@@ -1135,10 +1228,13 @@ Analysis:"""
             target=self.target,
         )
 
-        await self._emit("tool_suggestions", {
-            "suggestions": [s.to_dict() for s in suggestions[:10]],
-            "detected_services": self._detected_services,
-        })
+        await self._emit(
+            "tool_suggestions",
+            {
+                "suggestions": [s.to_dict() for s in suggestions[:10]],
+                "detected_services": self._detected_services,
+            },
+        )
 
         # Execute integration in priority order
         for suggestion in suggestions:
@@ -1159,10 +1255,13 @@ Analysis:"""
         if not self.msf_rpc:
             return
 
-        await self._emit("integration_started", {
-            "tool": "metasploit",
-            "reasoning": suggestion.reasoning,
-        })
+        await self._emit(
+            "integration_started",
+            {
+                "tool": "metasploit",
+                "reasoning": suggestion.reasoning,
+            },
+        )
 
         # Authenticate
         authed = await self.msf_rpc.login()
@@ -1200,12 +1299,15 @@ Analysis:"""
                 timeout=60,
             )
             self._msf_results.append(result.to_dict())
-            await self._emit("integration_result", {
-                "tool": "metasploit",
-                "module": module,
-                "status": result.status,
-                "findings": result.findings,
-            })
+            await self._emit(
+                "integration_result",
+                {
+                    "tool": "metasploit",
+                    "module": module,
+                    "status": result.status,
+                    "findings": result.findings,
+                },
+            )
 
         if self._msf_results:
             logger.info(f"MSF integration: {len(self._msf_results)} module results")
@@ -1215,10 +1317,13 @@ Analysis:"""
         if not self.burp_api:
             return
 
-        await self._emit("integration_started", {
-            "tool": "burp",
-            "reasoning": suggestion.reasoning,
-        })
+        await self._emit(
+            "integration_started",
+            {
+                "tool": "burp",
+                "reasoning": suggestion.reasoning,
+            },
+        )
 
         health = await self.burp_api.check_health()
         if not health:
@@ -1229,7 +1334,9 @@ Analysis:"""
         urls = []
         if "http" in self._detected_services or "https" in self._detected_services:
             scheme = "https" if "https" in self._detected_services else "http"
-            for port in self._detected_services.get("http", []) + self._detected_services.get("https", []):
+            for port in self._detected_services.get("http", []) + self._detected_services.get(
+                "https", []
+            ):
                 urls.append(f"{scheme}://{self.target}:{port}")
         if not urls:
             urls = [f"http://{self.target}"]
@@ -1242,12 +1349,15 @@ Analysis:"""
                 break
             job = await self.burp_api.start_scan(url)
             if job.status != "failed":
-                await self._emit("integration_result", {
-                    "tool": "burp",
-                    "scan_id": job.scan_id,
-                    "url": url,
-                    "status": job.status,
-                })
+                await self._emit(
+                    "integration_result",
+                    {
+                        "tool": "burp",
+                        "scan_id": job.scan_id,
+                        "url": url,
+                        "status": job.status,
+                    },
+                )
 
         # Collect existing issues
         self._burp_issues = await self.burp_api.get_issues()
@@ -1272,10 +1382,13 @@ Analysis:"""
         if not self.sqlmap_api:
             return
 
-        await self._emit("integration_started", {
-            "tool": "sqlmap",
-            "reasoning": suggestion.reasoning,
-        })
+        await self._emit(
+            "integration_started",
+            {
+                "tool": "sqlmap",
+                "reasoning": suggestion.reasoning,
+            },
+        )
 
         # Determine target URL
         url = suggestion.params.get("url", f"http://{self.target}")
@@ -1287,9 +1400,7 @@ Analysis:"""
             return
 
         # Wait for completion (with timeout)
-        task = await self.sqlmap_api.wait_for_completion(
-            task.task_id, max_time=120
-        )
+        task = await self.sqlmap_api.wait_for_completion(task.task_id, max_time=120)
 
         if task.is_complete:
             self._sqlmap_results.append(task.to_dict())
@@ -1307,19 +1418,22 @@ Analysis:"""
                 )
                 self._findings.append(f)
 
-            await self._emit("integration_result", {
-                "tool": "sqlmap",
-                "task_id": task.task_id,
-                "status": task.status,
-                "findings_count": len(task.findings),
-                "dbms": task.dbms,
-            })
+            await self._emit(
+                "integration_result",
+                {
+                    "tool": "sqlmap",
+                    "task_id": task.task_id,
+                    "status": task.status,
+                    "findings_count": len(task.findings),
+                    "dbms": task.dbms,
+                },
+            )
 
             logger.info(f"SQLmap integration: {len(task.findings)} injection points found")
 
     # ── Tool Selection Intelligence ────────────────────────────────────────
 
-    async def _generate_strategy(self) -> Dict[str, Any]:
+    async def _generate_strategy(self) -> dict[str, Any]:
         """Generate exploitation strategy using tool-selection intelligence."""
         if not self._detected_services:
             self._detect_services()
@@ -1368,7 +1482,7 @@ Analysis:"""
 
         self._correlation_result = await self.correlator.correlate(
             nmap_data=nmap_data,
-            burp_issues=self._burp_issues,
+            burp_issues=[issue.to_dict() for issue in self._burp_issues],
             msf_results=self._msf_results,
             sqlmap_tasks=self._sqlmap_results,
             findings=findings_dicts,
@@ -1402,28 +1516,43 @@ Analysis:"""
 
         if self._compliance_mapper is None:
             from nova_arsenal.compliance import ComplianceMapper
+
             self._compliance_mapper = ComplianceMapper()
 
         mapped_count = 0
-        framework_hits = {}
+        framework_hits: dict[str, int] = {}
+        mapped_results: list[Any] = []
         for finding in self._findings:
             ftype = self._infer_finding_type(finding)
             if not ftype:
                 continue
-            result = self._compliance_mapper.map_finding(ftype, finding.description)
+            result = self._compliance_mapper.map_finding(
+                finding_type=ftype,
+                title=finding.title,
+                severity=finding.severity,
+                evidence=finding.evidence,
+            )
             if result.controls:
                 mapped_count += 1
+                mapped_results.append(result)
                 for framework in result.frameworks_affected:
                     framework_hits[framework] = framework_hits.get(framework, 0) + 1
-                finding.description += f"\n[Compliance] {', '.join(f.c.id for f in result.controls[:3])}"
+                finding.description += (
+                    f"\n[Compliance] {', '.join(c.control_id for c in result.controls[:3])}"
+                )
 
-            stats = self._compliance_mapper.get_summary_stats() if mapped_count else None
-        await self._emit("compliance_complete", {
-            "mapped_findings": mapped_count,
-            "total_findings": len(self._findings),
-            "framework_hits": framework_hits,
-            "stats": stats,
-        })
+        stats = (
+            self._compliance_mapper.get_summary_stats(mapped_results) if mapped_results else None
+        )
+        await self._emit(
+            "compliance_complete",
+            {
+                "mapped_findings": mapped_count,
+                "total_findings": len(self._findings),
+                "framework_hits": framework_hits,
+                "stats": stats,
+            },
+        )
         logger.info(f"[Compliance] Mapped {mapped_count}/{len(self._findings)} findings")
 
     def _infer_finding_type(self, finding: Finding) -> str:
@@ -1461,26 +1590,34 @@ Analysis:"""
             description=self.objective,
             url=f"http://{self.target}" if not self.target.startswith("http") else self.target,
         )
-        await self._emit("ctf_started", {
-            "challenge": challenge.name,
-            "type": challenge.challenge_type.value,
-        })
+        await self._emit(
+            "ctf_started",
+            {
+                "challenge": challenge.name,
+                "type": challenge.challenge_type.value,
+            },
+        )
 
         flag = await self.ctf_solver.solve_challenge(challenge)
         if flag:
-            await self._emit("ctf_solved", {
-                "flag": flag.flag,
-                "type": flag.challenge_type.value,
-                "method": flag.method,
-                "confidence": flag.confidence,
-            })
-            self._findings.append(Finding(
-                title=f"CTF Flag: {challenge.name}",
-                severity="critical",
-                description=f"CTF challenge solved. Flag: {flag.flag}",
-                evidence=f"Method: {flag.method}, Type: {flag.challenge_type.value}",
-                tool_used="ctf_solver",
-            ))
+            await self._emit(
+                "ctf_solved",
+                {
+                    "flag": flag.flag,
+                    "type": flag.challenge_type.value,
+                    "method": flag.method,
+                    "confidence": flag.confidence,
+                },
+            )
+            self._findings.append(
+                Finding(
+                    title=f"CTF Flag: {challenge.name}",
+                    severity="critical",
+                    description=f"CTF challenge solved. Flag: {flag.flag}",
+                    evidence=f"Method: {flag.method}, Type: {flag.challenge_type.value}",
+                    tool_used="ctf_solver",
+                )
+            )
             logger.info(f"[CTF] SOLVED: {challenge.name} -> {flag.flag}")
         else:
             logger.info(f"[CTF] Not solved: {challenge.name}")
@@ -1542,7 +1679,7 @@ Recent actions:
 {self._format_context()}
 
 Findings so far:
-{chr(10).join(f'- {f.title} ({f.severity})' for f in self._findings) if self._findings else 'None yet'}
+{chr(10).join(f"- {f.title} ({f.severity})" for f in self._findings) if self._findings else "None yet"}
 
 Provide:
 1. Assessment of progress
@@ -1568,14 +1705,14 @@ Cross-Tool Correlation:
 - Correlated findings: {cr.total_correlated}
 - Critical: {len(cr.critical_findings)}
 - High: {len(cr.high_findings)}
-- Tools used: {', '.join(f'{k}({v})' for k, v in cr.tool_coverage.items()) if cr.tool_coverage else 'None'}
-- Confidence score: {cr.to_dict().get('confidence_score', 0)}
+- Tools used: {", ".join(f"{k}({v})" for k, v in cr.tool_coverage.items()) if cr.tool_coverage else "None"}
+- Confidence score: {cr.to_dict().get("confidence_score", 0)}
 
 Top Correlated Findings:
-{chr(10).join(f'  [{f.severity.upper()}] {f.title} (sources: {", ".join(f.source_tools)})' for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}
+{chr(10).join("  [{}] {} (sources: {})".format(f.severity.upper(), f.title, ", ".join(f.source_tools)) for f in cr.correlated_findings[:5]) if cr.correlated_findings else "  None"}
 
 Insights:
-{chr(10).join(f'  - {i}' for i in cr.cross_tool_insights) if cr.cross_tool_insights else '  No insights generated'}
+{chr(10).join(f"  - {i}" for i in cr.cross_tool_insights) if cr.cross_tool_insights else "  No insights generated"}
 """
 
         integration_section = ""
@@ -1596,14 +1733,14 @@ API Integration Results:
 Objective: {self.objective}
 Steps taken: {self._step}
 Findings: {len(self._findings)}
-Detected services: {json.dumps(self._detected_services) if self._detected_services else 'None detected'}
+Detected services: {json.dumps(self._detected_services) if self._detected_services else "None detected"}
 {integration_section}
 {correlation_section}
 Findings detail:
-{json.dumps([f.to_dict() for f in self._findings], indent=2) if self._findings else 'No findings discovered'}
+{json.dumps([f.to_dict() for f in self._findings], indent=2) if self._findings else "No findings discovered"}
 
 Actions taken:
-{chr(10).join(f'- {a.description}' for a in self._actions[:20])}
+{chr(10).join(f"- {a.description}" for a in self._actions[:20])}
 
 Generate a report with:
 1. Executive Summary
@@ -1628,12 +1765,13 @@ Report:"""
                 lines.append("")
         return "\n".join(lines[-50:]) if lines else "No scan results yet"
 
-    def _extract_commands(self, text: str) -> List[str]:
+    def _extract_commands(self, text: str) -> list[str]:
         """Extract commands from LLM text response."""
         import re
+
         commands = []
         # Try code blocks first
-        blocks = re.findall(r'```(?:bash|sh)?\n(.*?)```', text, re.DOTALL)
+        blocks = re.findall(r"```(?:bash|sh)?\n(.*?)```", text, re.DOTALL)
         for block in blocks:
             for line in block.strip().split("\n"):
                 line = line.strip()
@@ -1645,7 +1783,24 @@ Report:"""
             for line in text.split("\n"):
                 line = line.strip()
                 if line and not line.startswith("#") and not line.startswith("-") and " " in line:
-                    if any(tool in line for tool in ["nmap", "nuclei", "sqlmap", "ffuf", "hydra", "nikto", "subfinder", "httpx", "cat", "ls", "echo", "curl", "wget"]):
+                    if any(
+                        tool in line
+                        for tool in [
+                            "nmap",
+                            "nuclei",
+                            "sqlmap",
+                            "ffuf",
+                            "hydra",
+                            "nikto",
+                            "subfinder",
+                            "httpx",
+                            "cat",
+                            "ls",
+                            "echo",
+                            "curl",
+                            "wget",
+                        ]
+                    ):
                         commands.append(line)
 
         return commands[:5]  # Limit to 5 commands
@@ -1672,10 +1827,16 @@ Report:"""
             old = self._phase
             self._phase = phase
             self._update_thinking_profile_for_phase()
-            await self._emit("phase_changed", {"from": old.value, "to": phase.value,
-                                                "thinking_profile": self._thinking_profile.value})
+            await self._emit(
+                "phase_changed",
+                {
+                    "from": old.value,
+                    "to": phase.value,
+                    "thinking_profile": self._thinking_profile.value,
+                },
+            )
 
-    async def _emit(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def _emit(self, event_type: str, data: dict[str, Any]) -> None:
         """Emit an event to the callback."""
         if self._on_event:
             try:
@@ -1688,10 +1849,10 @@ def create_runner(
     target: str,
     objective: str = "Find and exploit all critical vulnerabilities",
     max_steps: int = 40,
-    scope: Optional[List[str]] = None,
-    llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
-    on_event: Optional[EventCallback] = None,
-    sandbox_mode: Optional[str] = None,
+    scope: list[str] | None = None,
+    llm_complete: Callable[..., Coroutine[Any, Any, str]] | None = None,
+    on_event: EventCallback | None = None,
+    sandbox_mode: str | None = None,
 ) -> AgentRunner:
     """Factory to create a fully configured AgentRunner."""
     executor = create_executor(mode=sandbox_mode)

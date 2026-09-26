@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -30,13 +30,13 @@ class LocalLLMEndpoint:
 
     kind: str  # ollama | openai_compatible
     base_url: str
-    models: List[str] = field(default_factory=list)
+    models: list[str] = field(default_factory=list)
     healthy: bool = False
     preferred_model: str = ""
     label: str = ""
     error: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "kind": self.kind,
             "base_url": self.base_url,
@@ -126,11 +126,11 @@ def probe_openai_compatible(base_url: str, timeout: float = 3.0) -> LocalLLMEndp
 
 
 def discover_local_llms(
-    extra_urls: Optional[List[str]] = None,
+    extra_urls: list[str] | None = None,
     timeout: float = 3.0,
-) -> List[LocalLLMEndpoint]:
+) -> list[LocalLLMEndpoint]:
     """Discover local LLM servers on common endpoints."""
-    found: List[LocalLLMEndpoint] = []
+    found: list[LocalLLMEndpoint] = []
     seen: set = set()
 
     urls = [u for u in DEFAULT_OLLAMA_URLS if u]
@@ -164,7 +164,7 @@ def discover_local_llms(
     return found
 
 
-def local_llm_status() -> Dict[str, Any]:
+def local_llm_status() -> dict[str, Any]:
     endpoints = discover_local_llms()
     return {
         "available": any(e.healthy for e in endpoints),

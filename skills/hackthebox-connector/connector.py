@@ -38,8 +38,7 @@ class HackTheBoxConnector(PlatformConnector):
         super().__init__(credentials)
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for the HackTheBox connector. "
-                "Install it with: pip install httpx"
+                "httpx is required for the HackTheBox connector. Install it with: pip install httpx"
             )
         self._token = credentials.get("app_token", "")
         self._client = httpx.Client(
@@ -119,7 +118,11 @@ class HackTheBoxConnector(PlatformConnector):
         try:
             r = self._client.post(
                 "/machine/own",
-                json={"id": int(target_id), "flag": flag, "difficulty": finding.get("difficulty", 50)},
+                json={
+                    "id": int(target_id),
+                    "flag": flag,
+                    "difficulty": finding.get("difficulty", 50),
+                },
             )
             r.raise_for_status()
             return r.json()

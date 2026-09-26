@@ -13,17 +13,18 @@ import asyncio
 import json
 import logging
 import random
-import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # ── Difficulty Scale (ported from taskgen) ──────────────────────────────────
+
 
 class DifficultyScale(Enum):
     VERY_EASY = 1
@@ -38,7 +39,7 @@ class DifficultyScale(Enum):
     POLYMATH = 10
 
 
-DIFFICULTY_LABELS: Dict[DifficultyScale, str] = {
+DIFFICULTY_LABELS: dict[DifficultyScale, str] = {
     DifficultyScale.VERY_EASY: "Very Easy (child-level)",
     DifficultyScale.EASY: "Easy (elementary)",
     DifficultyScale.BASIC: "Basic (middle school)",
@@ -115,118 +116,263 @@ Each block must be present and substantive. Empty blocks will be rejected."""
 
 # ── Security Domain Taxonomy ────────────────────────────────────────────────
 
+
 @dataclass
 class SecurityDomainTaxonomy:
     category: str
     name: str
-    subdomains: List[str]
+    subdomains: list[str]
 
 
-SECURITY_DOMAIN_TAXONOMY: List[SecurityDomainTaxonomy] = [
+SECURITY_DOMAIN_TAXONOMY: list[SecurityDomainTaxonomy] = [
     # Reconnaissance
-    SecurityDomainTaxonomy("recon", "Passive Reconnaissance", [
-        "dns_enumeration", "subdomain_discovery", "certificate_transparency",
-        "whois_lookup", "email_harvesting", "social_media_osint",
-    ]),
-    SecurityDomainTaxonomy("recon", "Active Reconnaissance", [
-        "port_scanning", "service_fingerprinting", "network_mapping",
-        "banner_grabbing", "firewall_detection", "cdn_detection",
-    ]),
-    SecurityDomainTaxonomy("recon", "Web Reconnaissance", [
-        "directory_enumeration", "parameter_discovery", "endpoint_mapping",
-        "tech_stack_detection", "hidden_files", "api_discovery",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "recon",
+        "Passive Reconnaissance",
+        [
+            "dns_enumeration",
+            "subdomain_discovery",
+            "certificate_transparency",
+            "whois_lookup",
+            "email_harvesting",
+            "social_media_osint",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "recon",
+        "Active Reconnaissance",
+        [
+            "port_scanning",
+            "service_fingerprinting",
+            "network_mapping",
+            "banner_grabbing",
+            "firewall_detection",
+            "cdn_detection",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "recon",
+        "Web Reconnaissance",
+        [
+            "directory_enumeration",
+            "parameter_discovery",
+            "endpoint_mapping",
+            "tech_stack_detection",
+            "hidden_files",
+            "api_discovery",
+        ],
+    ),
     # Exploitation
-    SecurityDomainTaxonomy("exploit", "Web Exploitation", [
-        "sql_injection", "xss", "csrf", "ssrf", "lfi_rfi",
-        "command_injection", "file_upload_bypass", "template_injection",
-        "deserialization", "xxe",
-    ]),
-    SecurityDomainTaxonomy("exploit", "Network Exploitation", [
-        "mitm", "arp_spoofing", "dns_spoofing", "sniffing",
-        "session_hijacking", "vlan_hopping",
-    ]),
-    SecurityDomainTaxonomy("exploit", "Authentication Bypass", [
-        "oauth_misconfiguration", "jwt_forgery", "session_fixation",
-        "brute_force", "credential_stuffing", "mfa_bypass",
-    ]),
-    SecurityDomainTaxonomy("exploit", "Privilege Escalation", [
-        "sudo_abuse", "suid_exploitation", "kernel_exploit",
-        "container_escape", "service_abuse", "token_impersonation",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Web Exploitation",
+        [
+            "sql_injection",
+            "xss",
+            "csrf",
+            "ssrf",
+            "lfi_rfi",
+            "command_injection",
+            "file_upload_bypass",
+            "template_injection",
+            "deserialization",
+            "xxe",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Network Exploitation",
+        [
+            "mitm",
+            "arp_spoofing",
+            "dns_spoofing",
+            "sniffing",
+            "session_hijacking",
+            "vlan_hopping",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Authentication Bypass",
+        [
+            "oauth_misconfiguration",
+            "jwt_forgery",
+            "session_fixation",
+            "brute_force",
+            "credential_stuffing",
+            "mfa_bypass",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Privilege Escalation",
+        [
+            "sudo_abuse",
+            "suid_exploitation",
+            "kernel_exploit",
+            "container_escape",
+            "service_abuse",
+            "token_impersonation",
+        ],
+    ),
     # OSINT
-    SecurityDomainTaxonomy("osint", "Technical OSINT", [
-        "github_recon", "shodan_search", "censys_search",
-        "google_dorking", "pastebin_monitoring", "dark_web_monitoring",
-    ]),
-    SecurityDomainTaxonomy("osint", "Human OSINT", [
-        "social_media_analysis", "relationship_mapping", "identity_correlation",
-        "geolocation", "timeline_analysis",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "osint",
+        "Technical OSINT",
+        [
+            "github_recon",
+            "shodan_search",
+            "censys_search",
+            "google_dorking",
+            "pastebin_monitoring",
+            "dark_web_monitoring",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "osint",
+        "Human OSINT",
+        [
+            "social_media_analysis",
+            "relationship_mapping",
+            "identity_correlation",
+            "geolocation",
+            "timeline_analysis",
+        ],
+    ),
     # Cryptography & Security Engineering
-    SecurityDomainTaxonomy("crypto", "Cryptography", [
-        "symmetric_encryption", "asymmetric_encryption", "hash_analysis",
-        "tls_ssl", "key_exchange", "digital_signatures",
-    ]),
-    SecurityDomainTaxonomy("crypto", "Security Engineering", [
-        "secure_architecture", "threat_modeling", "zero_trust",
-        "network_segmentation", "iam", "secret_management",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "crypto",
+        "Cryptography",
+        [
+            "symmetric_encryption",
+            "asymmetric_encryption",
+            "hash_analysis",
+            "tls_ssl",
+            "key_exchange",
+            "digital_signatures",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "crypto",
+        "Security Engineering",
+        [
+            "secure_architecture",
+            "threat_modeling",
+            "zero_trust",
+            "network_segmentation",
+            "iam",
+            "secret_management",
+        ],
+    ),
     # Malware & Forensics
-    SecurityDomainTaxonomy("forensics", "Digital Forensics", [
-        "memory_analysis", "disk_forensics", "network_forensics",
-        "log_analysis", "timeline_reconstruction", "file_carving",
-    ]),
-    SecurityDomainTaxonomy("forensics", "Malware Analysis", [
-        "static_analysis", "dynamic_analysis", "reverse_engineering",
-        "packer_detection", "c2_analysis", "ransomware_analysis",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "forensics",
+        "Digital Forensics",
+        [
+            "memory_analysis",
+            "disk_forensics",
+            "network_forensics",
+            "log_analysis",
+            "timeline_reconstruction",
+            "file_carving",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "forensics",
+        "Malware Analysis",
+        [
+            "static_analysis",
+            "dynamic_analysis",
+            "reverse_engineering",
+            "packer_detection",
+            "c2_analysis",
+            "ransomware_analysis",
+        ],
+    ),
     # AI Security
-    SecurityDomainTaxonomy("ai_security", "AI Security", [
-        "prompt_injection", "model_extraction", "adversarial_examples",
-        "training_data_poisoning", "model_inversion", "llm_safety",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "ai_security",
+        "AI Security",
+        [
+            "prompt_injection",
+            "model_extraction",
+            "adversarial_examples",
+            "training_data_poisoning",
+            "model_inversion",
+            "llm_safety",
+        ],
+    ),
     # Cloud & Container
-    SecurityDomainTaxonomy("cloud", "Cloud Security", [
-        "aws_enumeration", "gcp_enumeration", "azure_enumeration",
-        "iam_abuse", "storage_misconfiguration", "serverless_security",
-    ]),
-    SecurityDomainTaxonomy("cloud", "Container Security", [
-        "docker_escape", "k8s_enumeration", "container_vulnerability_scanning",
-        "image_analysis", "registry_security",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "cloud",
+        "Cloud Security",
+        [
+            "aws_enumeration",
+            "gcp_enumeration",
+            "azure_enumeration",
+            "iam_abuse",
+            "storage_misconfiguration",
+            "serverless_security",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "cloud",
+        "Container Security",
+        [
+            "docker_escape",
+            "k8s_enumeration",
+            "container_vulnerability_scanning",
+            "image_analysis",
+            "registry_security",
+        ],
+    ),
     # Code & Application Security
-    SecurityDomainTaxonomy("appsec", "Code Security", [
-        "static_analysis", "dynamic_analysis", "dependency_scanning",
-        "code_review", "secret_detection", "supply_chain_security",
-    ]),
-    SecurityDomainTaxonomy("appsec", "Network Security", [
-        "firewall_configuration", "ids_ips", "vpn_security",
-        "wireless_security", "protocol_analysis",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "appsec",
+        "Code Security",
+        [
+            "static_analysis",
+            "dynamic_analysis",
+            "dependency_scanning",
+            "code_review",
+            "secret_detection",
+            "supply_chain_security",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "appsec",
+        "Network Security",
+        [
+            "firewall_configuration",
+            "ids_ips",
+            "vpn_security",
+            "wireless_security",
+            "protocol_analysis",
+        ],
+    ),
     # Social Engineering
-    SecurityDomainTaxonomy("social", "Social Engineering", [
-        "phishing", "spear_phishing", "pretexting",
-        "baiting", "tailgating", "quid_pro_quo",
-    ]),
+    SecurityDomainTaxonomy(
+        "social",
+        "Social Engineering",
+        [
+            "phishing",
+            "spear_phishing",
+            "pretexting",
+            "baiting",
+            "tailgating",
+            "quid_pro_quo",
+        ],
+    ),
 ]
 
 # Category → domains mapping for weighted sampling
-CATEGORY_MAP: Dict[str, List[SecurityDomainTaxonomy]] = {}
+CATEGORY_MAP: dict[str, list[SecurityDomainTaxonomy]] = {}
 for d in SECURITY_DOMAIN_TAXONOMY:
     CATEGORY_MAP.setdefault(d.category, []).append(d)
 
 CATEGORIES = list(CATEGORY_MAP.keys())
 
-DEFAULT_CATEGORY_DISTRIBUTION: Dict[str, float] = {
+DEFAULT_CATEGORY_DISTRIBUTION: dict[str, float] = {
     "recon": 0.15,
     "exploit": 0.25,
     "osint": 0.10,
@@ -238,7 +384,7 @@ DEFAULT_CATEGORY_DISTRIBUTION: Dict[str, float] = {
     "social": 0.05,
 }
 
-DEFAULT_DIFFICULTY_DISTRIBUTION: Dict[int, float] = {
+DEFAULT_DIFFICULTY_DISTRIBUTION: dict[int, float] = {
     1: 0.05,
     2: 0.05,
     3: 0.10,
@@ -268,6 +414,7 @@ Output only the prompt itself. Keep it short but preserve all actual complexity.
 
 
 # ── Task Entry ──────────────────────────────────────────────────────────────
+
 
 @dataclass
 class TaskEntry:
@@ -323,7 +470,9 @@ class TaskEntry:
             domain=d["domain"].split("::")[1] if "::" in d["domain"] else d["domain"],
             subdomain=d["subdomain"],
             difficulty=d["difficulty"],
-            category=d.get("category", d["domain"].split("::")[0] if "::" in d.get("domain", "") else ""),
+            category=d.get(
+                "category", d["domain"].split("::")[0] if "::" in d.get("domain", "") else ""
+            ),
             language=d.get("language", "en"),
             cot_style="cot_instruction" in d,
             taskgen_model=d.get("taskgen_model", "unknown"),
@@ -334,28 +483,30 @@ class TaskEntry:
 
 # ── Generation Config ──────────────────────────────────────────────────────
 
+
 @dataclass
 class GenerationConfig:
     count: int = 250
     workers: int = 5
     temperature: float = 0.9
     model: str = "gpt-4o-mini"
-    system_prompt: Optional[str] = None
-    category_distribution: Optional[Dict[str, float]] = None
-    difficulty_distribution: Optional[Dict[int, float]] = None
-    output_path: Optional[Path] = None
+    system_prompt: str | None = None
+    category_distribution: dict[str, float] | None = None
+    difficulty_distribution: dict[int, float] | None = None
+    output_path: Path | None = None
     dedup: bool = True
     dedup_threshold: float = 0.6
     cot_ratio: float = 0.3
     append: bool = False
-    budget: Optional[float] = None
-    input_price: Optional[float] = None
-    output_price: Optional[float] = None
+    budget: float | None = None
+    input_price: float | None = None
+    output_price: float | None = None
 
 
 # ── Sampling Logic (ported from taskgen) ────────────────────────────────────
 
-def build_domain_pool(dist: Dict[str, float]) -> List[Tuple[str, str, str, float]]:
+
+def build_domain_pool(dist: dict[str, float]) -> list[tuple[str, str, str, float]]:
     pool = []
     for cat, weight in dist.items():
         domains = CATEGORY_MAP.get(cat, [])
@@ -370,8 +521,8 @@ def build_domain_pool(dist: Dict[str, float]) -> List[Tuple[str, str, str, float
 
 
 def weighted_sample(
-    items: List[Tuple[Any, ...]],
-    weights: List[float],
+    items: list[Any],
+    weights: list[float],
     rng: random.Random,
 ) -> Any:
     total = sum(weights)
@@ -386,18 +537,18 @@ def weighted_sample(
 
 def sample_domain(
     rng: random.Random,
-    pool: List[Tuple[str, str, str, float]],
-) -> Tuple[str, str, str]:
+    pool: list[tuple[str, str, str, float]],
+) -> tuple[str, str, str]:
     weights = [w for _, _, _, w in pool]
     return weighted_sample(pool, weights, rng)
 
 
 def sample_difficulty(
     rng: random.Random,
-    dist: Dict[int, float],
+    dist: dict[int, float],
 ) -> int:
     levels = list(dist.keys())
-    weights = [dist[l] for l in levels]
+    weights = [dist[level] for level in levels]
     return weighted_sample(levels, weights, rng)
 
 
@@ -427,10 +578,13 @@ def build_generation_messages(
     subdomain: str,
     difficulty: int,
     include_cot: bool,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     user_msg = SECURITY_TASK_INSTRUCTION.format(
-        domain=domain, name=name, subdomain=subdomain,
-        difficulty=difficulty, label=DIFFICULTY_LABELS.get(DifficultyScale(difficulty), ""),
+        domain=domain,
+        name=name,
+        subdomain=subdomain,
+        difficulty=difficulty,
+        label=DIFFICULTY_LABELS.get(DifficultyScale(difficulty), ""),
     )
     if include_cot:
         user_msg += f"""\n\nAdditionally, include the expected chain-of-thought reasoning format:
@@ -443,6 +597,7 @@ def build_generation_messages(
 
 
 # ── Generator ───────────────────────────────────────────────────────────────
+
 
 class NovaDataGenerator:
     """
@@ -459,7 +614,7 @@ class NovaDataGenerator:
         config: GenerationConfig,
         api_key: str,
         api_base: str = "https://api.openai.com/v1",
-        llm_call: Optional[Callable] = None,
+        llm_call: Callable | None = None,
     ):
         self.config = config
         self.api_key = api_key
@@ -470,11 +625,12 @@ class NovaDataGenerator:
 
     async def _default_llm_call(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int = 2048,
-    ) -> Tuple[str, int, int]:
+    ) -> tuple[str, int, int]:
         import httpx
+
         async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(
                 f"{self.api_base.rstrip('/')}/chat/completions",
@@ -505,14 +661,20 @@ class NovaDataGenerator:
         subdomain: str,
         difficulty: int,
         include_cot: bool,
-    ) -> Optional[TaskEntry]:
+    ) -> TaskEntry | None:
         system_prompt = self.config.system_prompt or DIFFICULTY_SYSTEM_PROMPT
         messages = build_generation_messages(
-            system_prompt, domain, name, subdomain, difficulty, include_cot,
+            system_prompt,
+            domain,
+            name,
+            subdomain,
+            difficulty,
+            include_cot,
         )
         try:
             text, in_tok, out_tok = await self.llm_call(
-                messages, self.config.temperature,
+                messages,
+                self.config.temperature,
             )
             if not text:
                 return None
@@ -533,10 +695,8 @@ class NovaDataGenerator:
             logger.warning(f"Generation failed for {domain}/{subdomain} d{difficulty}: {e}")
             return None
 
-    async def generate(self) -> List[TaskEntry]:
-        pool = build_domain_pool(
-            self.config.category_distribution or DEFAULT_CATEGORY_DISTRIBUTION
-        )
+    async def generate(self) -> list[TaskEntry]:
+        pool = build_domain_pool(self.config.category_distribution or DEFAULT_CATEGORY_DISTRIBUTION)
         diff_dist = self.config.difficulty_distribution or DEFAULT_DIFFICULTY_DISTRIBUTION
         if not pool:
             raise ValueError("No domains matched distribution")
@@ -571,11 +731,13 @@ class NovaDataGenerator:
         )
         return entries
 
-    def _write_output(self, entries: List[TaskEntry]) -> None:
+    def _write_output(self, entries: list[TaskEntry]) -> None:
         path = self.config.output_path
+        if path is None:
+            raise ValueError("output_path is required when writing generated tasks")
         mode = "a" if self.config.append else "w"
 
-        if path and path.suffix == ".parquet":
+        if path.suffix == ".parquet":
             self._write_parquet(entries, path)
         else:
             with open(path, mode, encoding="utf-8") as f:
@@ -583,10 +745,11 @@ class NovaDataGenerator:
                     f.write(entry.to_jsonl() + "\n")
         logger.info(f"Wrote {len(entries)} tasks to {path}")
 
-    def _write_parquet(self, entries: List[TaskEntry], path: Path) -> None:
+    def _write_parquet(self, entries: list[TaskEntry], path: Path) -> None:
         """Write entries in Nex-N2 style parquet format (prompt/ground_truth columns)."""
         try:
-            import pandas as pd
+            import pandas as pd  # type: ignore[reportMissingImports]
+
             rows = [e.to_nexn2_rl_row() for e in entries]
             df = pd.DataFrame(rows)
             df.to_parquet(path, index=False)
@@ -596,5 +759,5 @@ class NovaDataGenerator:
                 for entry in entries:
                     f.write(entry.to_jsonl() + "\n")
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         return dict(self._stats)

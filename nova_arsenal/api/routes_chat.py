@@ -12,7 +12,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -60,6 +60,7 @@ def set_router(multi: MultiProviderRouter) -> None:
 
 # ── Models ───────────────────────────────────────────────────────────────────
 
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -95,21 +96,53 @@ async def _require_owned_chat_session(
 # ── Intent (light routing only — conversation is default) ────────────────────
 
 INTENT_PATTERNS = [
-    ("security_task", [
-        "scan ", "scan my", "pentest", "penetration test", "run nmap",
-        "exploit ", "brute force", "start agent", "autonomous",
-        "zero-day", "zeroday", "swarm scan", "recon on",
-        "sub-agent", "subagent", "work session", "parallel agents",
-        "multi-agent", "spawn agents",
-    ]),
-    ("code_request", [
-        "write code", "write a script", "generate code", "write me a",
-        "create a payload", "python script", "bash script",
-    ]),
-    ("tool_info", [
-        "how to use nmap", "how does nmap", "how do i use",
-        "what is sqlmap", "how to use sqlmap", "metasploit module",
-    ]),
+    (
+        "security_task",
+        [
+            "scan ",
+            "scan my",
+            "pentest",
+            "penetration test",
+            "run nmap",
+            "exploit ",
+            "brute force",
+            "start agent",
+            "autonomous",
+            "zero-day",
+            "zeroday",
+            "swarm scan",
+            "recon on",
+            "sub-agent",
+            "subagent",
+            "work session",
+            "parallel agents",
+            "multi-agent",
+            "spawn agents",
+        ],
+    ),
+    (
+        "code_request",
+        [
+            "write code",
+            "write a script",
+            "generate code",
+            "write me a",
+            "create a payload",
+            "python script",
+            "bash script",
+        ],
+    ),
+    (
+        "tool_info",
+        [
+            "how to use nmap",
+            "how does nmap",
+            "how do i use",
+            "what is sqlmap",
+            "how to use sqlmap",
+            "metasploit module",
+        ],
+    ),
 ]
 
 
@@ -154,6 +187,7 @@ The user is asking for something operational.
 
 
 # ── History formatting ───────────────────────────────────────────────────────
+
 
 def _truncate_middle(text: str, limit: int) -> str:
     """Keep both ends of oversized content instead of silently dropping context."""
@@ -224,6 +258,7 @@ def _system_for_intent(intent: str) -> str:
 
 
 # ── LLM access ───────────────────────────────────────────────────────────────
+
 
 async def _resolve_llm():
     """Return the current multi-router and global router.
@@ -427,6 +462,7 @@ def _local_respond(message: str, system_prompt: str) -> str:
 
 # ── Streaming generator ──────────────────────────────────────────────────────
 
+
 async def _stream_response(
     message: str,
     session_id: str,
@@ -465,9 +501,7 @@ async def _stream_response(
             metadata: dict[str, Any] = {
                 "intent": intent,
                 "suggestions": bp.suggest_tools(message)[:5],
-                "tools_mentioned": [
-                    n for n in bp.tools if n.lower() in message.lower()
-                ][:10],
+                "tools_mentioned": [n for n in bp.tools if n.lower() in message.lower()][:10],
             }
 
             await add_chat_message(db, session_id, "assistant", response, metadata)
@@ -484,6 +518,7 @@ async def _stream_response(
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
 
 @router.post("", response_model=ChatResponse)
 @router.post("/", response_model=ChatResponse)

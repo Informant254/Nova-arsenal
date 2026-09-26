@@ -38,8 +38,7 @@ class BugcrowdConnector(PlatformConnector):
         super().__init__(credentials)
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for the Bugcrowd connector. "
-                "Install it with: pip install httpx"
+                "httpx is required for the Bugcrowd connector. Install it with: pip install httpx"
             )
         self._token = credentials.get("api_token", "")
         self._client = httpx.Client(

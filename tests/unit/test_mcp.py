@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import pytest
 
 from nova_arsenal.mcp import NovaMcpServer
 
@@ -85,30 +84,45 @@ class TestNovaMcpServer:
 
     def test_handle_tool_call_compliance(self):
         server = NovaMcpServer()
-        result = self._run_async(server.handle_tool_call("compliance_check", {
-            "finding_type": "sql_injection",
-            "description": "SQL injection found in login",
-        }))
+        result = self._run_async(
+            server.handle_tool_call(
+                "compliance_check",
+                {
+                    "finding_type": "sql_injection",
+                    "description": "SQL injection found in login",
+                },
+            )
+        )
         parsed = json.loads(result)
         assert "controls" in parsed
         assert "frameworks_affected" in parsed
 
     def test_handle_tool_call_payload(self):
         server = NovaMcpServer()
-        result = self._run_async(server.handle_tool_call("payload_generate", {
-            "payload_type": "reverse_shell",
-            "lhost": "10.0.0.1",
-            "lport": 4444,
-            "language": "bash",
-        }))
+        result = self._run_async(
+            server.handle_tool_call(
+                "payload_generate",
+                {
+                    "payload_type": "reverse_shell",
+                    "lhost": "10.0.0.1",
+                    "lport": 4444,
+                    "language": "bash",
+                },
+            )
+        )
         parsed = json.loads(result)
         assert "reverse_shell" in parsed
 
     def test_handle_tool_call_ctf(self):
         server = NovaMcpServer()
-        result = self._run_async(server.handle_tool_call("ctf_solve", {
-            "challenge_name": "test_flag",
-            "challenge_type": "web",
-        }))
+        result = self._run_async(
+            server.handle_tool_call(
+                "ctf_solve",
+                {
+                    "challenge_name": "test_flag",
+                    "challenge_type": "web",
+                },
+            )
+        )
         parsed = json.loads(result)
         assert "solved" in parsed

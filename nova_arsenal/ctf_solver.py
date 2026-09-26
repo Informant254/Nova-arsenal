@@ -1,11 +1,11 @@
 import asyncio
-import json
 import logging
 import re
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Pattern
+from re import Pattern
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class CtfFlag:
     confidence: float = 1.0
     method: str = ""
     source: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -39,56 +39,58 @@ class CtfChallenge:
     description: str = ""
     points: int = 0
     solved: bool = False
-    flag: Optional[CtfFlag] = None
-    hints: List[str] = field(default_factory=list)
-    files: List[str] = field(default_factory=list)
+    flag: CtfFlag | None = None
+    hints: list[str] = field(default_factory=list)
+    files: list[str] = field(default_factory=list)
     url: str = ""
     port: int = 0
-    solve_steps: List[str] = field(default_factory=list)
+    solve_steps: list[str] = field(default_factory=list)
 
 
 FLAG_GREP_PATTERN = "flag\\{[^}]+\\}|CTF\\{[^}]+\\}"
 
-FLAG_PATTERNS: List[Pattern] = [
-    re.compile(r'(?i)flag\{([^}]+)\}'),
-    re.compile(r'(?i)CTF\{([^}]+)\}'),
-    re.compile(r'(?i)CTF_([a-zA-Z0-9_]+)'),
-    re.compile(r'(?i)FLAG[:\s]+([a-zA-Z0-9_!@#$%^&*()=+\[\]{}|;:,.<>?]+)'),
-    re.compile(r'(?i)([a-zA-Z0-9]{20,40})'),
+FLAG_PATTERNS: list[Pattern] = [
+    re.compile(r"(?i)flag\{([^}]+)\}"),
+    re.compile(r"(?i)CTF\{([^}]+)\}"),
+    re.compile(r"(?i)CTF_([a-zA-Z0-9_]+)"),
+    re.compile(r"(?i)FLAG[:\s]+([a-zA-Z0-9_!@#$%^&*()=+\[\]{}|;:,.<>?]+)"),
+    re.compile(r"(?i)([a-zA-Z0-9]{20,40})"),
 ]
 
-CHALLENGE_TYPE_PATTERNS: Dict[ChallengeType, List[Pattern]] = {
+CHALLENGE_TYPE_PATTERNS: dict[ChallengeType, list[Pattern]] = {
     ChallengeType.WEB: [
-        re.compile(r'(?i)(web|http|XSS|SQL[-\s]?injection|admin|login|cookie|session|csrf|ssrf)'),
+        re.compile(r"(?i)(web|http|XSS|SQL[-\s]?injection|admin|login|cookie|session|csrf|ssrf)"),
     ],
     ChallengeType.CRYPTO: [
-        re.compile(r'(?i)(crypto|cipher|encrypt|decrypt|RSA|AES|hash|md5|sha|base64|XOR|substitution|vigenere|caesar)'),
+        re.compile(
+            r"(?i)(crypto|cipher|encrypt|decrypt|RSA|AES|hash|md5|sha|base64|XOR|substitution|vigenere|caesar)"
+        ),
     ],
     ChallengeType.STEGO: [
-        re.compile(r'(?i)(stego|steganography|LSB|image|hidden|embedded|pixel|exif)'),
+        re.compile(r"(?i)(stego|steganography|LSB|image|hidden|embedded|pixel|exif)"),
     ],
     ChallengeType.FORENSICS: [
-        re.compile(r'(?i)(forensic|memory|dump|pcap|network|traffic|volatility|binwalk|strings)'),
+        re.compile(r"(?i)(forensic|memory|dump|pcap|network|traffic|volatility|binwalk|strings)"),
     ],
     ChallengeType.REVERSING: [
-        re.compile(r'(?i)(reverse|rev|binary|disassem|ghidra|ida|radare|angr|decompile)'),
+        re.compile(r"(?i)(reverse|rev|binary|disassem|ghidra|ida|radare|angr|decompile)"),
     ],
     ChallengeType.PWN: [
-        re.compile(r'(?i)(pwn|binary|exploit|buffer|overflow|ROP|shellcode|format.string|ret2)'),
+        re.compile(r"(?i)(pwn|binary|exploit|buffer|overflow|ROP|shellcode|format.string|ret2)"),
     ],
     ChallengeType.OSINT: [
-        re.compile(r'(?i)(OSINT|recon|social|search|find|locate|people|email|domain)'),
+        re.compile(r"(?i)(OSINT|recon|social|search|find|locate|people|email|domain)"),
     ],
     ChallengeType.RECON: [
-        re.compile(r'(?i)(recon|scan|port|service|enumeration|discover|fingerprint)'),
+        re.compile(r"(?i)(recon|scan|port|service|enumeration|discover|fingerprint)"),
     ],
 }
 
 
 class CtfSolver:
     def __init__(self) -> None:
-        self.challenges: List[CtfChallenge] = []
-        self.solved_challenges: List[CtfChallenge] = []
+        self.challenges: list[CtfChallenge] = []
+        self.solved_challenges: list[CtfChallenge] = []
         self.total_points: int = 0
         self.solved_points: int = 0
 
@@ -108,7 +110,7 @@ class CtfSolver:
 
         return best_type
 
-    def extract_flags(self, text: str, source: str = "") -> List[CtfFlag]:
+    def extract_flags(self, text: str, source: str = "") -> list[CtfFlag]:
         flags = []
         seen = set()
 
@@ -130,17 +132,19 @@ class CtfSolver:
                 elif "flag{" in raw.lower() or "ctf{" in raw.lower():
                     confidence = 1.0
 
-                flags.append(CtfFlag(
-                    flag=flag_value,
-                    challenge_type=ctype,
-                    confidence=confidence,
-                    method=f"regex:{pat.pattern[:40]}",
-                    source=source,
-                ))
+                flags.append(
+                    CtfFlag(
+                        flag=flag_value,
+                        challenge_type=ctype,
+                        confidence=confidence,
+                        method=f"regex:{pat.pattern[:40]}",
+                        source=source,
+                    )
+                )
 
         return flags
 
-    async def solve_web(self, challenge: CtfChallenge) -> Optional[CtfFlag]:
+    async def solve_web(self, challenge: CtfChallenge) -> CtfFlag | None:
         logger.info(f"[CTF] Solving web challenge: {challenge.name}")
         url = challenge.url or f"http://{challenge.name}"
         commands = [
@@ -167,13 +171,12 @@ class CtfSolver:
                 logger.debug(f"[CTF] Web command failed: {e}")
         return None
 
-    async def solve_crypto(self, challenge: CtfChallenge) -> Optional[CtfFlag]:
+    async def solve_crypto(self, challenge: CtfChallenge) -> CtfFlag | None:
         logger.info(f"[CTF] Solving crypto challenge: {challenge.name}")
         for filepath in challenge.files:
             try:
                 proc = await asyncio.create_subprocess_shell(
-                    f"cat '{filepath}' 2>/dev/null",
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    f"cat '{filepath}' 2>/dev/null", stdout=subprocess.PIPE, stderr=subprocess.PIPE
                 )
                 stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
                 content = stdout.decode(errors="replace")
@@ -181,12 +184,13 @@ class CtfSolver:
                 if flags:
                     return flags[0]
 
-                if re.search(r'(?i)base64', content):
-                    decoded = re.sub(r'\s', '', content)
+                if re.search(r"(?i)base64", content):
+                    decoded = re.sub(r"\s", "", content)
                     try:
                         import base64
+
                         plain = base64.b64decode(decoded).decode(errors="replace")
-                        for line in plain.split('\n'):
+                        for line in plain.split("\n"):
                             flags = self.extract_flags(line, source="base64_decoded")
                             if flags:
                                 return flags[0]
@@ -196,7 +200,7 @@ class CtfSolver:
                 continue
         return None
 
-    async def solve_stego(self, challenge: CtfChallenge) -> Optional[CtfFlag]:
+    async def solve_stego(self, challenge: CtfChallenge) -> CtfFlag | None:
         logger.info(f"[CTF] Solving stego challenge: {challenge.name}")
         for filepath in challenge.files:
             commands = [
@@ -221,7 +225,7 @@ class CtfSolver:
                     continue
         return None
 
-    async def solve_osint(self, challenge: CtfChallenge) -> Optional[CtfFlag]:
+    async def solve_osint(self, challenge: CtfChallenge) -> CtfFlag | None:
         logger.info(f"[CTF] Solving OSINT challenge: {challenge.name}")
         target = challenge.url or challenge.name
         commands = [
@@ -244,7 +248,7 @@ class CtfSolver:
                 continue
         return None
 
-    async def solve_challenge(self, challenge: CtfChallenge) -> Optional[CtfFlag]:
+    async def solve_challenge(self, challenge: CtfChallenge) -> CtfFlag | None:
         solvers = {
             ChallengeType.WEB: self.solve_web,
             ChallengeType.CRYPTO: self.solve_crypto,
@@ -264,7 +268,7 @@ class CtfSolver:
 
         return None
 
-    async def solve_all(self, timeout: int = 300) -> List[CtfFlag]:
+    async def solve_all(self, timeout: int = 300) -> list[CtfFlag]:
         tasks = []
         for challenge in self.challenges:
             if challenge.solved:
@@ -286,7 +290,7 @@ class CtfSolver:
                 pass
         return results
 
-    async def _solve_one(self, challenge: CtfChallenge) -> Optional[CtfFlag]:
+    async def _solve_one(self, challenge: CtfChallenge) -> CtfFlag | None:
         flag = await self.solve_challenge(challenge)
         if flag:
             challenge.solved = True
@@ -296,10 +300,16 @@ class CtfSolver:
             logger.info(f"[CTF] SOLVED: {challenge.name} -> {flag.flag}")
         return flag
 
-    def add_challenge(self, name: str, description: str = "",
-                      challenge_type: Optional[ChallengeType] = None,
-                      points: int = 0, url: str = "", port: int = 0,
-                      files: Optional[List[str]] = None) -> CtfChallenge:
+    def add_challenge(
+        self,
+        name: str,
+        description: str = "",
+        challenge_type: ChallengeType | None = None,
+        points: int = 0,
+        url: str = "",
+        port: int = 0,
+        files: list[str] | None = None,
+    ) -> CtfChallenge:
         if challenge_type is None:
             challenge_type = self.classify_challenge(name, description, url)
 
@@ -316,13 +326,15 @@ class CtfSolver:
         self.total_points += points
         return challenge
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {
             "total_challenges": len(self.challenges),
             "solved": len(self.solved_challenges),
             "total_points": self.total_points,
             "solved_points": self.solved_points,
-            "completion_pct": round(len(self.solved_challenges) / max(len(self.challenges), 1) * 100, 1),
+            "completion_pct": round(
+                len(self.solved_challenges) / max(len(self.challenges), 1) * 100, 1
+            ),
             "by_type": {
                 ct.value: {
                     "total": sum(1 for c in self.challenges if c.challenge_type == ct),

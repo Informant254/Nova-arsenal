@@ -7,10 +7,9 @@ This module provides both:
 """
 
 import os
-import json
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -18,15 +17,15 @@ class AgentState:
     """Current state of the agent during execution."""
 
     step: int = 0
-    findings: List[Dict[str, Any]] = field(default_factory=list)
-    actions_taken: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    findings: list[dict[str, Any]] = field(default_factory=list)
+    actions_taken: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class NovaAgent:
     """
     Autonomous security research agent.
-    
+
     Can operate in two modes:
     1. Basic mode (existing): plan/step/reflect for manual use
     2. Autonomous mode: delegates to AgentRunner for full autonomy
@@ -38,7 +37,7 @@ class NovaAgent:
         objective: str = "Find and exploit all critical vulnerabilities",
         max_steps: int = 40,
         model: str = "deepseek-r1",
-        workspace: Optional[str] = None,
+        workspace: str | None = None,
     ) -> None:
         self.target = target
         self.objective = objective
@@ -48,16 +47,16 @@ class NovaAgent:
             os.path.expanduser("~"), "nova_workspace", target.replace(".", "_")
         )
         self.state = AgentState()
-        self._history: List[Dict[str, Any]] = []
-        self._runner: Optional[Any] = None
+        self._history: list[dict[str, Any]] = []
+        self._runner: Any | None = None
 
-    def plan(self) -> List[str]:
+    def plan(self) -> list[str]:
         """Generate a plan of attack for the target."""
         return [
             f"Reconnaissance: enumerate services on {self.target}",
-            f"Vulnerability scanning: identify weaknesses",
-            f"Exploitation: attempt to exploit found vulnerabilities",
-            f"Post-exploitation: assess impact and extract data",
+            "Vulnerability scanning: identify weaknesses",
+            "Exploitation: attempt to exploit found vulnerabilities",
+            "Post-exploitation: assess impact and extract data",
             f"Reporting: compile findings for {self.target}",
         ]
 
@@ -65,13 +64,15 @@ class NovaAgent:
         """Record an agent step."""
         self.state.step += 1
         self.state.actions_taken.append(action)
-        self._history.append({
-            "step": self.state.step,
-            "action": action,
-            "result": result,
-        })
+        self._history.append(
+            {
+                "step": self.state.step,
+                "action": action,
+                "result": result,
+            }
+        )
 
-    def add_finding(self, finding: Dict[str, Any]) -> None:
+    def add_finding(self, finding: dict[str, Any]) -> None:
         """Record a security finding."""
         self.state.findings.append(finding)
 
@@ -85,11 +86,11 @@ class NovaAgent:
             f"Objective: {self.objective}"
         )
 
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_history(self) -> list[dict[str, Any]]:
         """Return the action history."""
         return list(self._history)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Return a summary of the agent session."""
         return {
             "target": self.target,
@@ -105,14 +106,14 @@ class NovaAgent:
 
     async def run_autonomous(
         self,
-        scope: Optional[List[str]] = None,
-        llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
-        on_event: Optional[Callable[..., Coroutine[Any, Any, None]]] = None,
-        sandbox_mode: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        scope: list[str] | None = None,
+        llm_complete: Callable[..., Coroutine[Any, Any, str]] | None = None,
+        on_event: Callable[..., Coroutine[Any, Any, None]] | None = None,
+        sandbox_mode: str | None = None,
+    ) -> dict[str, Any]:
         """
         Run the fully autonomous agent loop.
-        
+
         This delegates to AgentRunner for the complete cycle:
         LLM reasoning → tool selection → command execution → result analysis → iteration
         """
@@ -139,9 +140,9 @@ class NovaAgent:
     async def step_once(
         self,
         instruction: str = "",
-        scope: Optional[List[str]] = None,
-        llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
-    ) -> Dict[str, Any]:
+        scope: list[str] | None = None,
+        llm_complete: Callable[..., Coroutine[Any, Any, str]] | None = None,
+    ) -> dict[str, Any]:
         """Execute a single step in autonomous mode."""
         from nova_arsenal.agent_runner import create_runner
 
@@ -157,7 +158,7 @@ class NovaAgent:
         action = await self._runner.step_once(instruction)
         return action.to_dict()
 
-    def get_runner(self) -> Optional[Any]:
+    def get_runner(self) -> Any | None:
         """Get the underlying AgentRunner instance."""
         return self._runner
 

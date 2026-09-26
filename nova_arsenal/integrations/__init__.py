@@ -8,8 +8,8 @@ Native API/RPC clients for external security tools:
 - SQLmap (API mode)
 """
 
-from .msf_rpc import MetasploitRPC
 from .burp_api import BurpAPI
+from .msf_rpc import MetasploitRPC
 from .nmap_parser import NmapParser
 from .sqlmap_api import SQLmapAPI
 

@@ -2,9 +2,9 @@
 Nova Tool Kit Module - Governed security tools with permission profiles and scope guards.
 """
 
-import re
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 
@@ -42,11 +42,11 @@ SENSITIVE_PATHS = [
 class ScopeGuard:
     """Guards tool execution against scope boundaries."""
 
-    def __init__(self, scope: List[str], strict: bool = False) -> None:
+    def __init__(self, scope: list[str], strict: bool = False) -> None:
         self._scope = scope
         self._strict = strict
 
-    def check_url(self, url: str) -> Tuple[bool, str]:
+    def check_url(self, url: str) -> tuple[bool, str]:
         """Check if a URL is within scope."""
         try:
             parsed = urlparse(url)
@@ -75,7 +75,7 @@ class ScopeGuard:
 
         return False, f"{host} is not in scope"
 
-    def check_path(self, path: str) -> Tuple[bool, str]:
+    def check_path(self, path: str) -> tuple[bool, str]:
         """Check if a file path is safe to access."""
         for sensitive in SENSITIVE_PATHS:
             if path.startswith(sensitive):
@@ -91,8 +91,8 @@ class GovernedTool:
         name: str,
         description: str,
         handler: Callable[..., str],
-        schema: Optional[Dict[str, Any]] = None,
-        allowed_profiles: Optional[List[PermissionProfile]] = None,
+        schema: dict[str, Any] | None = None,
+        allowed_profiles: list[PermissionProfile] | None = None,
     ) -> None:
         self.name = name
         self.description = description
@@ -107,9 +107,12 @@ class GovernedTool:
     def schema_str(self) -> str:
         """Return schema as JSON string."""
         import json
+
         return json.dumps(self.schema, indent=2)
 
-    def call(self, args: Dict[str, Any], profile: PermissionProfile = PermissionProfile.FULL) -> str:
+    def call(
+        self, args: dict[str, Any], profile: PermissionProfile = PermissionProfile.FULL
+    ) -> str:
         """Execute the tool with given arguments and permission profile."""
         if profile not in self._allowed_profiles:
             return f"BLOCKED: Tool '{self.name}' is not allowed under {profile.value} profile"
@@ -150,13 +153,13 @@ class NovaToolKit:
     def __init__(
         self,
         profile: PermissionProfile = PermissionProfile.SCOPED,
-        scope: Optional[List[str]] = None,
+        scope: list[str] | None = None,
     ) -> None:
         self._profile = profile
         self._scope = scope or []
         self._guard = ScopeGuard(self._scope)
 
-    def build(self) -> List[GovernedTool]:
+    def build(self) -> list[GovernedTool]:
         """Build and return the list of governed tools."""
         tools = [
             GovernedTool(
@@ -196,7 +199,11 @@ class NovaToolKit:
                     },
                     "required": ["path"],
                 },
-                allowed_profiles=[PermissionProfile.READ_ONLY, PermissionProfile.SCOPED, PermissionProfile.FULL],
+                allowed_profiles=[
+                    PermissionProfile.READ_ONLY,
+                    PermissionProfile.SCOPED,
+                    PermissionProfile.FULL,
+                ],
             ),
             GovernedTool(
                 name="grep_code",
@@ -210,7 +217,11 @@ class NovaToolKit:
                     },
                     "required": ["pattern"],
                 },
-                allowed_profiles=[PermissionProfile.READ_ONLY, PermissionProfile.SCOPED, PermissionProfile.FULL],
+                allowed_profiles=[
+                    PermissionProfile.READ_ONLY,
+                    PermissionProfile.SCOPED,
+                    PermissionProfile.FULL,
+                ],
             ),
             GovernedTool(
                 name="write_file",

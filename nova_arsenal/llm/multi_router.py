@@ -6,11 +6,10 @@ Supports: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, HuggingFace, Qwen, Deep
 """
 
 import logging
-import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Type
+from typing import Any
 
 from nova_arsenal.llm.base import LLMProvider
 
@@ -19,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class TaskCategory(Enum):
     """Categories of tasks for provider routing."""
+
     CODE_GENERATION = "code_generation"
     CODE_REVIEW = "code_review"
     SECURITY_ANALYSIS = "security_analysis"
@@ -45,7 +45,7 @@ class ProviderProfile:
     """
 
     name: str
-    strengths: List[TaskCategory]
+    strengths: list[TaskCategory]
     supports_tools: bool = False
     local: bool = False
 
@@ -53,17 +53,18 @@ class ProviderProfile:
 @dataclass
 class RoutingDecision:
     """Decision made by the router."""
+
     provider: str
     model: str
     category: TaskCategory
     confidence: float
     reason: str
-    fallback_chain: List[Dict[str, str]] = field(default_factory=list)
+    fallback_chain: list[dict[str, str]] = field(default_factory=list)
 
 
 # ── Provider Registry ──────────────────────────────────────────────────────
 
-PROVIDER_PROFILES: List[ProviderProfile] = [
+PROVIDER_PROFILES: list[ProviderProfile] = [
     ProviderProfile(
         name="anthropic",
         strengths=[
@@ -176,66 +177,197 @@ PROVIDER_PROFILES: List[ProviderProfile] = [
 
 # ── Task Classifier ────────────────────────────────────────────────────────
 
-TASK_KEYWORDS: Dict[TaskCategory, List[str]] = {
+TASK_KEYWORDS: dict[TaskCategory, list[str]] = {
     TaskCategory.CODE_GENERATION: [
-        "write code", "implement", "function", "class", "script", "program",
-        "create a", "build a", "generate code", "coding", "python", "javascript",
-        "rust", "golang", "java", "c++", "html", "css", "bash",
-        "algorithm", "data structure", "api endpoint", "webhook",
+        "write code",
+        "implement",
+        "function",
+        "class",
+        "script",
+        "program",
+        "create a",
+        "build a",
+        "generate code",
+        "coding",
+        "python",
+        "javascript",
+        "rust",
+        "golang",
+        "java",
+        "c++",
+        "html",
+        "css",
+        "bash",
+        "algorithm",
+        "data structure",
+        "api endpoint",
+        "webhook",
     ],
     TaskCategory.CODE_REVIEW: [
-        "review code", "code review", "audit code", "check code", "lint",
-        "refactor", "optimize code", "code quality", "best practice",
-        "code smell", "technical debt", "code analysis",
+        "review code",
+        "code review",
+        "audit code",
+        "check code",
+        "lint",
+        "refactor",
+        "optimize code",
+        "code quality",
+        "best practice",
+        "code smell",
+        "technical debt",
+        "code analysis",
     ],
     TaskCategory.SECURITY_ANALYSIS: [
-        "vulnerability", "exploit", "penetration test", "security audit",
-        "attack vector", "scan for vulnerability", "nmap", "sqlmap", "nuclei",
-        "brute force", "xss", "sqli", "rce", "lfi", "ssrf", "csrf",
-        "auth bypass", "privilege escalation", "reverse shell", "payload",
-        "cve", "incident response", "forensics", "malware", "threat",
-        "security scan", "pen test", "security assessment", "sql injection",
+        "vulnerability",
+        "exploit",
+        "penetration test",
+        "security audit",
+        "attack vector",
+        "scan for vulnerability",
+        "nmap",
+        "sqlmap",
+        "nuclei",
+        "brute force",
+        "xss",
+        "sqli",
+        "rce",
+        "lfi",
+        "ssrf",
+        "csrf",
+        "auth bypass",
+        "privilege escalation",
+        "reverse shell",
+        "payload",
+        "cve",
+        "incident response",
+        "forensics",
+        "malware",
+        "threat",
+        "security scan",
+        "pen test",
+        "security assessment",
+        "sql injection",
     ],
     TaskCategory.REASONING: [
-        "reason", "think", "logic", "prove", "explain why",
-        "deduce", "compare and contrast", "debate", "argument",
-        "syllogism", "deduction", "induction", "inference", "logical",
+        "reason",
+        "think",
+        "logic",
+        "prove",
+        "explain why",
+        "deduce",
+        "compare and contrast",
+        "debate",
+        "argument",
+        "syllogism",
+        "deduction",
+        "induction",
+        "inference",
+        "logical",
     ],
     TaskCategory.ANALYSIS: [
-        "analyze", "analysis", "examine", "investigate", "study",
-        "assess", "evaluate", "review", "report", "summary",
-        "data analysis", "trend", "pattern", "correlation",
-        "network traffic", "anomalies",
+        "analyze",
+        "analysis",
+        "examine",
+        "investigate",
+        "study",
+        "assess",
+        "evaluate",
+        "review",
+        "report",
+        "summary",
+        "data analysis",
+        "trend",
+        "pattern",
+        "correlation",
+        "network traffic",
+        "anomalies",
     ],
     TaskCategory.CREATIVE: [
-        "write", "story", "poem", "creative", "imagine", "fiction",
-        "narrative", "essay", "article", "blog post", "content",
-        "copywriting", "marketing", "slogan", "tagline",
+        "write",
+        "story",
+        "poem",
+        "creative",
+        "imagine",
+        "fiction",
+        "narrative",
+        "essay",
+        "article",
+        "blog post",
+        "content",
+        "copywriting",
+        "marketing",
+        "slogan",
+        "tagline",
     ],
     TaskCategory.TRANSLATION: [
-        "translate", "translation", "localize", "internationalization",
-        "i18n", "localization", "language", "multilingual",
+        "translate",
+        "translation",
+        "localize",
+        "internationalization",
+        "i18n",
+        "localization",
+        "language",
+        "multilingual",
     ],
     TaskCategory.SUMMARIZATION: [
-        "summarize", "summary", "tldr", "brief", "overview",
-        "condense", "abstract", "executive summary",
+        "summarize",
+        "summary",
+        "tldr",
+        "brief",
+        "overview",
+        "condense",
+        "abstract",
+        "executive summary",
     ],
     TaskCategory.DATA_PROCESSING: [
-        "parse", "extract", "transform", "ETL", "pipeline",
-        "data processing", "csv", "json", "xml", "scrape",
-        "web scraping", "data cleaning", "data wrangling",
+        "parse",
+        "extract",
+        "transform",
+        "ETL",
+        "pipeline",
+        "data processing",
+        "csv",
+        "json",
+        "xml",
+        "scrape",
+        "web scraping",
+        "data cleaning",
+        "data wrangling",
     ],
     TaskCategory.CONVERSATION: [
-        "chat", "talk", "discuss", "conversation", "ask",
-        "question", "help me", "what is", "how to", "explain",
+        "chat",
+        "talk",
+        "discuss",
+        "conversation",
+        "ask",
+        "question",
+        "help me",
+        "what is",
+        "how to",
+        "explain",
     ],
     TaskCategory.RESEARCH: [
-        "research", "find", "search", "discover", "investigate",
-        "literature review", "survey", "state of the art", "benchmark",
+        "research",
+        "find",
+        "search",
+        "discover",
+        "investigate",
+        "literature review",
+        "survey",
+        "state of the art",
+        "benchmark",
     ],
     TaskCategory.PLANNING: [
-        "plan", "strategy", "roadmap", "architecture", "design",
-        "blueprint", "workflow", "pipeline", "process", "methodology",
+        "plan",
+        "strategy",
+        "roadmap",
+        "architecture",
+        "design",
+        "blueprint",
+        "workflow",
+        "pipeline",
+        "process",
+        "methodology",
     ],
 }
 
@@ -243,7 +375,7 @@ TASK_KEYWORDS: Dict[TaskCategory, List[str]] = {
 def classify_task(prompt: str) -> TaskCategory:
     """Classify a prompt into a task category."""
     prompt_lower = prompt.lower()
-    scores: Dict[TaskCategory, int] = {cat: 0 for cat in TaskCategory}
+    scores: dict[TaskCategory, int] = {cat: 0 for cat in TaskCategory}
 
     for category, keywords in TASK_KEYWORDS.items():
         for keyword in keywords:
@@ -259,10 +391,11 @@ def classify_task(prompt: str) -> TaskCategory:
 
 # ── Multi-Provider Router ──────────────────────────────────────────────────
 
+
 class MultiProviderRouter:
     """
     Sakana Fugu-style multi-provider orchestrator.
-    
+
     Classifies tasks and routes to the best provider based on:
     - Task category (code, security, reasoning, etc.)
     - Provider strengths
@@ -273,27 +406,25 @@ class MultiProviderRouter:
 
     def __init__(
         self,
-        providers: Optional[Dict[str, LLMProvider]] = None,
+        providers: dict[str, LLMProvider] | None = None,
         preference: str = "balanced",
     ):
         self._providers = providers or {}
         self._preference = preference
-        self._provider_profiles: Dict[str, ProviderProfile] = {
-            p.name: p for p in PROVIDER_PROFILES
-        }
-        self._routing_history: List[RoutingDecision] = []
-        self._provider_stats: Dict[str, Dict[str, float]] = {}
+        self._provider_profiles: dict[str, ProviderProfile] = {p.name: p for p in PROVIDER_PROFILES}
+        self._routing_history: list[RoutingDecision] = []
+        self._provider_stats: dict[str, dict[str, float]] = {}
 
     def register_provider(self, name: str, provider: LLMProvider) -> None:
         """Register a provider instance."""
         self._providers[name] = provider
         logger.info(f"Registered provider: {name}")
 
-    def get_provider(self, name: str) -> Optional[LLMProvider]:
+    def get_provider(self, name: str) -> LLMProvider | None:
         """Get a registered provider by name."""
         return self._providers.get(name)
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """List all registered providers."""
         return list(self._providers.keys())
 
@@ -304,8 +435,8 @@ class MultiProviderRouter:
     def route(
         self,
         prompt: str,
-        preference: Optional[str] = None,
-        exclude: Optional[List[str]] = None,
+        preference: str | None = None,
+        exclude: list[str] | None = None,
     ) -> RoutingDecision:
         """Route to a registered provider using capabilities plus runtime telemetry.
 
@@ -319,7 +450,7 @@ class MultiProviderRouter:
         excluded = set(exclude or [])
         category = classify_task(prompt)
 
-        candidates: List[Dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
         for name, provider in self._providers.items():
             if name in excluded:
                 continue
@@ -350,8 +481,7 @@ class MultiProviderRouter:
         candidates.sort(key=lambda item: item["score"], reverse=True)
         best = candidates[0]
         fallback_chain = [
-            {"provider": item["name"], "model": item["model"]}
-            for item in candidates[1:4]
+            {"provider": item["name"], "model": item["model"]} for item in candidates[1:4]
         ]
 
         decision = RoutingDecision(
@@ -359,10 +489,7 @@ class MultiProviderRouter:
             model=best["model"],
             category=category,
             confidence=best["score"],
-            reason=(
-                f"Capability/runtime match for {category.value} "
-                f"with {pref} preference"
-            ),
+            reason=(f"Capability/runtime match for {category.value} with {pref} preference"),
             fallback_chain=fallback_chain,
         )
         self._routing_history.append(decision)
@@ -371,10 +498,10 @@ class MultiProviderRouter:
     async def complete(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        preference: Optional[str] = None,
+        preference: str | None = None,
         **kwargs,
     ) -> str:
         """
@@ -392,8 +519,8 @@ class MultiProviderRouter:
                 continue
 
             providers_tried.append(provider_name)
+            started = time.monotonic()
             try:
-                started = time.monotonic()
                 result = await provider.complete(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -411,26 +538,20 @@ class MultiProviderRouter:
                 )
                 return result
             except Exception as e:
-                elapsed_ms = (
-                    (time.monotonic() - started) * 1000
-                    if "started" in locals()
-                    else 0.0
-                )
+                elapsed_ms = (time.monotonic() - started) * 1000
                 self._record_failure(provider_name, elapsed_ms)
                 logger.warning(f"Provider {provider_name} failed: {e}")
                 continue
 
-        raise RuntimeError(
-            f"All providers failed. Tried: {providers_tried}"
-        )
+        raise RuntimeError(f"All providers failed. Tried: {providers_tried}")
 
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        preference: Optional[str] = None,
+        preference: str | None = None,
         **kwargs,
     ):
         """Stream using the best provider with automatic fallback."""
@@ -442,8 +563,8 @@ class MultiProviderRouter:
             if not provider:
                 continue
 
+            started = time.monotonic()
             try:
-                started = time.monotonic()
                 async for chunk in provider.stream(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -458,18 +579,14 @@ class MultiProviderRouter:
                 )
                 return
             except Exception as e:
-                elapsed_ms = (
-                    (time.monotonic() - started) * 1000
-                    if "started" in locals()
-                    else 0.0
-                )
+                elapsed_ms = (time.monotonic() - started) * 1000
                 self._record_failure(provider_name, elapsed_ms)
                 logger.warning(f"Provider {provider_name} stream failed: {e}")
                 continue
 
         raise RuntimeError("All providers failed for streaming")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get routing statistics."""
         return {
             "total_routes": len(self._routing_history),
@@ -478,7 +595,7 @@ class MultiProviderRouter:
             "registered_providers": self.list_providers(),
         }
 
-    def get_routing_history(self) -> List[Dict[str, Any]]:
+    def get_routing_history(self) -> list[dict[str, Any]]:
         """Get the routing history."""
         return [
             {
@@ -563,7 +680,7 @@ class MultiProviderRouter:
         self._record_latency(stats, latency_ms)
 
     @staticmethod
-    def _record_latency(stats: Dict[str, float], latency_ms: float) -> None:
+    def _record_latency(stats: dict[str, float], latency_ms: float) -> None:
         if latency_ms <= 0:
             return
         stats["latency_ms_total"] += latency_ms
@@ -571,8 +688,8 @@ class MultiProviderRouter:
         if attempts > 0:
             stats["avg_latency_ms"] = stats["latency_ms_total"] / attempts
 
-    def _get_category_distribution(self) -> Dict[str, int]:
-        dist: Dict[str, int] = {}
+    def _get_category_distribution(self) -> dict[str, int]:
+        dist: dict[str, int] = {}
         for d in self._routing_history:
             cat = d.category.value
             dist[cat] = dist.get(cat, 0) + 1

@@ -12,9 +12,10 @@ import asyncio
 import logging
 import shlex
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 from .surface import SurfaceEndpoint
 
@@ -45,9 +46,9 @@ class FuzzJob:
     timeout_seconds: int = 300
     parallel_jobs: int = 1
     priority: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "job_id": self.job_id,
             "engine": self.engine,
@@ -68,16 +69,16 @@ class FuzzCampaign:
     """Planned multi-engine fuzz campaign."""
 
     target: str
-    jobs: List[FuzzJob] = field(default_factory=list)
+    jobs: list[FuzzJob] = field(default_factory=list)
     total_parallelism: int = 0
     estimated_startup_ms: float = 0.0
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
     @property
     def job_count(self) -> int:
         return len(self.jobs)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "job_count": self.job_count,
@@ -115,8 +116,8 @@ class FuzzOrchestrator:
         output_dir: str = "./fuzz_out",
     ) -> FuzzCampaign:
         t0 = time.perf_counter()
-        jobs: List[FuzzJob] = []
-        notes: List[str] = []
+        jobs: list[FuzzJob] = []
+        notes: list[str] = []
 
         ranked = sorted(endpoints, key=lambda e: e.fuzz_affinity, reverse=True)
         for idx, ep in enumerate(ranked):
@@ -159,8 +160,8 @@ class FuzzOrchestrator:
         authorized: bool = False,
         authorization_ref: str = "",
         use_live_worker: bool = True,
-        job_timeout: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        job_timeout: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Execute planned jobs.
 
@@ -210,7 +211,7 @@ class FuzzOrchestrator:
 
         sem = asyncio.Semaphore(self.workers)
 
-        async def run_one(job: FuzzJob) -> Dict[str, Any]:
+        async def run_one(job: FuzzJob) -> dict[str, Any]:
             async with sem:
                 try:
                     proc = await asyncio.create_subprocess_shell(
@@ -258,13 +259,17 @@ class FuzzOrchestrator:
         binary_path: str,
         corpus_dir: str,
         output_dir: str,
-    ) -> List[FuzzJob]:
-        jobs: List[FuzzJob] = []
+    ) -> list[FuzzJob]:
+        jobs: list[FuzzJob] = []
         sid = ep.surface_id
         base_pri = ep.fuzz_affinity + ep.priority * 0.1
 
         if ep.service in {"http", "https", "http-proxy"}:
-            url = ep.path if ep.path.startswith("http") else f"http://{target}:{ep.port or 80}{ep.path or '/'}"
+            url = (
+                ep.path
+                if ep.path.startswith("http")
+                else f"http://{target}:{ep.port or 80}{ep.path or '/'}"
+            )
             wordlist = "/usr/share/seclists/Discovery/Web-Content/raft-small-words.txt"
             jobs.append(
                 FuzzJob(

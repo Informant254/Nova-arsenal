@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class SessionStatus(str, Enum):
@@ -36,7 +36,7 @@ class SubAgentRole(str, Enum):
     REPORTER = "reporter"
 
 
-DEFAULT_PARALLEL_ROLES: List[SubAgentRole] = [
+DEFAULT_PARALLEL_ROLES: list[SubAgentRole] = [
     SubAgentRole.RECON,
     SubAgentRole.WEB,
     SubAgentRole.OSINT,
@@ -60,10 +60,10 @@ class SessionEvent:
     event_type: str
     message: str
     agent_id: str = ""
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     ts: str = field(default_factory=_now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "event_type": self.event_type,
             "message": self.message,
@@ -80,7 +80,7 @@ class SubAgentSpec:
     max_steps: int = 8
     weight: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role.value,
             "objective": self.objective,
@@ -94,16 +94,16 @@ class SubAgentResult:
     agent_id: str
     role: SubAgentRole
     status: SubAgentStatus = SubAgentStatus.PENDING
-    findings: List[Dict[str, Any]] = field(default_factory=list)
+    findings: list[dict[str, Any]] = field(default_factory=list)
     summary: str = ""
     evidence: str = ""
     confidence: float = 0.0
     steps: int = 0
     duration_ms: float = 0.0
     error: str = ""
-    reasoning: List[str] = field(default_factory=list)
+    reasoning: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "role": self.role.value,
@@ -127,19 +127,19 @@ class TaskSession:
     goal: str = ""
     target: str = ""
     status: SessionStatus = SessionStatus.PENDING
-    roles: List[SubAgentRole] = field(default_factory=lambda: list(DEFAULT_PARALLEL_ROLES))
+    roles: list[SubAgentRole] = field(default_factory=lambda: list(DEFAULT_PARALLEL_ROLES))
     max_concurrent: int = 6
     authorized: bool = False
     authorization_ref: str = ""
     created_at: str = field(default_factory=_now)
     started_at: str = ""
     completed_at: str = ""
-    agents: Dict[str, SubAgentResult] = field(default_factory=dict)
-    events: List[SessionEvent] = field(default_factory=list)
-    aggregated_findings: List[Dict[str, Any]] = field(default_factory=list)
-    consensus: List[Dict[str, Any]] = field(default_factory=list)
+    agents: dict[str, SubAgentResult] = field(default_factory=dict)
+    events: list[SessionEvent] = field(default_factory=list)
+    aggregated_findings: list[dict[str, Any]] = field(default_factory=list)
+    consensus: list[dict[str, Any]] = field(default_factory=list)
     summary: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def emit(self, event_type: str, message: str, agent_id: str = "", **data: Any) -> None:
         self.events.append(
@@ -154,8 +154,8 @@ class TaskSession:
         if len(self.events) > 500:
             self.events = self.events[-400:]
 
-    def to_dict(self, include_events: bool = True) -> Dict[str, Any]:
-        d: Dict[str, Any] = {
+    def to_dict(self, include_events: bool = True) -> dict[str, Any]:
+        d: dict[str, Any] = {
             "session_id": self.session_id,
             "goal": self.goal,
             "target": self.target,

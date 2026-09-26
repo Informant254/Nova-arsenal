@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class PlatformKind(str, Enum):
@@ -29,25 +29,27 @@ class Target:
     Unified representation of something Nova could choose to work on,
     regardless of which platform it came from.
     """
+
     id: str
-    platform: str                 # "hackerone" | "bugcrowd" | "hackthebox" | "tryhackme"
+    platform: str  # "hackerone" | "bugcrowd" | "hackthebox" | "tryhackme"
     kind: PlatformKind
     name: str
     url: str
     scope_summary: str = ""
     tags: list[str] = field(default_factory=list)
-    difficulty: Optional[str] = None          # easy/medium/hard/insane (labs/ctf)
-    max_reward_usd: Optional[float] = None    # bug bounty only
+    difficulty: str | None = None  # easy/medium/hard/insane (labs/ctf)
+    max_reward_usd: float | None = None  # bug bounty only
     asset_types: list[str] = field(default_factory=list)  # web, api, mobile, network...
-    last_updated: Optional[datetime] = None
+    last_updated: datetime | None = None
     raw: dict[str, Any] = field(default_factory=dict)  # original platform payload
 
 
 @dataclass
 class TargetScore:
     """Nova's reasoning output for why a target is/isn't worth pursuing."""
+
     target: Target
-    score: float                 # 0.0 - 1.0, higher = more worth pursuing
+    score: float  # 0.0 - 1.0, higher = more worth pursuing
     reasoning: str
     matched_strengths: list[str] = field(default_factory=list)  # Nova modules that fit
     estimated_effort: str = "unknown"  # low/medium/high
@@ -111,14 +113,16 @@ class TargetReasoner:
         "smb": ["msf_rpc.py", "nova_idor_scanner.py"],
         "active_directory": ["msf_rpc.py"],
         "mobile": [],  # honest gap — Nova has no dedicated mobile module yet
-        "cloud": [],   # honest gap
+        "cloud": [],  # honest gap
     }
 
     def score(self, target: Target) -> TargetScore:
         matched = []
         score = 0.3  # baseline
 
-        haystack = " ".join([target.name, target.scope_summary, *target.tags, *target.asset_types]).lower()
+        haystack = " ".join(
+            [target.name, target.scope_summary, *target.tags, *target.asset_types]
+        ).lower()
 
         for keyword, modules in self.STRENGTH_MAP.items():
             if keyword in haystack:

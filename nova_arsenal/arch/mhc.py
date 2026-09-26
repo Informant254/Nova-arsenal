@@ -11,11 +11,10 @@ for future Nova model architecture experiments.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import torch  # type: ignore[reportMissingImports]
+import torch.nn as nn  # type: ignore[reportMissingImports]
+import torch.nn.functional as F  # type: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +79,15 @@ class ManifoldConstrainedHyperConnection(nn.Module):
         self.nhc = nhc
         self.tmax = tmax
 
-        self.branches = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim, bias=False),
-                nn.LayerNorm(hidden_dim),
-            )
-            for _ in range(nhc)
-        ])
+        self.branches = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim, bias=False),
+                    nn.LayerNorm(hidden_dim),
+                )
+                for _ in range(nhc)
+            ]
+        )
 
         self.weight_proj = nn.Linear(hidden_dim, nhc * nhc, bias=False)
         self.gate = nn.Parameter(torch.ones(1, nhc, 1))
@@ -120,7 +121,7 @@ class MultimodalProjection(nn.Module):
 
     def __init__(
         self,
-        modal_dims: Dict[str, int],
+        modal_dims: dict[str, int],
         hidden_dim: int,
         num_heads: int = 8,
     ):
@@ -129,19 +130,15 @@ class MultimodalProjection(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
 
-        self.projectors = nn.ModuleDict({
-            name: nn.Linear(dim, hidden_dim, bias=False)
-            for name, dim in modal_dims.items()
-        })
+        self.projectors = nn.ModuleDict(
+            {name: nn.Linear(dim, hidden_dim, bias=False) for name, dim in modal_dims.items()}
+        )
 
-        self.norms = nn.ModuleDict({
-            name: nn.LayerNorm(hidden_dim)
-            for name in modal_dims
-        })
+        self.norms = nn.ModuleDict({name: nn.LayerNorm(hidden_dim) for name in modal_dims})
 
     def forward(
         self,
-        inputs: Dict[str, torch.Tensor],
+        inputs: dict[str, torch.Tensor],
     ) -> torch.Tensor:
         projected = []
         for name, x in inputs.items():
@@ -152,7 +149,9 @@ class MultimodalProjection(nn.Module):
 
         if not projected:
             return torch.zeros(
-                inputs[next(iter(inputs))].shape[0], 1, self.hidden_dim,
+                inputs[next(iter(inputs))].shape[0],
+                1,
+                self.hidden_dim,
                 device=next(iter(inputs.values())).device,
             )
 
@@ -198,8 +197,8 @@ class AnticipatoryRouter(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        expert_counts: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        expert_counts: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         B, L, D = x.shape
         x_flat = x.view(-1, D)
 
@@ -208,7 +207,7 @@ class AnticipatoryRouter(nn.Module):
         adjusted_logits = logits + 0.1 * conflict_logits.tanh()
 
         if expert_counts is not None:
-            capacity = int(L * self.capacity_factor)
+            _capacity = int(L * self.capacity_factor)
             expert_counts_flat = expert_counts.view(-1, self.num_experts)
             adjusted_logits = adjusted_logits - 0.01 * expert_counts_flat
 
@@ -223,13 +222,11 @@ class AnticipatoryRouter(nn.Module):
         self._stats["total_tokens"] += B * L
         self._stats["conflicts_detected"] += conflicts.sum().item()
         total = self._stats["total_tokens"]
-        self._stats["conflict_rate"] = (
-            self._stats["conflicts_detected"] / max(total, 1)
-        )
+        self._stats["conflict_rate"] = self._stats["conflicts_detected"] / max(total, 1)
 
         return indices, weights
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         return {
             "conflict_rate": self._stats["conflict_rate"],
             "total_tokens": self._stats["total_tokens"],

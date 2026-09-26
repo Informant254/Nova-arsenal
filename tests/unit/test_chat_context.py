@@ -57,10 +57,7 @@ def test_assistant_latest_does_not_add_continuation_label():
 
 
 def test_history_message_count_limit():
-    messages = [
-        {"role": "user", "content": f"message-{index}"}
-        for index in range(10)
-    ]
+    messages = [{"role": "user", "content": f"message-{index}"} for index in range(10)]
 
     prompt = _format_history(messages, max_messages=3, max_chars=10_000)
 

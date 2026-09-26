@@ -18,15 +18,16 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 from .crash_triage import CrashReport, CrashTriageEngine, TriagedCrash
 from .fuzz_orchestrator import FuzzCampaign, FuzzOrchestrator
-from .novelty import NoveltyAssessment, NoveltyScorer
+from .novelty import NoveltyScorer
 from .static_scanner import StaticBugScanner, StaticFinding
-from .surface import AttackSurfaceMapper, SurfaceEndpoint, SurfaceMap
+from .surface import AttackSurfaceMapper, SurfaceMap
 from .variant import VariantAnalyzer, VariantHypothesis
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class ZeroDayHuntConfig:
     min_novelty_score: float = 0.45
     require_authorization: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "authorized": self.authorized,
             "authorization_ref": self.authorization_ref,
@@ -83,13 +84,13 @@ class ZeroDayCandidate:
     source_stage: str
     target: str
     evidence: str
-    next_steps: List[str] = field(default_factory=list)
-    related_cves: List[str] = field(default_factory=list)
+    next_steps: list[str] = field(default_factory=list)
+    related_cves: list[str] = field(default_factory=list)
     surface_id: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     novelty_label: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "candidate_id": self.candidate_id,
             "title": self.title,
@@ -115,15 +116,15 @@ class ZeroDayHuntResult:
     hunt_id: str
     target: str
     status: str
-    candidates: List[ZeroDayCandidate] = field(default_factory=list)
-    surface: Optional[Dict[str, Any]] = None
-    variants: List[Dict[str, Any]] = field(default_factory=list)
-    static_findings: List[Dict[str, Any]] = field(default_factory=list)
-    fuzz_campaign: Optional[Dict[str, Any]] = None
-    triaged_crashes: List[Dict[str, Any]] = field(default_factory=list)
+    candidates: list[ZeroDayCandidate] = field(default_factory=list)
+    surface: dict[str, Any] | None = None
+    variants: list[dict[str, Any]] = field(default_factory=list)
+    static_findings: list[dict[str, Any]] = field(default_factory=list)
+    fuzz_campaign: dict[str, Any] | None = None
+    triaged_crashes: list[dict[str, Any]] = field(default_factory=list)
     elapsed_ms: float = 0.0
-    stage_timings_ms: Dict[str, float] = field(default_factory=dict)
-    warnings: List[str] = field(default_factory=list)
+    stage_timings_ms: dict[str, float] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
     disclaimer: str = (
         "Candidates are research leads, not confirmed zero-days. "
         "Validate, minimize impact, and follow responsible disclosure. "
@@ -131,7 +132,7 @@ class ZeroDayHuntResult:
     )
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hunt_id": self.hunt_id,
             "target": self.target,
@@ -168,12 +169,12 @@ class ZeroDayHunter:
 
     def __init__(
         self,
-        surface_mapper: Optional[AttackSurfaceMapper] = None,
-        variant_analyzer: Optional[VariantAnalyzer] = None,
-        static_scanner: Optional[StaticBugScanner] = None,
-        fuzz_orchestrator: Optional[FuzzOrchestrator] = None,
-        crash_triage: Optional[CrashTriageEngine] = None,
-        novelty_scorer: Optional[NoveltyScorer] = None,
+        surface_mapper: AttackSurfaceMapper | None = None,
+        variant_analyzer: VariantAnalyzer | None = None,
+        static_scanner: StaticBugScanner | None = None,
+        fuzz_orchestrator: FuzzOrchestrator | None = None,
+        crash_triage: CrashTriageEngine | None = None,
+        novelty_scorer: NoveltyScorer | None = None,
         cve_research: Any = None,
     ) -> None:
         self.surface_mapper = surface_mapper or AttackSurfaceMapper()
@@ -187,20 +188,20 @@ class ZeroDayHunter:
     async def hunt(
         self,
         target: str,
-        services: Optional[Dict[str, Any]] = None,
-        endpoints: Optional[Sequence[Dict[str, Any]]] = None,
-        technologies: Optional[Sequence[str]] = None,
-        findings: Optional[Sequence[Dict[str, Any]]] = None,
-        known_cves: Optional[Sequence[Dict[str, Any]]] = None,
-        source_files: Optional[Dict[str, str]] = None,
-        crashes: Optional[Sequence[CrashReport]] = None,
-        config: Optional[ZeroDayHuntConfig] = None,
+        services: dict[str, Any] | None = None,
+        endpoints: Sequence[dict[str, Any]] | None = None,
+        technologies: Sequence[str] | None = None,
+        findings: Sequence[dict[str, Any]] | None = None,
+        known_cves: Sequence[dict[str, Any]] | None = None,
+        source_files: dict[str, str] | None = None,
+        crashes: Sequence[CrashReport] | None = None,
+        config: ZeroDayHuntConfig | None = None,
     ) -> ZeroDayHuntResult:
         cfg = config or ZeroDayHuntConfig()
         hunt_id = uuid.uuid4().hex[:12]
         t0 = time.perf_counter()
-        timings: Dict[str, float] = {}
-        warnings: List[str] = []
+        timings: dict[str, float] = {}
+        warnings: list[str] = []
 
         if cfg.require_authorization and not cfg.authorized:
             return ZeroDayHuntResult(
@@ -232,7 +233,7 @@ class ZeroDayHunter:
 
         # ── Stage 2: CVE baseline (parallel per service) ──────────────────
         s0 = time.perf_counter()
-        cves: List[Dict[str, Any]] = list(known_cves or [])
+        cves: list[dict[str, Any]] = list(known_cves or [])
         if not cves:
             cves = await self._research_cves(services or {})
         timings["cve_ms"] = (time.perf_counter() - s0) * 1000.0
@@ -240,10 +241,10 @@ class ZeroDayHunter:
         # ── Stages 3–6 parallel where possible ────────────────────────────
         s0 = time.perf_counter()
 
-        async def run_variants() -> List[VariantHypothesis]:
+        async def run_variants() -> list[VariantHypothesis]:
             return await self.variant_analyzer.analyze_async(cves, services=services)
 
-        async def run_static() -> List[StaticFinding]:
+        async def run_static() -> list[StaticFinding]:
             if not source_files:
                 return []
             return await self.static_scanner.scan_files_async(source_files)
@@ -268,8 +269,8 @@ class ZeroDayHunter:
         )
         timings["parallel_analysis_ms"] = (time.perf_counter() - s0) * 1000.0
 
-        fuzz_exec_results: List[Dict[str, Any]] = []
-        live_crashes: List[CrashReport] = []
+        fuzz_exec_results: list[dict[str, Any]] = []
+        live_crashes: list[CrashReport] = []
         if cfg.execute_fuzz or cfg.live_fuzz:
             s0 = time.perf_counter()
             # dry_run when not execute_fuzz; still uses LiveFuzzWorker for capability report
@@ -311,8 +312,8 @@ class ZeroDayHunter:
                             )
 
         # ── Stage 7: crash triage ─────────────────────────────────────────
-        triaged: List[TriagedCrash] = []
-        all_crashes: List[CrashReport] = list(crashes or []) + live_crashes
+        triaged: list[TriagedCrash] = []
+        all_crashes: list[CrashReport] = list(crashes or []) + live_crashes
         if all_crashes:
             s0 = time.perf_counter()
             triaged = await self.crash_triage.triage_async(all_crashes)
@@ -363,7 +364,7 @@ class ZeroDayHunter:
     def hunt_sync(self, *args: Any, **kwargs: Any) -> ZeroDayHuntResult:
         return asyncio.get_event_loop().run_until_complete(self.hunt(*args, **kwargs))
 
-    async def _research_cves(self, services: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _research_cves(self, services: dict[str, Any]) -> list[dict[str, Any]]:
         try:
             if self._cve_research is None:
                 from nova_arsenal.intelligence.cve_research import CveResearch
@@ -374,18 +375,19 @@ class ZeroDayHunter:
             logger.warning("CVE research unavailable: %s", exc)
             return []
 
-        async def one(name: str, meta: Any) -> List[Dict[str, Any]]:
+        async def one(name: str, meta: Any) -> list[dict[str, Any]]:
             version = ""
             port = 0
             if isinstance(meta, dict):
                 version = str(meta.get("version") or "")
                 p = meta.get("port") or meta.get("ports") or 0
-                if isinstance(p, list) and p:
-                    port = int(p[0]) if str(p[0]).isdigit() else 0
-                elif str(p).isdigit():
-                    port = int(p)
+                candidate = p[0] if isinstance(p, list) and p else p
+                if isinstance(candidate, (int, str)) and str(candidate).isdigit():
+                    port = int(candidate)
             elif isinstance(meta, list) and meta:
-                port = int(meta[0]) if str(meta[0]).isdigit() else 0
+                candidate = meta[0]
+                if isinstance(candidate, (int, str)) and str(candidate).isdigit():
+                    port = int(candidate)
             try:
                 result = await researcher.research(str(name), version, port)
                 return [c.to_dict() for c in result.cves]
@@ -394,7 +396,7 @@ class ZeroDayHunter:
                 return []
 
         batches = await asyncio.gather(*[one(k, v) for k, v in services.items()])
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for batch in batches:
             out.extend(batch)
         return out
@@ -403,14 +405,14 @@ class ZeroDayHunter:
         self,
         target: str,
         surface: SurfaceMap,
-        variants: List[VariantHypothesis],
-        static_findings: List[StaticFinding],
-        triaged: List[TriagedCrash],
-        cves: List[Dict[str, Any]],
+        variants: list[VariantHypothesis],
+        static_findings: list[StaticFinding],
+        triaged: list[TriagedCrash],
+        cves: list[dict[str, Any]],
         min_novelty: float,
         max_candidates: int,
-    ) -> List[ZeroDayCandidate]:
-        candidates: List[ZeroDayCandidate] = []
+    ) -> list[ZeroDayCandidate]:
+        candidates: list[ZeroDayCandidate] = []
         known_ids = {
             str(c.get("cve_id") or c.get("id") or "").upper()
             for c in cves

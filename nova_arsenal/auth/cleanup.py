@@ -8,9 +8,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 
-from nova_arsenal.db import get_db
 from nova_arsenal.db.models import ApiKey
 
 logger = logging.getLogger(__name__)
@@ -19,11 +18,13 @@ logger = logging.getLogger(__name__)
 async def cleanup_expired_api_keys():
     """Deactivate API keys that have passed their expiry date."""
     try:
-        from nova_arsenal.db.session import async_session
-        async with async_session() as db:
+        from nova_arsenal.db.session import get_session_factory
+
+        factory = get_session_factory()
+        async with factory() as db:
             result = await db.execute(
                 select(ApiKey).where(
-                    ApiKey.is_active == True,
+                    ApiKey.is_active.is_(True),
                     ApiKey.expires_at.isnot(None),
                     ApiKey.expires_at < datetime.now(timezone.utc),
                 )

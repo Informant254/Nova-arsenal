@@ -12,15 +12,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from nova_arsenal.async_utils import (
+    AsyncTimeoutError,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerState,
-    async_timeout,
-    AsyncTimeoutError,
-    async_retry,
-    RetryConfig,
-    ResourceTracker,
     ResourceLimits,
+    ResourceTracker,
+    RetryConfig,
+    async_retry,
+    async_timeout,
 )
 
 
@@ -101,7 +101,10 @@ class TestCircuitBreaker:
         # Next call should transition to HALF_OPEN
         with pytest.raises(ValueError):
             await breaker.call(failing_func)
-        assert breaker.state == CircuitBreakerState.HALF_OPEN or breaker.state == CircuitBreakerState.OPEN
+        assert (
+            breaker.state == CircuitBreakerState.HALF_OPEN
+            or breaker.state == CircuitBreakerState.OPEN
+        )
 
 
 class TestAsyncTimeout:
@@ -110,6 +113,7 @@ class TestAsyncTimeout:
     @pytest.mark.asyncio
     async def test_timeout_allows_fast_operation(self):
         """Test timeout allows operations faster than limit."""
+
         async def fast_op():
             await asyncio.sleep(0.01)
             return "ok"
@@ -120,6 +124,7 @@ class TestAsyncTimeout:
     @pytest.mark.asyncio
     async def test_timeout_raises_on_slow_operation(self):
         """Test timeout raises when operation exceeds limit."""
+
         async def slow_op():
             await asyncio.sleep(1.0)
             return "should not reach"
@@ -130,6 +135,7 @@ class TestAsyncTimeout:
     @pytest.mark.asyncio
     async def test_timeout_includes_operation_name(self):
         """Test timeout error message includes operation name."""
+
         async def slow_op():
             await asyncio.sleep(1.0)
 
@@ -147,6 +153,7 @@ class TestAsyncRetry:
     @pytest.mark.asyncio
     async def test_retry_succeeds_immediately(self):
         """Test retry returns on first success."""
+
         async def success_func():
             return "ok"
 
@@ -173,6 +180,7 @@ class TestAsyncRetry:
     @pytest.mark.asyncio
     async def test_retry_exhausts_attempts(self):
         """Test retry raises after exhausting all attempts."""
+
         async def always_fail():
             raise ValueError("Always fails")
 
@@ -183,6 +191,7 @@ class TestAsyncRetry:
     @pytest.mark.asyncio
     async def test_retry_with_args_kwargs(self):
         """Test retry passes through args and kwargs."""
+
         async def func_with_args(a, b, c=None):
             return f"{a}-{b}-{c}"
 
@@ -245,6 +254,7 @@ class TestResourceTracker:
     def test_resource_tracker_execution_timeout(self):
         """Test tracker enforces execution timeout."""
         import time
+
         limits = ResourceLimits(max_execution_time_seconds=0.05)
         tracker = ResourceTracker(limits)
         tracker.start_execution()
