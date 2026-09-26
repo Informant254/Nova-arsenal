@@ -1,152 +1,191 @@
-"""
-Unit tests for multi-provider routing system.
-"""
+"""Unit tests for multi-provider routing system."""
 
 import sys
 from pathlib import Path
 
-import pytest
-
-# Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
-class TestTaskClassifier:
-    """Test task classification."""
+class FakeProvider:
+    """Minimal provider double for routing tests."""
 
+    def __init__(self, name: str, model: str):
+        self.name = name
+        self.model = model
+
+    async def complete(self, *args, **kwargs):
+        return "ok"
+
+    async def stream(self, *args, **kwargs):
+        yield "ok"
+
+    async def health_check(self):
+        return True
+
+
+class TestTaskClassifier:
     def test_classify_code_generation(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("write a python function to parse JSON")
-        assert result == TaskCategory.CODE_GENERATION
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("write a python function to parse JSON") == TaskCategory.CODE_GENERATION
 
     def test_classify_security(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("scan for SQL injection vulnerabilities")
-        assert result == TaskCategory.SECURITY_ANALYSIS
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("scan for SQL injection vulnerabilities") == TaskCategory.SECURITY_ANALYSIS
 
     def test_classify_reasoning(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("analyze the logical argument and prove it wrong")
-        assert result == TaskCategory.REASONING
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("analyze the logical argument and prove it wrong") == TaskCategory.REASONING
 
     def test_classify_creative(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("write a creative story about a hacker")
-        assert result == TaskCategory.CREATIVE
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("write a creative story about a hacker") == TaskCategory.CREATIVE
 
     def test_classify_translation(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("translate this document to Japanese")
-        assert result == TaskCategory.TRANSLATION
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("translate this document to Japanese") == TaskCategory.TRANSLATION
 
     def test_classify_analysis(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("analyze the network traffic data for anomalies")
-        assert result == TaskCategory.ANALYSIS
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("analyze the network traffic data for anomalies") == TaskCategory.ANALYSIS
 
     def test_classify_planning(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("create an architecture plan for the microservices")
-        assert result == TaskCategory.PLANNING
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("create an architecture plan for the microservices") == TaskCategory.PLANNING
 
     def test_classify_conversation(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("what is the meaning of life")
-        assert result == TaskCategory.CONVERSATION
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("what is the meaning of life") == TaskCategory.CONVERSATION
 
     def test_classify_unknown(self):
-        from nova_arsenal.llm.multi_router import classify_task, TaskCategory
-        result = classify_task("asdfghjkl")
-        assert result == TaskCategory.UNKNOWN
+        from nova_arsenal.llm.multi_router import TaskCategory, classify_task
+
+        assert classify_task("asdfghjkl") == TaskCategory.UNKNOWN
 
 
 class TestMultiProviderRouter:
-    """Test MultiProviderRouter."""
-
     def test_initialization(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter
-        router = MultiProviderRouter()
-        assert router is not None
 
-    def test_route_code_task(self):
+        assert MultiProviderRouter() is not None
+
+    def test_route_without_providers(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter, TaskCategory
 
-        router = MultiProviderRouter()
-        decision = router.route("write a Python web scraper")
+        decision = MultiProviderRouter().route("write a Python web scraper")
         assert decision.category == TaskCategory.CODE_GENERATION
-        # No providers registered, so confidence is 0
-        assert decision.confidence >= 0
+        assert decision.provider == "none"
+        assert decision.confidence == 0.0
 
-    def test_route_security_task(self):
-        from nova_arsenal.llm.multi_router import MultiProviderRouter, TaskCategory
-
-        router = MultiProviderRouter()
-        decision = router.route("find SQL injection vulnerabilities in this endpoint")
-        assert decision.category == TaskCategory.SECURITY_ANALYSIS
-
-    def test_route_with_preference(self):
+    def test_route_uses_actual_configured_model(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter
 
-        router = MultiProviderRouter()
-        decision_quality = router.route("write code", preference="quality")
-        decision_cost = router.route("write code", preference="cost")
-        # Both should return a valid decision
-        assert decision_quality.provider
-        assert decision_cost.provider
+        router = MultiProviderRouter(
+            providers={"openai": FakeProvider("openai", "custom-model-id")}
+        )
+        decision = router.route("write code")
+        assert decision.provider == "openai"
+        assert decision.model == "custom-model-id"
+
+    def test_cost_preference_favors_local_provider(self):
+        from nova_arsenal.llm.multi_router import MultiProviderRouter
+
+        router = MultiProviderRouter(
+            providers={
+                "openai": FakeProvider("openai", "cloud-model"),
+                "ollama": FakeProvider("ollama", "local-model"),
+            }
+        )
+        decision = router.route("write code", preference="cost")
+        assert decision.provider == "ollama"
+        assert decision.model == "local-model"
+
+    def test_runtime_reliability_influences_quality_routing(self):
+        from nova_arsenal.llm.multi_router import MultiProviderRouter
+
+        router = MultiProviderRouter(
+            providers={
+                "openai": FakeProvider("openai", "model-a"),
+                "deepseek": FakeProvider("deepseek", "model-b"),
+            }
+        )
+        for _ in range(4):
+            router._record_failure("openai", 100)
+            router._record_success("deepseek", 100)
+
+        decision = router.route("write code", preference="quality")
+        assert decision.provider == "deepseek"
 
     def test_route_excludes_providers(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter
 
-        router = MultiProviderRouter()
-        decision = router.route("write code", exclude=["nonexistent"])
-        assert decision.provider
+        router = MultiProviderRouter(
+            providers={
+                "openai": FakeProvider("openai", "cloud"),
+                "ollama": FakeProvider("ollama", "local"),
+            }
+        )
+        decision = router.route("write code", exclude=["openai"])
+        assert decision.provider == "ollama"
 
     def test_classify_method(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter, TaskCategory
 
-        router = MultiProviderRouter()
-        category = router.classify("analyze the vulnerability scan results")
+        category = MultiProviderRouter().classify("analyze the vulnerability scan results")
         assert category == TaskCategory.SECURITY_ANALYSIS
 
     def test_stats(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter
 
-        router = MultiProviderRouter()
+        router = MultiProviderRouter(
+            providers={"openai": FakeProvider("openai", "model")}
+        )
         router.route("write code")
         stats = router.get_stats()
-        assert "total_routes" in stats
         assert stats["total_routes"] == 1
+        assert stats["registered_providers"] == ["openai"]
 
     def test_provider_profiles_exist(self):
         from nova_arsenal.llm.multi_router import PROVIDER_PROFILES
 
-        names = [p.name for p in PROVIDER_PROFILES]
-        assert "anthropic" in names
-        assert "openai" in names
-        assert "gemini" in names
-        assert "deepseek" in names
-        assert "qwen" in names
-        assert "openrouter" in names
-        assert "huggingface" in names
-        assert "ollama" in names
+        names = [profile.name for profile in PROVIDER_PROFILES]
+        for expected in (
+            "anthropic",
+            "openai",
+            "gemini",
+            "deepseek",
+            "qwen",
+            "openrouter",
+            "huggingface",
+            "ollama",
+            "local",
+        ):
+            assert expected in names
 
 
 class TestProviderProfiles:
-    """Test provider profile data."""
-
-    def test_anthropic_profile(self):
+    def test_anthropic_tools_capability(self):
         from nova_arsenal.llm.multi_router import PROVIDER_PROFILES
-        anthropic = [p for p in PROVIDER_PROFILES if p.name == "anthropic"][0]
-        assert "claude-sonnet-4-20250514" in anthropic.models
-        assert anthropic.supports_tools is True
 
-    def test_deepseek_profile(self):
-        from nova_arsenal.llm.multi_router import PROVIDER_PROFILES
-        deepseek = [p for p in PROVIDER_PROFILES if p.name == "deepseek"][0]
-        assert deepseek.cost_per_1k_input < 0.001
+        profile = next(p for p in PROVIDER_PROFILES if p.name == "anthropic")
+        assert profile.supports_tools is True
 
-    def test_ollama_profile(self):
+    def test_local_profiles_are_marked_local(self):
         from nova_arsenal.llm.multi_router import PROVIDER_PROFILES
-        ollama = [p for p in PROVIDER_PROFILES if p.name == "ollama"][0]
-        assert ollama.cost_per_1k_input == 0.0
-        assert ollama.cost_per_1k_output == 0.0
+
+        ollama = next(p for p in PROVIDER_PROFILES if p.name == "ollama")
+        local = next(p for p in PROVIDER_PROFILES if p.name == "local")
+        assert ollama.local is True
+        assert local.local is True
+
+    def test_profiles_do_not_hardcode_model_catalogs(self):
+        from nova_arsenal.llm.multi_router import PROVIDER_PROFILES
+
+        assert all(not hasattr(profile, "models") for profile in PROVIDER_PROFILES)

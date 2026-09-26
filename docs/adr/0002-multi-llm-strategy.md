@@ -2,57 +2,61 @@
 
 ## Status
 
-Accepted
+Accepted, revised September 2026.
 
 ## Context
 
-Nova-Arsenal needs to support multiple LLM providers for flexibility, cost optimization, and reliability. Users may prefer different providers based on:
-- Cost (Ollama is free, cloud APIs cost money)
-- Performance (different models for different tasks)
-- Availability (fallback when one provider is down)
+Nova-Arsenal supports multiple LLM providers for reliability, privacy, cost control,
+and local inference. Model catalogs, pricing, context windows, and published latency
+change too quickly to be reliable routing constants inside application code.
+
+The previous router embedded exact vendor model names, token prices, context sizes,
+and guessed latency values. That created two correctness problems:
+
+1. routing metadata could report a different model from the one actually configured;
+2. routing quality degraded as vendor catalogs changed.
 
 ## Decision
 
-We will implement a multi-provider LLM system with:
+Nova uses a provider interface plus runtime-aware routing.
 
-1. **Provider Interface**: Abstract base class for all providers
-2. **Router**: Automatic provider selection and fallback
-3. **Configuration**: YAML-based provider configuration
-4. **Fallback Chain**: Automatic failover on provider failure
-
-### Supported Providers
-
-| Provider | Use Case | Cost |
-|----------|----------|------|
-| Ollama | Local inference | Free |
-| OpenAI | High-quality output | Pay-per-token |
-| Anthropic | Long context | Pay-per-token |
-| Gemini | Fast inference | Pay-per-token |
-
-### Routing Strategy
-
-```yaml
-routing:
-  strategy: "cost-optimized"
-  fallback_threshold: 3
-  max_retries: 3
-```
+1. **Actual configured model wins.** Routing decisions always report the model on the
+   registered provider instance.
+2. **Stable capabilities only.** Static profiles describe broad task strengths,
+   local-vs-cloud status, and tool support. They do not contain model catalogs,
+   prices, context-window sizes, or assumed latency.
+3. **Runtime telemetry.** Successful and failed calls update per-provider reliability
+   and observed latency. Later routing decisions can use those measurements.
+4. **Preferences are bounded.**
+   - `balanced` combines task fit, reliability, observed latency, and a small local bonus;
+   - `quality` emphasizes task fit and observed reliability;
+   - `speed` uses observed latency when available;
+   - `cost` only gives a structural advantage to local inference, because cloud pricing
+     varies by model and account and must not be guessed.
+5. **Fallback remains automatic.** Up to three alternate registered providers are
+   retained in the routing decision.
+6. **Provider defaults stay overridable.** `LLM_PROVIDER`, `LLM_MODEL`, and
+   provider-specific model environment variables always take precedence over defaults.
+7. **OpenAI API mode.** Official OpenAI endpoints use the Responses API; generic
+   OpenAI-compatible local endpoints continue to use Chat Completions by default.
 
 ## Consequences
 
 ### Positive
 
-- Users can choose their preferred provider
-- Automatic fallback increases reliability
-- Cost optimization for budget-conscious users
-- Local inference option for privacy
+- routing reflects the model that will actually receive the request;
+- no stale in-code price or latency tables;
+- local inference remains a first-class privacy/cost option;
+- provider reliability can improve routing over time;
+- vendor model upgrades mostly become configuration changes rather than router rewrites.
 
 ### Negative
 
-- Increased complexity in provider management
-- Need to maintain multiple provider implementations
-- Potential inconsistencies between providers
+- cold-start routing has less model-specific detail;
+- runtime telemetry is process-local and is not yet persisted;
+- “quality” is approximated by capability fit and reliability, not subjective benchmark rankings.
 
-## Implementation
+## Follow-up
 
-See `nova_arsenal/llm/` for implementation details.
+Persist routing telemetry and add optional administrator-defined provider weights if
+production deployments need deterministic organization-specific routing policy.

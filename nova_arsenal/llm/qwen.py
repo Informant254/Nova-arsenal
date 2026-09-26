@@ -18,7 +18,7 @@ class QwenProvider(LLMProvider):
 
     def __init__(
         self,
-        model: str = "qwen-max",
+        model: str = "qwen3.8-flash",
         api_key: str = "",
         base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
         timeout: int = 120,

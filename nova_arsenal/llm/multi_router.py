@@ -7,6 +7,7 @@ Supports: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, HuggingFace, Qwen, Deep
 
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Type
@@ -35,16 +36,18 @@ class TaskCategory(Enum):
 
 @dataclass
 class ProviderProfile:
-    """Profile of a provider's strengths."""
+    """Stable provider capabilities used for cold-start routing.
+
+    Model IDs, prices, context windows, and latency are intentionally not stored
+    here because they change frequently and may differ per configured model.
+    Runtime routing always uses the actual registered provider.model and learns
+    reliability/latency from observed calls.
+    """
+
     name: str
-    models: List[str]
     strengths: List[TaskCategory]
-    cost_per_1k_input: float
-    cost_per_1k_output: float
-    latency_ms: int
-    max_context: int
-    supports_streaming: bool = True
     supports_tools: bool = False
+    local: bool = False
 
 
 @dataclass
@@ -63,169 +66,109 @@ class RoutingDecision:
 PROVIDER_PROFILES: List[ProviderProfile] = [
     ProviderProfile(
         name="anthropic",
-        models=["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-3-5-haiku-20241022"],
         strengths=[
             TaskCategory.CODE_GENERATION,
             TaskCategory.CODE_REVIEW,
             TaskCategory.REASONING,
             TaskCategory.ANALYSIS,
             TaskCategory.PLANNING,
+            TaskCategory.SUMMARIZATION,
         ],
-        cost_per_1k_input=0.003,
-        cost_per_1k_output=0.015,
-        latency_ms=800,
-        max_context=200000,
         supports_tools=True,
     ),
     ProviderProfile(
         name="openai",
-        models=["gpt-4o", "gpt-4o-mini", "o3", "o4-mini"],
         strengths=[
             TaskCategory.CODE_GENERATION,
-            TaskCategory.CREATIVE,
+            TaskCategory.CODE_REVIEW,
+            TaskCategory.REASONING,
+            TaskCategory.ANALYSIS,
             TaskCategory.CONVERSATION,
             TaskCategory.SUMMARIZATION,
+            TaskCategory.PLANNING,
         ],
-        cost_per_1k_input=0.0025,
-        cost_per_1k_output=0.01,
-        latency_ms=600,
-        max_context=128000,
         supports_tools=True,
     ),
     ProviderProfile(
         name="gemini",
-        models=["gemini-2.5-flash", "gemini-2.5-pro"],
         strengths=[
             TaskCategory.ANALYSIS,
             TaskCategory.RESEARCH,
             TaskCategory.DATA_PROCESSING,
             TaskCategory.TRANSLATION,
+            TaskCategory.SUMMARIZATION,
         ],
-        cost_per_1k_input=0.00075,
-        cost_per_1k_output=0.003,
-        latency_ms=500,
-        max_context=1000000,
         supports_tools=True,
     ),
     ProviderProfile(
         name="deepseek",
-        models=["deepseek-chat", "deepseek-reasoner"],
         strengths=[
             TaskCategory.CODE_GENERATION,
+            TaskCategory.CODE_REVIEW,
             TaskCategory.REASONING,
-            TaskCategory.SECURITY_ANALYSIS,
+            TaskCategory.ANALYSIS,
         ],
-        cost_per_1k_input=0.00014,
-        cost_per_1k_output=0.00028,
-        latency_ms=700,
-        max_context=64000,
         supports_tools=True,
     ),
     ProviderProfile(
         name="qwen",
-        models=["qwen-max", "qwen-plus", "qwen-turbo", "qwen-long"],
         strengths=[
             TaskCategory.CODE_GENERATION,
+            TaskCategory.CODE_REVIEW,
             TaskCategory.ANALYSIS,
             TaskCategory.TRANSLATION,
             TaskCategory.DATA_PROCESSING,
         ],
-        cost_per_1k_input=0.0004,
-        cost_per_1k_output=0.0012,
-        latency_ms=600,
-        max_context=131072,
         supports_tools=True,
     ),
     ProviderProfile(
         name="openrouter",
-        models=["anthropic/claude-sonnet-4", "openai/gpt-4o", "google/gemini-2.5-flash", "nexus/nex-n2-pro", "nexus/nex-n2-mini"],
         strengths=[
             TaskCategory.CODE_GENERATION,
             TaskCategory.REASONING,
+            TaskCategory.ANALYSIS,
             TaskCategory.CREATIVE,
+            TaskCategory.RESEARCH,
         ],
-        cost_per_1k_input=0.003,
-        cost_per_1k_output=0.015,
-        latency_ms=900,
-        max_context=200000,
         supports_tools=True,
     ),
     ProviderProfile(
         name="huggingface",
-        models=["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mistral-Large-Instruct-2411"],
         strengths=[
             TaskCategory.CODE_GENERATION,
             TaskCategory.ANALYSIS,
+            TaskCategory.SUMMARIZATION,
         ],
-        cost_per_1k_input=0.0002,
-        cost_per_1k_output=0.0002,
-        latency_ms=1000,
-        max_context=128000,
-        supports_tools=False,
     ),
     ProviderProfile(
         name="ollama",
-        models=["deepseek-r1", "llama3.3", "qwen2.5", "mistral"],
         strengths=[
             TaskCategory.CONVERSATION,
             TaskCategory.CODE_GENERATION,
+            TaskCategory.CODE_REVIEW,
+            TaskCategory.SUMMARIZATION,
         ],
-        cost_per_1k_input=0.0,
-        cost_per_1k_output=0.0,
-        latency_ms=2000,
-        max_context=32000,
-        supports_tools=False,
+        local=True,
+    ),
+    ProviderProfile(
+        name="local",
+        strengths=[
+            TaskCategory.CONVERSATION,
+            TaskCategory.CODE_GENERATION,
+            TaskCategory.CODE_REVIEW,
+            TaskCategory.SUMMARIZATION,
+        ],
+        local=True,
     ),
     ProviderProfile(
         name="opencode",
-        models=["opencode-qwen-72b"],
         strengths=[
             TaskCategory.CONVERSATION,
             TaskCategory.CODE_GENERATION,
+            TaskCategory.CODE_REVIEW,
             TaskCategory.REASONING,
             TaskCategory.ANALYSIS,
-            TaskCategory.SECURITY_ANALYSIS,
-            TaskCategory.CREATIVE,
         ],
-        cost_per_1k_input=0.0,  # Free access
-        cost_per_1k_output=0.0,  # Free access
-        latency_ms=1500,
-        max_context=128000,
-        supports_tools=True,
-    ),
-    ProviderProfile(
-        name="qwythos",
-        models=["qwythos-9b", "qwythos-9b:1m"],
-        strengths=[
-            TaskCategory.REASONING,
-            TaskCategory.CODE_GENERATION,
-            TaskCategory.SECURITY_ANALYSIS,
-            TaskCategory.ANALYSIS,
-            TaskCategory.PLANNING,
-        ],
-        cost_per_1k_input=0.0,
-        cost_per_1k_output=0.0,
-        latency_ms=3000,
-        max_context=128000,
-        supports_tools=False,
-    ),
-    ProviderProfile(
-        name="nexn2",
-        models=["nex-n2-pro", "nex-n2-mini"],
-        strengths=[
-            TaskCategory.REASONING,
-            TaskCategory.CODE_GENERATION,
-            TaskCategory.SECURITY_ANALYSIS,
-            TaskCategory.ANALYSIS,
-            TaskCategory.PLANNING,
-            TaskCategory.RESEARCH,
-            TaskCategory.CONVERSATION,
-            TaskCategory.CREATIVE,
-        ],
-        cost_per_1k_input=0.0,
-        cost_per_1k_output=0.0,
-        latency_ms=2500,
-        max_context=262144,
         supports_tools=True,
     ),
 ]
@@ -339,7 +282,7 @@ class MultiProviderRouter:
             p.name: p for p in PROVIDER_PROFILES
         }
         self._routing_history: List[RoutingDecision] = []
-        self._provider_stats: Dict[str, Dict[str, int]] = {}
+        self._provider_stats: Dict[str, Dict[str, float]] = {}
 
     def register_provider(self, name: str, provider: LLMProvider) -> None:
         """Register a provider instance."""
@@ -364,47 +307,34 @@ class MultiProviderRouter:
         preference: Optional[str] = None,
         exclude: Optional[List[str]] = None,
     ) -> RoutingDecision:
+        """Route to a registered provider using capabilities plus runtime telemetry.
+
+        Static vendor price/latency/model tables age badly. Nova therefore uses
+        stable task capabilities for cold start, the *actual configured model*
+        from each provider instance, and observed success/latency once calls run.
         """
-        Route a task to the best provider.
-        
-        Preferences:
-        - "balanced": best quality/cost ratio
-        - "quality": highest quality regardless of cost
-        - "speed": lowest latency
-        - "cost": cheapest option
-        """
-        pref = preference or self._preference
-        exclude = exclude or []
+        pref = (preference or self._preference or "balanced").lower()
+        if pref not in {"balanced", "quality", "speed", "cost"}:
+            pref = "balanced"
+        excluded = set(exclude or [])
         category = classify_task(prompt)
 
-        # Find available providers with matching strengths
         candidates: List[Dict[str, Any]] = []
-
-        for name, profile in self._provider_profiles.items():
-            if name in exclude:
+        for name, provider in self._providers.items():
+            if name in excluded:
                 continue
-            if name not in self._providers:
-                continue
-
-            score = self._score_provider(profile, category, pref)
-            candidates.append({
-                "name": name,
-                "model": profile.models[0],
-                "profile": profile,
-                "score": score,
-            })
-
-        if not candidates:
-            # Fallback to any available provider
-            for name, provider in self._providers.items():
-                if name not in exclude:
-                    profile = self._provider_profiles.get(name)
-                    candidates.append({
-                        "name": name,
-                        "model": profile.models[0] if profile else provider.model,
-                        "profile": profile,
-                        "score": 0.5,
-                    })
+            profile = self._provider_profiles.get(
+                name,
+                ProviderProfile(name=name, strengths=[]),
+            )
+            candidates.append(
+                {
+                    "name": name,
+                    "model": provider.model,
+                    "profile": profile,
+                    "score": self._score_provider(name, profile, category, pref),
+                }
+            )
 
         if not candidates:
             decision = RoutingDecision(
@@ -417,27 +347,24 @@ class MultiProviderRouter:
             self._routing_history.append(decision)
             return decision
 
-        # Sort by score
-        candidates.sort(key=lambda c: c["score"], reverse=True)
+        candidates.sort(key=lambda item: item["score"], reverse=True)
         best = candidates[0]
-
-        # Build fallback chain
-        fallback_chain = []
-        for c in candidates[1:4]:
-            fallback_chain.append({
-                "provider": c["name"],
-                "model": c["model"],
-            })
+        fallback_chain = [
+            {"provider": item["name"], "model": item["model"]}
+            for item in candidates[1:4]
+        ]
 
         decision = RoutingDecision(
             provider=best["name"],
             model=best["model"],
             category=category,
             confidence=best["score"],
-            reason=f"Best match for {category.value} with {pref} preference",
+            reason=(
+                f"Capability/runtime match for {category.value} "
+                f"with {pref} preference"
+            ),
             fallback_chain=fallback_chain,
         )
-
         self._routing_history.append(decision)
         return decision
 
@@ -466,6 +393,7 @@ class MultiProviderRouter:
 
             providers_tried.append(provider_name)
             try:
+                started = time.monotonic()
                 result = await provider.complete(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -473,14 +401,22 @@ class MultiProviderRouter:
                     max_tokens=max_tokens,
                     **kwargs,
                 )
-                self._record_success(provider_name)
+                self._record_success(
+                    provider_name,
+                    (time.monotonic() - started) * 1000,
+                )
                 logger.info(
                     f"Completed with {provider_name}/{provider.model} "
                     f"(category={decision.category.value}, confidence={decision.confidence:.2f})"
                 )
                 return result
             except Exception as e:
-                self._record_failure(provider_name)
+                elapsed_ms = (
+                    (time.monotonic() - started) * 1000
+                    if "started" in locals()
+                    else 0.0
+                )
+                self._record_failure(provider_name, elapsed_ms)
                 logger.warning(f"Provider {provider_name} failed: {e}")
                 continue
 
@@ -507,6 +443,7 @@ class MultiProviderRouter:
                 continue
 
             try:
+                started = time.monotonic()
                 async for chunk in provider.stream(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -515,8 +452,18 @@ class MultiProviderRouter:
                     **kwargs,
                 ):
                     yield chunk
+                self._record_success(
+                    provider_name,
+                    (time.monotonic() - started) * 1000,
+                )
                 return
             except Exception as e:
+                elapsed_ms = (
+                    (time.monotonic() - started) * 1000
+                    if "started" in locals()
+                    else 0.0
+                )
+                self._record_failure(provider_name, elapsed_ms)
                 logger.warning(f"Provider {provider_name} stream failed: {e}")
                 continue
 
@@ -548,63 +495,81 @@ class MultiProviderRouter:
 
     def _score_provider(
         self,
+        provider_name: str,
         profile: ProviderProfile,
         category: TaskCategory,
         preference: str,
     ) -> float:
-        """Score a provider for a given task category and preference."""
-        score = 0.0
+        """Score with stable capabilities and observed runtime behavior."""
+        score = 0.30
 
-        # Base score: strength match
         if category in profile.strengths:
-            score += 0.5
-        elif category != TaskCategory.UNKNOWN:
-            score += 0.1
+            score += 0.30
+        elif category == TaskCategory.UNKNOWN:
+            score += 0.05
 
-        # Preference modifiers
-        if preference == "quality":
-            # Prefer expensive, high-quality models
-            if profile.cost_per_1k_output > 0.01:
-                score += 0.3
-            if profile.max_context >= 128000:
-                score += 0.1
-        elif preference == "speed":
-            # Prefer low latency
-            if profile.latency_ms < 600:
-                score += 0.3
-            elif profile.latency_ms < 1000:
-                score += 0.1
+        stats = self._provider_stats.get(provider_name, {})
+        successes = stats.get("success", 0.0)
+        failures = stats.get("failure", 0.0)
+        attempts = successes + failures
+
+        # Bayesian prior prevents a single request from dominating routing.
+        reliability = (successes + 1.0) / (attempts + 2.0)
+        score += 0.20 * reliability
+
+        avg_latency = stats.get("avg_latency_ms", 0.0)
+        if preference == "speed":
+            if avg_latency > 0:
+                score += max(0.0, 0.20 - min(avg_latency / 10000.0, 0.20))
+            else:
+                score += 0.10
         elif preference == "cost":
-            # Prefer cheap providers
-            if profile.cost_per_1k_input < 0.001:
-                score += 0.3
-            if profile.cost_per_1k_output < 0.001:
-                score += 0.1
+            # Cost is only treated as knowable when it is structurally local.
+            # Cloud prices are model/account specific and must not be hardcoded.
+            if profile.local:
+                score += 0.20
+        elif preference == "quality":
+            # Reliability is measurable; vendor/model "quality" rankings are not.
+            score += 0.10 * reliability
         else:  # balanced
-            # Balanced scoring
-            quality_score = min(profile.cost_per_1k_output * 10, 0.3)
-            speed_score = max(0, 0.3 - (profile.latency_ms / 5000))
-            score += quality_score + speed_score
+            if profile.local:
+                score += 0.05
+            if avg_latency > 0:
+                score += max(0.0, 0.10 - min(avg_latency / 20000.0, 0.10))
 
-        # Bonus for tool support
         if profile.supports_tools and category in (
             TaskCategory.CODE_GENERATION,
-            TaskCategory.SECURITY_ANALYSIS,
+            TaskCategory.CODE_REVIEW,
             TaskCategory.PLANNING,
         ):
-            score += 0.1
+            score += 0.05
 
-        return min(score, 1.0)
+        return max(0.0, min(score, 1.0))
 
-    def _record_success(self, provider_name: str) -> None:
-        if provider_name not in self._provider_stats:
-            self._provider_stats[provider_name] = {"success": 0, "failure": 0}
-        self._provider_stats[provider_name]["success"] += 1
+    def _record_success(self, provider_name: str, latency_ms: float = 0.0) -> None:
+        stats = self._provider_stats.setdefault(
+            provider_name,
+            {"success": 0.0, "failure": 0.0, "latency_ms_total": 0.0, "avg_latency_ms": 0.0},
+        )
+        stats["success"] += 1.0
+        self._record_latency(stats, latency_ms)
 
-    def _record_failure(self, provider_name: str) -> None:
-        if provider_name not in self._provider_stats:
-            self._provider_stats[provider_name] = {"success": 0, "failure": 0}
-        self._provider_stats[provider_name]["failure"] += 1
+    def _record_failure(self, provider_name: str, latency_ms: float = 0.0) -> None:
+        stats = self._provider_stats.setdefault(
+            provider_name,
+            {"success": 0.0, "failure": 0.0, "latency_ms_total": 0.0, "avg_latency_ms": 0.0},
+        )
+        stats["failure"] += 1.0
+        self._record_latency(stats, latency_ms)
+
+    @staticmethod
+    def _record_latency(stats: Dict[str, float], latency_ms: float) -> None:
+        if latency_ms <= 0:
+            return
+        stats["latency_ms_total"] += latency_ms
+        attempts = stats["success"] + stats["failure"]
+        if attempts > 0:
+            stats["avg_latency_ms"] = stats["latency_ms_total"] / attempts
 
     def _get_category_distribution(self) -> Dict[str, int]:
         dist: Dict[str, int] = {}

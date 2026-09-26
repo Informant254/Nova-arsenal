@@ -18,7 +18,7 @@ class DeepSeekProvider(LLMProvider):
 
     def __init__(
         self,
-        model: str = "deepseek-chat",
+        model: str = "deepseek-flash",
         api_key: str = "",
         base_url: str = "https://api.deepseek.com/v1",
         timeout: int = 120,
