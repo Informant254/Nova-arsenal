@@ -20,74 +20,19 @@ jobs:
           cache: pip
       - name: Install package and development tools
         run: pip install -e ".[dev]"
-      - name: Apply guarded Ruff safe fixes, then test
+      - name: Apply guarded Ruff safe fixes and test
         shell: bash
         run: |
           set +e
-
-          # Make the correlation report formatter-safe on Python 3.10/3.11.
-          # The old nested f-string can be rewritten by newer formatters into
-          # PEP 701 syntax that is only parseable on Python 3.12+.
           python - <<'PY'
           from pathlib import Path
 
           path = Path("nova_arsenal/agent_runner.py")
           text = path.read_text()
-          old = '''        if self._correlation_result:
-            cr = self._correlation_result
-            correlation_section = f"""
-Cross-Tool Correlation:
-- Correlated findings: {cr.total_correlated}
-- Critical: {len(cr.critical_findings)}
-- High: {len(cr.high_findings)}
-- Tools used: {', '.join(f'{k}({v})' for k, v in cr.tool_coverage.items()) if cr.tool_coverage else 'None'}
-- Confidence score: {cr.to_dict().get('confidence_score', 0)}
-
-Top Correlated Findings:
-{chr(10).join(f'  [{f.severity.upper()}] {f.title} (sources: {", ".join(f.source_tools)})' for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}
-
-Insights:
-{chr(10).join(f'  - {i}' for i in cr.cross_tool_insights) if cr.cross_tool_insights else '  No insights generated'}
-"""
-'''
-          new = '''        if self._correlation_result:
-            cr = self._correlation_result
-            tool_coverage = (
-                ", ".join(f"{name}({count})" for name, count in cr.tool_coverage.items())
-                if cr.tool_coverage
-                else "None"
-            )
-            top_correlated = (
-                "\\n".join(
-                    f"  [{finding.severity.upper()}] {finding.title} "
-                    f"(sources: {', '.join(finding.source_tools)})"
-                    for finding in cr.correlated_findings[:5]
-                )
-                if cr.correlated_findings
-                else "  None"
-            )
-            insights = (
-                "\\n".join(f"  - {insight}" for insight in cr.cross_tool_insights)
-                if cr.cross_tool_insights
-                else "  No insights generated"
-            )
-            correlation_section = f"""
-Cross-Tool Correlation:
-- Correlated findings: {cr.total_correlated}
-- Critical: {len(cr.critical_findings)}
-- High: {len(cr.high_findings)}
-- Tools used: {tool_coverage}
-- Confidence score: {cr.to_dict().get('confidence_score', 0)}
-
-Top Correlated Findings:
-{top_correlated}
-
-Insights:
-{insights}
-"""
-'''
+          old = """{chr(10).join(f'  [{f.severity.upper()}] {f.title} (sources: {\", \".join(f.source_tools)})' for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}"""
+          new = """{chr(10).join('  [{}] {} (sources: {})'.format(f.severity.upper(), f.title, ", ".join(f.source_tools)) for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}"""
           if old not in text:
-              raise SystemExit("Expected correlation report block not found")
+              raise SystemExit("Expected correlation f-string not found")
           path.write_text(text.replace(old, new, 1))
           PY
 
@@ -111,7 +56,6 @@ Insights:
               echo "## Ruff output (exit $RUFF_EXIT)"
               cat /tmp/ruff-fix.txt
             } > .hardening/test-failure.txt
-
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .hardening/test-failure.txt
@@ -147,13 +91,13 @@ Insights:
               lines.append(f"- {key}: {count}")
 
           fmt = Path("/tmp/format.txt").read_text(errors="replace").strip()
-          lines.extend(["", "## Ruff format", fmt[:5000] or "No format output."])
+          lines.extend(["", "## Ruff format", fmt[:3000] or "No format output."])
 
           try:
               pyright = json.loads(Path("/tmp/pyright.json").read_text())
           except Exception as exc:
               pyright = {}
-              lines.extend(["", f"BasedPyright JSON parse failed: {exc}", Path("/tmp/pyright.stderr").read_text(errors="replace")[:3000]])
+              lines.extend(["", f"BasedPyright JSON parse failed: {exc}"])
           summary = pyright.get("summary", {})
           diagnostics = pyright.get("generalDiagnostics", [])
           lines.extend([
