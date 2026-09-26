@@ -1028,4 +1028,3 @@ async def ctf_stats():
 
     solver = CtfSolver()
     return solver.get_stats()
-

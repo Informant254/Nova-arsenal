@@ -495,4 +495,3 @@ def reload_config(config_path: str | None = None) -> NovaConfig:
     except Exception:  # noqa: BLE001
         pass
     return _config
-
