@@ -1,0 +1,219 @@
+name: Type Fix Batch
+
+on:
+  push:
+    branches: ["release/hardening"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install package and development tools
+        run: pip install -e ".[dev]"
+      - name: Apply targeted type fixes
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "nova_arsenal/agent_runner.py": [
+                  (
+                      "from nova_arsenal.integrations import BurpAPI, MetasploitRPC, NmapParser, SQLmapAPI\n",
+                      "from nova_arsenal.integrations import BurpAPI, MetasploitRPC, NmapParser, SQLmapAPI\nfrom nova_arsenal.integrations.burp_api import BurpIssue\n",
+                  ),
+                  (
+                      "        self._burp_issues: list[dict[str, Any]] = []",
+                      "        self._burp_issues: list[BurpIssue] = []",
+                  ),
+                  (
+                      "        mapped_count = 0\n        framework_hits = {}\n        for finding in self._findings:\n",
+                      "        mapped_count = 0\n        framework_hits: dict[str, int] = {}\n        mapped_results: list[Any] = []\n        for finding in self._findings:\n",
+                  ),
+                  (
+                      "            result = self._compliance_mapper.map_finding(ftype, finding.description)\n",
+                      "            result = self._compliance_mapper.map_finding(\n                finding_type=ftype,\n                title=finding.title,\n                severity=finding.severity,\n                evidence=finding.evidence,\n            )\n",
+                  ),
+                  (
+                      "                mapped_count += 1\n                for framework in result.frameworks_affected:\n",
+                      "                mapped_count += 1\n                mapped_results.append(result)\n                for framework in result.frameworks_affected:\n",
+                  ),
+                  (
+                      "                finding.description += f\"\\n[Compliance] {', '.join(f.c.id for f in result.controls[:3])}\"\n\n            stats = self._compliance_mapper.get_summary_stats() if mapped_count else None\n",
+                      "                finding.description += f\"\\n[Compliance] {', '.join(c.control_id for c in result.controls[:3])}\"\n\n        stats = self._compliance_mapper.get_summary_stats(mapped_results) if mapped_results else None\n",
+                  ),
+              ],
+              "nova_arsenal/llm/multi_router.py": [
+                  (
+                      "            providers_tried.append(provider_name)\n            try:\n                started = time.monotonic()",
+                      "            providers_tried.append(provider_name)\n            started = time.monotonic()\n            try:",
+                  ),
+                  (
+                      "                elapsed_ms = (\n                    (time.monotonic() - started) * 1000\n                    if \"started\" in locals()\n                    else 0.0\n                )",
+                      "                elapsed_ms = (time.monotonic() - started) * 1000",
+                  ),
+                  (
+                      "            try:\n                started = time.monotonic()\n                async for chunk in provider.stream(",
+                      "            started = time.monotonic()\n            try:\n                async for chunk in provider.stream(",
+                  ),
+                  (
+                      "                elapsed_ms = (\n                    (time.monotonic() - started) * 1000\n                    if \"started\" in locals()\n                    else 0.0\n                )",
+                      "                elapsed_ms = (time.monotonic() - started) * 1000",
+                  ),
+              ],
+              "nova_arsenal/skills/session_memory.py": [
+                  (
+                      "            return cur.lastrowid\n\n    def recent_tasks",
+                      "            if cur.lastrowid is None:\n                raise RuntimeError(\"Task insert did not produce a row id\")\n            return int(cur.lastrowid)\n\n    def recent_tasks",
+                  ),
+                  (
+                      "            return cur.lastrowid\n\n    def findings_for_target",
+                      "            if cur.lastrowid is None:\n                raise RuntimeError(\"Finding insert did not produce a row id\")\n            return int(cur.lastrowid)\n\n    def findings_for_target",
+                  ),
+              ],
+              "nova_arsenal/async_utils.py": [
+                  (
+                      "    last_exception = None\n",
+                      "    last_exception: Exception | None = None\n",
+                  ),
+                  (
+                      "    raise last_exception\n\n\n@dataclass\nclass ResourceLimits",
+                      "    if last_exception is None:\n        raise RuntimeError(f\"{operation_name} failed without an exception\")\n    raise last_exception\n\n\n@dataclass\nclass ResourceLimits",
+                  ),
+              ],
+              "nova_arsenal/auth/rate_limit.py": [
+                  (
+                      "    def consume(self, now: float = None) -> bool:",
+                      "    def consume(self, now: float | None = None) -> bool:",
+                  ),
+              ],
+              "nova_arsenal/auth/cleanup.py": [
+                  (
+                      "        from nova_arsenal.db.session import async_session\n        async with async_session() as db:\n",
+                      "        from nova_arsenal.db.session import get_session_factory\n        factory = get_session_factory()\n        async with factory() as db:\n",
+                  ),
+              ],
+              "nova_arsenal/sessions/runtime.py": [
+                  (
+                      "                if isinstance(outcome, Exception):",
+                      "                if isinstance(outcome, BaseException):",
+                  ),
+              ],
+              "nova_arsenal/swarm.py": [
+                  (
+                      "    agent_stats: dict[str, dict[str, int]] = field(default_factory=dict)",
+                      "    agent_stats: dict[str, dict[str, Any]] = field(default_factory=dict)",
+                  ),
+                  (
+                      "                if isinstance(agent_result, Exception):",
+                      "                if isinstance(agent_result, BaseException):",
+                  ),
+                  (
+                      "                if isinstance(agent_result, Exception):",
+                      "                if isinstance(agent_result, BaseException):",
+                  ),
+                  (
+                      "                if isinstance(agent_result, Exception):",
+                      "                if isinstance(agent_result, BaseException):",
+                  ),
+              ],
+              "nova_arsenal/training/glm_agentic_rl.py": [
+                  (
+                      "        self._stats = {\n            \"total_rollouts\": 0,",
+                      "        self._stats: dict[str, Any] = {\n            \"total_rollouts\": 0,",
+                  ),
+              ],
+              "nova_arsenal/incremental/engine.py": [
+                  (
+                      "from enum import Enum\n",
+                      "from enum import Enum\nfrom typing import Any\n",
+                  ),
+                  (
+                      "        self._version_hashes: dict[str, dict[str, str]] = {}",
+                      "        self._version_hashes: dict[str, dict[str, Any]] = {}",
+                  ),
+                  (
+                      "        test_cases: list[dict] = []",
+                      "        test_cases: list[dict[str, Any]] = []",
+                  ),
+              ],
+              "nova_arsenal/data_generation/core.py": [
+                  (
+                      "    items: list[tuple[Any, ...]],",
+                      "    items: list[Any],",
+                  ),
+                  (
+                      "        path = self.config.output_path\n        mode = \"a\" if self.config.append else \"w\"\n\n        if path and path.suffix == \".parquet\":",
+                      "        path = self.config.output_path\n        if path is None:\n            raise ValueError(\"output_path is required when writing generated tasks\")\n        mode = \"a\" if self.config.append else \"w\"\n\n        if path.suffix == \".parquet\":",
+                  ),
+                  (
+                      "            import pandas as pd\n",
+                      "            import pandas as pd  # type: ignore[reportMissingImports]\n",
+                  ),
+              ],
+              "nova_arsenal/llm/__init__.py": [
+                  (
+                      "from nova_arsenal.llm.base import LLMProvider\n",
+                      "from typing import TYPE_CHECKING\n\nfrom nova_arsenal.llm.base import LLMProvider\n\nif TYPE_CHECKING:\n    from nova_arsenal.llm.multi_router import MultiProviderRouter\n    from nova_arsenal.llm.router import LLMRouter, get_llm_router\n",
+                  ),
+              ],
+          }
+
+          for filename, pairs in replacements.items():
+              path = Path(filename)
+              text = path.read_text()
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f"Expected text not found in {filename}: {old!r}")
+                  text = text.replace(old, new, 1)
+              path.write_text(text)
+          PY
+
+          ruff check . --fix
+          git diff --check
+          pytest -q
+      - name: Capture type-check snapshot
+        shell: bash
+        run: |
+          set +e
+          mkdir -p .hardening
+          basedpyright nova_arsenal/ --outputjson > /tmp/pyright.json 2>/tmp/pyright.stderr
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/pyright.json').read_text())
+          summary = data.get('summary', {})
+          diagnostics = data.get('generalDiagnostics', [])
+          lines = [
+              '# Targeted type-fix batch',
+              '',
+              f"Errors: {summary.get('errorCount', 'unknown')}",
+              f"Warnings: {summary.get('warningCount', 'unknown')}",
+              '',
+          ]
+          for d in diagnostics:
+              start = d.get('range', {}).get('start', {})
+              line = int(start.get('line', 0)) + 1
+              msg = ' '.join(str(d.get('message', '')).split())[:300]
+              lines.append(f"- {d.get('file', 'unknown')}:{line} [{d.get('rule', 'unknown')}] {msg}")
+          Path('.hardening/type-batch.txt').write_text('\n'.join(lines) + '\n')
+          PY
+      - name: Commit tested fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(hardening): resolve targeted type-safety issues"
+          git push
