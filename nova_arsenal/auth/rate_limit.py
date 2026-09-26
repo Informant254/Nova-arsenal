@@ -25,7 +25,7 @@ class TokenBucket:
         self.tokens = float(self.capacity)
         self.last_refill = time.monotonic()
 
-    def consume(self, now: float = None) -> bool:
+    def consume(self, now: float | None = None) -> bool:
         if now is None:
             now = time.monotonic()
         elapsed = now - self.last_refill

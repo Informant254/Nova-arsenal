@@ -224,7 +224,7 @@ class SessionManager:
             )
             for item, outcome in zip(agent_items, outcomes):
                 aid, _ = item
-                if isinstance(outcome, Exception):
+                if isinstance(outcome, BaseException):
                     r = sess.agents[aid]
                     r.status = SubAgentStatus.FAILED
                     r.error = str(outcome)

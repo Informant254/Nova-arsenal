@@ -173,7 +173,9 @@ class SessionMemory:
                     json.dumps(detail or {}), _now(),
                 ),
             )
-            return cur.lastrowid
+            if cur.lastrowid is None:
+                raise RuntimeError("Task insert did not produce a row id")
+            return int(cur.lastrowid)
 
     def recent_tasks(self, limit: int = 20) -> list[TaskEntry]:
         with self._conn() as conn:
@@ -287,7 +289,9 @@ class SessionMemory:
                     status, json.dumps(detail or {}), _now(),
                 ),
             )
-            return cur.lastrowid
+            if cur.lastrowid is None:
+                raise RuntimeError("Finding insert did not produce a row id")
+            return int(cur.lastrowid)
 
     def findings_for_target(self, target_id: str, platform: str) -> list[dict[str, Any]]:
         with self._conn() as conn:

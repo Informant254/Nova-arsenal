@@ -14,6 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ class IncrementalTester:
     def __init__(self):
         self._test_plans: list[TestPlan] = []
         self._test_results: list[TestResult] = []
-        self._version_hashes: dict[str, dict[str, str]] = {}
+        self._version_hashes: dict[str, dict[str, Any]] = {}
 
     def compute_version_hash(self, version: str, files: dict[str, str]) -> str:
         """Compute a hash for an entire version's file set."""
@@ -193,7 +194,7 @@ class IncrementalTester:
     ) -> TestPlan:
         """Generate a test plan focused only on changed components."""
         all_tests = all_tests or []
-        test_cases: list[dict] = []
+        test_cases: list[dict[str, Any]] = []
         skipped = 0
         priority_matrix: dict[str, list[str]] = {
             "critical": [], "high": [], "medium": [], "low": [],

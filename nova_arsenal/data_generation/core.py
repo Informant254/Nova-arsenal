@@ -370,7 +370,7 @@ def build_domain_pool(dist: dict[str, float]) -> list[tuple[str, str, str, float
 
 
 def weighted_sample(
-    items: list[tuple[Any, ...]],
+    items: list[Any],
     weights: list[float],
     rng: random.Random,
 ) -> Any:
@@ -573,9 +573,11 @@ class NovaDataGenerator:
 
     def _write_output(self, entries: list[TaskEntry]) -> None:
         path = self.config.output_path
+        if path is None:
+            raise ValueError("output_path is required when writing generated tasks")
         mode = "a" if self.config.append else "w"
 
-        if path and path.suffix == ".parquet":
+        if path.suffix == ".parquet":
             self._write_parquet(entries, path)
         else:
             with open(path, mode, encoding="utf-8") as f:
@@ -586,7 +588,7 @@ class NovaDataGenerator:
     def _write_parquet(self, entries: list[TaskEntry], path: Path) -> None:
         """Write entries in Nex-N2 style parquet format (prompt/ground_truth columns)."""
         try:
-            import pandas as pd
+            import pandas as pd  # type: ignore[reportMissingImports]
             rows = [e.to_nexn2_rl_row() for e in entries]
             df = pd.DataFrame(rows)
             df.to_parquet(path, index=False)

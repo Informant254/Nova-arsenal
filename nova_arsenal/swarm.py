@@ -60,7 +60,7 @@ class SwarmResult:
     target: str
     findings: list[SwarmFinding] = field(default_factory=list)
     consensus_findings: list[SwarmFinding] = field(default_factory=list)
-    agent_stats: dict[str, dict[str, int]] = field(default_factory=dict)
+    agent_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
     total_steps: int = 0
     elapsed_seconds: float = 0.0
     zeroday_hunt: dict[str, Any] | None = None
@@ -212,7 +212,7 @@ class SwarmOrchestrator:
                 return_exceptions=True,
             )
             for role, agent_result in zip(recon_roles, phase1):
-                if isinstance(agent_result, Exception):
+                if isinstance(agent_result, BaseException):
                     logger.error("Swarm agent %s failed: %s", role.value, agent_result)
                     result.agent_stats[role.value] = {"status": "error", "error": str(agent_result)}
                     continue
@@ -260,7 +260,7 @@ class SwarmOrchestrator:
                 return_exceptions=True,
             )
             for role, agent_result in zip(later_roles, phase3):
-                if isinstance(agent_result, Exception):
+                if isinstance(agent_result, BaseException):
                     logger.error("Swarm agent %s failed: %s", role.value, agent_result)
                     result.agent_stats[role.value] = {"status": "error", "error": str(agent_result)}
                     continue
@@ -281,7 +281,7 @@ class SwarmOrchestrator:
                 return_exceptions=True,
             )
             for config, agent_result in zip(extras, extra_results):
-                if isinstance(agent_result, Exception):
+                if isinstance(agent_result, BaseException):
                     continue
                 findings, stats = agent_result
                 result.findings.extend(findings)

@@ -435,7 +435,7 @@ class MultiTaskRolloutOrchestrator:
         self._services: dict[AgenticTaskType, TaskService] = {}
         self._task_ratios: dict[AgenticTaskType, float] = {}
         self._unified_trajectories: list[dict[str, Any]] = []
-        self._stats = {
+        self._stats: dict[str, Any] = {
             "total_rollouts": 0,
             "completed_trajectories": 0,
             "tasks_served": 0,

@@ -1,0 +1,35 @@
+# Targeted type-fix batch
+
+Errors: 30
+Warnings: 0
+
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1377 [reportArgumentType] Argument of type "list[BurpIssue]" cannot be assigned to parameter "burp_issues" of type "list[dict[str, Any]] | None" in function "correlate" Type "list[BurpIssue]" is not assignable to type "list[dict[str, Any]] | None" "list[BurpIssue]" is not assignable to "list[dict[str, Any]]" Type parameter "
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:396 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "int" "None" is not assignable to "int"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:397 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "str" "None" is not assignable to "str"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:421 [reportOptionalMemberAccess] "value" is not a known attribute of "None"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:455 [reportOptionalMemberAccess] "value" is not a known attribute of "None"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:528 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "str" "None" is not assignable to "str"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:779 [reportOptionalMemberAccess] "value" is not a known attribute of "None"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:15 [reportMissingImports] Import "torch" could not be resolved
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:16 [reportMissingImports] Import "torch.nn" could not be resolved
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:17 [reportMissingImports] Import "torch.nn.functional" could not be resolved
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/oauth.py:117 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable to "str" "None" is incompatible with pro
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/oauth.py:117 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable to "str" "None" is incompatible with pro
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py:228 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable to "str" "None" is incompatible with pro
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py:228 [reportArgumentType] Argument of type "Any | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Any | None" is not assignable to type "ConvertibleToInt" Type "None" is not assignable to type "ConvertibleToInt" "None" is not assignable to "str" "None" is incompatible with pro
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/attack_chaining.py:364 [reportGeneralTypeIssues] "Never" is not awaitable
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/incremental/engine.py:219 [reportArgumentType] Argument of type "Literal[1, 2, 3, 4, 5]" cannot be assigned to parameter "value" of type "str" in function "__setitem__" Type "Literal[1, 2, 3, 4, 5]" is not assignable to type "str" "Literal[1]" is not assignable to "str"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [reportAttributeAccessIssue] "MCPServer" is unknown import symbol
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [reportAttributeAccessIssue] "Resource" is unknown import symbol
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:9 [reportAttributeAccessIssue] "Tool" is unknown import symbol
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:417 [reportPossiblyUnboundVariable] "Tool" is possibly unbound
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:425 [reportPossiblyUnboundVariable] "Resource" is possibly unbound
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:431 [reportPossiblyUnboundVariable] "MCPServer" is possibly unbound
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py:438 [reportOptionalMemberAccess] "run" is not a known attribute of "None"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/optimizers/muon.py:17 [reportMissingImports] Import "torch" could not be resolved
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/optimizers/muon.py:18 [reportMissingImports] Import "torch.optim.optimizer" could not be resolved
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/ransomware/emulator.py:146 [reportAttributeAccessIssue] Cannot assign to attribute "start_time" for class "RansomwareAction" Attribute "start_time" is unknown
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/safety/controller.py:122 [reportGeneralTypeIssues] Expected class but received "(obj: object, /) -> TypeIs[(...) -> object]"
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sandbox_executor.py:159 [reportAttributeAccessIssue] Cannot access attribute "execute_local" for class "SandboxExecutor*" Attribute "execute_local" is unknown
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/zeroday/pipeline.py:387 [reportArgumentType] Argument of type "Unknown | list[Unknown] | Literal[0]" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Unknown | list[Unknown] | Literal[0]" is not assignable to type "ConvertibleToInt" Type "list[Unknown]" is not assignable to type "ConvertibleToInt" "lis
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/zeroday/pipeline.py:387 [reportArgumentType] Argument of type "Unknown | list[Unknown] | Literal[0]" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__" Type "Unknown | list[Unknown] | Literal[0]" is not assignable to type "ConvertibleToInt" Type "list[Unknown]" is not assignable to type "ConvertibleToInt" "lis

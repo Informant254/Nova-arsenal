@@ -157,7 +157,7 @@ async def async_retry(
         Last exception if all retries exhausted
     """
     config = config or RetryConfig()
-    last_exception = None
+    last_exception: Exception | None = None
 
     for attempt in range(config.max_retries + 1):
         try:
@@ -177,6 +177,8 @@ async def async_retry(
             else:
                 logger.error(f"{operation_name} failed after {config.max_retries + 1} attempts")
 
+    if last_exception is None:
+        raise RuntimeError(f"{operation_name} failed without an exception")
     raise last_exception
 
 

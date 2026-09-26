@@ -30,6 +30,7 @@ from nova_arsenal.ctf_solver import CtfSolver
 
 # API integrations (lazy-imported to avoid hard deps)
 from nova_arsenal.integrations import BurpAPI, MetasploitRPC, NmapParser, SQLmapAPI
+from nova_arsenal.integrations.burp_api import BurpIssue
 from nova_arsenal.intelligence import CveResearch, ToolSelector
 from nova_arsenal.intelligence.self_optimizer import SelfOptimizer
 from nova_arsenal.kali_blueprint import KaliBlueprint
@@ -261,7 +262,7 @@ class AgentRunner:
         self._detected_services: dict[str, list[int]] = {}
 
         # Integration artifacts
-        self._burp_issues: list[dict[str, Any]] = []
+        self._burp_issues: list[BurpIssue] = []
         self._msf_results: list[dict[str, Any]] = []
         self._sqlmap_results: list[dict[str, Any]] = []
 
@@ -1410,19 +1411,26 @@ Analysis:"""
             self._compliance_mapper = ComplianceMapper()
 
         mapped_count = 0
-        framework_hits = {}
+        framework_hits: dict[str, int] = {}
+        mapped_results: list[Any] = []
         for finding in self._findings:
             ftype = self._infer_finding_type(finding)
             if not ftype:
                 continue
-            result = self._compliance_mapper.map_finding(ftype, finding.description)
+            result = self._compliance_mapper.map_finding(
+                finding_type=ftype,
+                title=finding.title,
+                severity=finding.severity,
+                evidence=finding.evidence,
+            )
             if result.controls:
                 mapped_count += 1
+                mapped_results.append(result)
                 for framework in result.frameworks_affected:
                     framework_hits[framework] = framework_hits.get(framework, 0) + 1
-                finding.description += f"\n[Compliance] {', '.join(f.c.id for f in result.controls[:3])}"
+                finding.description += f"\n[Compliance] {', '.join(c.control_id for c in result.controls[:3])}"
 
-            stats = self._compliance_mapper.get_summary_stats() if mapped_count else None
+        stats = self._compliance_mapper.get_summary_stats(mapped_results) if mapped_results else None
         await self._emit("compliance_complete", {
             "mapped_findings": mapped_count,
             "total_findings": len(self._findings),

@@ -1,6 +1,12 @@
 """Nova-Arsenal LLM Module"""
 
+from typing import TYPE_CHECKING
+
 from nova_arsenal.llm.base import LLMProvider
+
+if TYPE_CHECKING:
+    from nova_arsenal.llm.multi_router import MultiProviderRouter
+    from nova_arsenal.llm.router import LLMRouter, get_llm_router
 
 __all__ = ["LLMProvider", "LLMRouter", "get_llm_router", "MultiProviderRouter"]
 

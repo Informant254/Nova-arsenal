@@ -391,8 +391,8 @@ class MultiProviderRouter:
                 continue
 
             providers_tried.append(provider_name)
+            started = time.monotonic()
             try:
-                started = time.monotonic()
                 result = await provider.complete(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -410,11 +410,7 @@ class MultiProviderRouter:
                 )
                 return result
             except Exception as e:
-                elapsed_ms = (
-                    (time.monotonic() - started) * 1000
-                    if "started" in locals()
-                    else 0.0
-                )
+                elapsed_ms = (time.monotonic() - started) * 1000
                 self._record_failure(provider_name, elapsed_ms)
                 logger.warning(f"Provider {provider_name} failed: {e}")
                 continue
@@ -441,8 +437,8 @@ class MultiProviderRouter:
             if not provider:
                 continue
 
+            started = time.monotonic()
             try:
-                started = time.monotonic()
                 async for chunk in provider.stream(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -457,11 +453,7 @@ class MultiProviderRouter:
                 )
                 return
             except Exception as e:
-                elapsed_ms = (
-                    (time.monotonic() - started) * 1000
-                    if "started" in locals()
-                    else 0.0
-                )
+                elapsed_ms = (time.monotonic() - started) * 1000
                 self._record_failure(provider_name, elapsed_ms)
                 logger.warning(f"Provider {provider_name} stream failed: {e}")
                 continue
