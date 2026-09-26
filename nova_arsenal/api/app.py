@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # ── App Factory ──────────────────────────────────────────────────────────────
 
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Nova-Arsenal",
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
         # Initialize database tables
         try:
             from nova_arsenal.db.session import create_tables
+
             await create_tables()
             logger.info("Database tables created / verified")
 
@@ -85,6 +87,7 @@ def create_app() -> FastAPI:
             import asyncio
 
             from nova_arsenal.auth.cleanup import start_cleanup_task
+
             asyncio.create_task(start_cleanup_task(interval_seconds=3600))
             logger.info("API key cleanup task started (hourly)")
         except Exception as e:

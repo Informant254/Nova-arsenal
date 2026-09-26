@@ -315,7 +315,9 @@ def _account_main(argv: list[str]) -> None:
         help="Import from local Claude Code / Codex / Cursor credentials",
     )
     p_login.add_argument("--url", default="", help="Local LLM base URL (Ollama / LM Studio)")
-    p_login.add_argument("--model", default="", help="Model name for local LLM or preferred cloud model")
+    p_login.add_argument(
+        "--model", default="", help="Model name for local LLM or preferred cloud model"
+    )
     p_login.add_argument("--label", default="", help="Friendly label for this account")
 
     p_logout = sub.add_parser("logout", help="Remove a stored AI account")
@@ -354,7 +356,15 @@ def _account_main(argv: list[str]) -> None:
         if args.import_existing:
             results = store.import_from_tools()
             reset_llm_router()
-            print(json.dumps({"imported": results, "accounts": [a.to_public_dict() for a in store.list_accounts()]}, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "imported": results,
+                        "accounts": [a.to_public_dict() for a in store.list_accounts()],
+                    },
+                    indent=2,
+                )
+            )
             return
 
         provider = (args.provider or "").lower()
@@ -509,7 +519,7 @@ def _session_main(argv: list[str]) -> None:
         if final.consensus:
             print("\nTop consensus:")
             for f in final.consensus[:8]:
-                print(f"  - [{f.get('severity','?')}] {f.get('title','')[:90]}")
+                print(f"  - [{f.get('severity', '?')}] {f.get('title', '')[:90]}")
 
 
 if __name__ == "__main__":

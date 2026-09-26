@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # ── Difficulty Scale (ported from taskgen) ──────────────────────────────────
 
+
 class DifficultyScale(Enum):
     VERY_EASY = 1
     EASY = 2
@@ -115,6 +116,7 @@ Each block must be present and substantive. Empty blocks will be rejected."""
 
 # ── Security Domain Taxonomy ────────────────────────────────────────────────
 
+
 @dataclass
 class SecurityDomainTaxonomy:
     category: str
@@ -124,99 +126,243 @@ class SecurityDomainTaxonomy:
 
 SECURITY_DOMAIN_TAXONOMY: list[SecurityDomainTaxonomy] = [
     # Reconnaissance
-    SecurityDomainTaxonomy("recon", "Passive Reconnaissance", [
-        "dns_enumeration", "subdomain_discovery", "certificate_transparency",
-        "whois_lookup", "email_harvesting", "social_media_osint",
-    ]),
-    SecurityDomainTaxonomy("recon", "Active Reconnaissance", [
-        "port_scanning", "service_fingerprinting", "network_mapping",
-        "banner_grabbing", "firewall_detection", "cdn_detection",
-    ]),
-    SecurityDomainTaxonomy("recon", "Web Reconnaissance", [
-        "directory_enumeration", "parameter_discovery", "endpoint_mapping",
-        "tech_stack_detection", "hidden_files", "api_discovery",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "recon",
+        "Passive Reconnaissance",
+        [
+            "dns_enumeration",
+            "subdomain_discovery",
+            "certificate_transparency",
+            "whois_lookup",
+            "email_harvesting",
+            "social_media_osint",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "recon",
+        "Active Reconnaissance",
+        [
+            "port_scanning",
+            "service_fingerprinting",
+            "network_mapping",
+            "banner_grabbing",
+            "firewall_detection",
+            "cdn_detection",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "recon",
+        "Web Reconnaissance",
+        [
+            "directory_enumeration",
+            "parameter_discovery",
+            "endpoint_mapping",
+            "tech_stack_detection",
+            "hidden_files",
+            "api_discovery",
+        ],
+    ),
     # Exploitation
-    SecurityDomainTaxonomy("exploit", "Web Exploitation", [
-        "sql_injection", "xss", "csrf", "ssrf", "lfi_rfi",
-        "command_injection", "file_upload_bypass", "template_injection",
-        "deserialization", "xxe",
-    ]),
-    SecurityDomainTaxonomy("exploit", "Network Exploitation", [
-        "mitm", "arp_spoofing", "dns_spoofing", "sniffing",
-        "session_hijacking", "vlan_hopping",
-    ]),
-    SecurityDomainTaxonomy("exploit", "Authentication Bypass", [
-        "oauth_misconfiguration", "jwt_forgery", "session_fixation",
-        "brute_force", "credential_stuffing", "mfa_bypass",
-    ]),
-    SecurityDomainTaxonomy("exploit", "Privilege Escalation", [
-        "sudo_abuse", "suid_exploitation", "kernel_exploit",
-        "container_escape", "service_abuse", "token_impersonation",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Web Exploitation",
+        [
+            "sql_injection",
+            "xss",
+            "csrf",
+            "ssrf",
+            "lfi_rfi",
+            "command_injection",
+            "file_upload_bypass",
+            "template_injection",
+            "deserialization",
+            "xxe",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Network Exploitation",
+        [
+            "mitm",
+            "arp_spoofing",
+            "dns_spoofing",
+            "sniffing",
+            "session_hijacking",
+            "vlan_hopping",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Authentication Bypass",
+        [
+            "oauth_misconfiguration",
+            "jwt_forgery",
+            "session_fixation",
+            "brute_force",
+            "credential_stuffing",
+            "mfa_bypass",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "exploit",
+        "Privilege Escalation",
+        [
+            "sudo_abuse",
+            "suid_exploitation",
+            "kernel_exploit",
+            "container_escape",
+            "service_abuse",
+            "token_impersonation",
+        ],
+    ),
     # OSINT
-    SecurityDomainTaxonomy("osint", "Technical OSINT", [
-        "github_recon", "shodan_search", "censys_search",
-        "google_dorking", "pastebin_monitoring", "dark_web_monitoring",
-    ]),
-    SecurityDomainTaxonomy("osint", "Human OSINT", [
-        "social_media_analysis", "relationship_mapping", "identity_correlation",
-        "geolocation", "timeline_analysis",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "osint",
+        "Technical OSINT",
+        [
+            "github_recon",
+            "shodan_search",
+            "censys_search",
+            "google_dorking",
+            "pastebin_monitoring",
+            "dark_web_monitoring",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "osint",
+        "Human OSINT",
+        [
+            "social_media_analysis",
+            "relationship_mapping",
+            "identity_correlation",
+            "geolocation",
+            "timeline_analysis",
+        ],
+    ),
     # Cryptography & Security Engineering
-    SecurityDomainTaxonomy("crypto", "Cryptography", [
-        "symmetric_encryption", "asymmetric_encryption", "hash_analysis",
-        "tls_ssl", "key_exchange", "digital_signatures",
-    ]),
-    SecurityDomainTaxonomy("crypto", "Security Engineering", [
-        "secure_architecture", "threat_modeling", "zero_trust",
-        "network_segmentation", "iam", "secret_management",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "crypto",
+        "Cryptography",
+        [
+            "symmetric_encryption",
+            "asymmetric_encryption",
+            "hash_analysis",
+            "tls_ssl",
+            "key_exchange",
+            "digital_signatures",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "crypto",
+        "Security Engineering",
+        [
+            "secure_architecture",
+            "threat_modeling",
+            "zero_trust",
+            "network_segmentation",
+            "iam",
+            "secret_management",
+        ],
+    ),
     # Malware & Forensics
-    SecurityDomainTaxonomy("forensics", "Digital Forensics", [
-        "memory_analysis", "disk_forensics", "network_forensics",
-        "log_analysis", "timeline_reconstruction", "file_carving",
-    ]),
-    SecurityDomainTaxonomy("forensics", "Malware Analysis", [
-        "static_analysis", "dynamic_analysis", "reverse_engineering",
-        "packer_detection", "c2_analysis", "ransomware_analysis",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "forensics",
+        "Digital Forensics",
+        [
+            "memory_analysis",
+            "disk_forensics",
+            "network_forensics",
+            "log_analysis",
+            "timeline_reconstruction",
+            "file_carving",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "forensics",
+        "Malware Analysis",
+        [
+            "static_analysis",
+            "dynamic_analysis",
+            "reverse_engineering",
+            "packer_detection",
+            "c2_analysis",
+            "ransomware_analysis",
+        ],
+    ),
     # AI Security
-    SecurityDomainTaxonomy("ai_security", "AI Security", [
-        "prompt_injection", "model_extraction", "adversarial_examples",
-        "training_data_poisoning", "model_inversion", "llm_safety",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "ai_security",
+        "AI Security",
+        [
+            "prompt_injection",
+            "model_extraction",
+            "adversarial_examples",
+            "training_data_poisoning",
+            "model_inversion",
+            "llm_safety",
+        ],
+    ),
     # Cloud & Container
-    SecurityDomainTaxonomy("cloud", "Cloud Security", [
-        "aws_enumeration", "gcp_enumeration", "azure_enumeration",
-        "iam_abuse", "storage_misconfiguration", "serverless_security",
-    ]),
-    SecurityDomainTaxonomy("cloud", "Container Security", [
-        "docker_escape", "k8s_enumeration", "container_vulnerability_scanning",
-        "image_analysis", "registry_security",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "cloud",
+        "Cloud Security",
+        [
+            "aws_enumeration",
+            "gcp_enumeration",
+            "azure_enumeration",
+            "iam_abuse",
+            "storage_misconfiguration",
+            "serverless_security",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "cloud",
+        "Container Security",
+        [
+            "docker_escape",
+            "k8s_enumeration",
+            "container_vulnerability_scanning",
+            "image_analysis",
+            "registry_security",
+        ],
+    ),
     # Code & Application Security
-    SecurityDomainTaxonomy("appsec", "Code Security", [
-        "static_analysis", "dynamic_analysis", "dependency_scanning",
-        "code_review", "secret_detection", "supply_chain_security",
-    ]),
-    SecurityDomainTaxonomy("appsec", "Network Security", [
-        "firewall_configuration", "ids_ips", "vpn_security",
-        "wireless_security", "protocol_analysis",
-    ]),
-
+    SecurityDomainTaxonomy(
+        "appsec",
+        "Code Security",
+        [
+            "static_analysis",
+            "dynamic_analysis",
+            "dependency_scanning",
+            "code_review",
+            "secret_detection",
+            "supply_chain_security",
+        ],
+    ),
+    SecurityDomainTaxonomy(
+        "appsec",
+        "Network Security",
+        [
+            "firewall_configuration",
+            "ids_ips",
+            "vpn_security",
+            "wireless_security",
+            "protocol_analysis",
+        ],
+    ),
     # Social Engineering
-    SecurityDomainTaxonomy("social", "Social Engineering", [
-        "phishing", "spear_phishing", "pretexting",
-        "baiting", "tailgating", "quid_pro_quo",
-    ]),
+    SecurityDomainTaxonomy(
+        "social",
+        "Social Engineering",
+        [
+            "phishing",
+            "spear_phishing",
+            "pretexting",
+            "baiting",
+            "tailgating",
+            "quid_pro_quo",
+        ],
+    ),
 ]
 
 # Category → domains mapping for weighted sampling
@@ -268,6 +414,7 @@ Output only the prompt itself. Keep it short but preserve all actual complexity.
 
 
 # ── Task Entry ──────────────────────────────────────────────────────────────
+
 
 @dataclass
 class TaskEntry:
@@ -323,7 +470,9 @@ class TaskEntry:
             domain=d["domain"].split("::")[1] if "::" in d["domain"] else d["domain"],
             subdomain=d["subdomain"],
             difficulty=d["difficulty"],
-            category=d.get("category", d["domain"].split("::")[0] if "::" in d.get("domain", "") else ""),
+            category=d.get(
+                "category", d["domain"].split("::")[0] if "::" in d.get("domain", "") else ""
+            ),
             language=d.get("language", "en"),
             cot_style="cot_instruction" in d,
             taskgen_model=d.get("taskgen_model", "unknown"),
@@ -333,6 +482,7 @@ class TaskEntry:
 
 
 # ── Generation Config ──────────────────────────────────────────────────────
+
 
 @dataclass
 class GenerationConfig:
@@ -354,6 +504,7 @@ class GenerationConfig:
 
 
 # ── Sampling Logic (ported from taskgen) ────────────────────────────────────
+
 
 def build_domain_pool(dist: dict[str, float]) -> list[tuple[str, str, str, float]]:
     pool = []
@@ -429,8 +580,11 @@ def build_generation_messages(
     include_cot: bool,
 ) -> list[dict[str, str]]:
     user_msg = SECURITY_TASK_INSTRUCTION.format(
-        domain=domain, name=name, subdomain=subdomain,
-        difficulty=difficulty, label=DIFFICULTY_LABELS.get(DifficultyScale(difficulty), ""),
+        domain=domain,
+        name=name,
+        subdomain=subdomain,
+        difficulty=difficulty,
+        label=DIFFICULTY_LABELS.get(DifficultyScale(difficulty), ""),
     )
     if include_cot:
         user_msg += f"""\n\nAdditionally, include the expected chain-of-thought reasoning format:
@@ -443,6 +597,7 @@ def build_generation_messages(
 
 
 # ── Generator ───────────────────────────────────────────────────────────────
+
 
 class NovaDataGenerator:
     """
@@ -475,6 +630,7 @@ class NovaDataGenerator:
         max_tokens: int = 2048,
     ) -> tuple[str, int, int]:
         import httpx
+
         async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(
                 f"{self.api_base.rstrip('/')}/chat/completions",
@@ -508,11 +664,17 @@ class NovaDataGenerator:
     ) -> TaskEntry | None:
         system_prompt = self.config.system_prompt or DIFFICULTY_SYSTEM_PROMPT
         messages = build_generation_messages(
-            system_prompt, domain, name, subdomain, difficulty, include_cot,
+            system_prompt,
+            domain,
+            name,
+            subdomain,
+            difficulty,
+            include_cot,
         )
         try:
             text, in_tok, out_tok = await self.llm_call(
-                messages, self.config.temperature,
+                messages,
+                self.config.temperature,
             )
             if not text:
                 return None
@@ -534,9 +696,7 @@ class NovaDataGenerator:
             return None
 
     async def generate(self) -> list[TaskEntry]:
-        pool = build_domain_pool(
-            self.config.category_distribution or DEFAULT_CATEGORY_DISTRIBUTION
-        )
+        pool = build_domain_pool(self.config.category_distribution or DEFAULT_CATEGORY_DISTRIBUTION)
         diff_dist = self.config.difficulty_distribution or DEFAULT_DIFFICULTY_DISTRIBUTION
         if not pool:
             raise ValueError("No domains matched distribution")
@@ -589,6 +749,7 @@ class NovaDataGenerator:
         """Write entries in Nex-N2 style parquet format (prompt/ground_truth columns)."""
         try:
             import pandas as pd  # type: ignore[reportMissingImports]
+
             rows = [e.to_nexn2_rl_row() for e in entries]
             df = pd.DataFrame(rows)
             df.to_parquet(path, index=False)

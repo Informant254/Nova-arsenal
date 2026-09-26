@@ -27,6 +27,7 @@ class CorrelatedFinding:
     The severity is boosted when multiple independent tools
     confirm the same vulnerability.
     """
+
     title: str
     severity: str
     description: str
@@ -64,6 +65,7 @@ class CorrelatedFinding:
 @dataclass
 class CorrelationResult:
     """Complete correlation output."""
+
     correlated_findings: list[CorrelatedFinding] = field(default_factory=list)
     uncorrelated_findings: list[dict[str, Any]] = field(default_factory=list)
     tool_coverage: dict[str, int] = field(default_factory=dict)
@@ -140,8 +142,14 @@ class Correlator:
                 "tags": ["web", "multi-source"],
                 "sources": ["burp", "nuclei", "nikto", "sqlmap", "nmap", "metasploit", "findings"],
                 "indicators": [
-                    "injection", "rce", "xss", "sql", "exploit",
-                    "vulnerable", "critical", "remote code",
+                    "injection",
+                    "rce",
+                    "xss",
+                    "sql",
+                    "exploit",
+                    "vulnerable",
+                    "critical",
+                    "remote code",
                 ],
             },
             {
@@ -152,9 +160,16 @@ class Correlator:
                 "tags": ["web"],
                 "sources": ["burp", "nuclei", "nikto", "whatweb", "nmap", "findings"],
                 "indicators": [
-                    "misconfig", "disclosure", "exposure", "leak",
-                    "weak", "outdated", "directory listing", "http",
-                    "open port", "web service",
+                    "misconfig",
+                    "disclosure",
+                    "exposure",
+                    "leak",
+                    "weak",
+                    "outdated",
+                    "directory listing",
+                    "http",
+                    "open port",
+                    "web service",
                 ],
             },
             # ── SMB / Network Chain ──
@@ -166,8 +181,13 @@ class Correlator:
                 "tags": ["smb", "network", "multi-source"],
                 "sources": ["metasploit", "nmap", "enum4linux", "crackmapexec", "findings"],
                 "indicators": [
-                    "smb", "eternalblue", "ms17-010", "smb_vuln",
-                    "vulnerable", "exploitable", "remote code execution",
+                    "smb",
+                    "eternalblue",
+                    "ms17-010",
+                    "smb_vuln",
+                    "vulnerable",
+                    "exploitable",
+                    "remote code execution",
                 ],
             },
             {
@@ -178,8 +198,13 @@ class Correlator:
                 "tags": ["smb", "network"],
                 "sources": ["metasploit", "nmap", "enum4linux", "findings"],
                 "indicators": [
-                    "smb", "share", "null session", "anonymous",
-                    "default", "password", "credentials",
+                    "smb",
+                    "share",
+                    "null session",
+                    "anonymous",
+                    "default",
+                    "password",
+                    "credentials",
                 ],
             },
             # ── Service Version Chain ──
@@ -191,8 +216,14 @@ class Correlator:
                 "tags": ["version", "cve", "multi-source"],
                 "sources": ["nmap", "metasploit", "whatweb", "nuclei", "findings"],
                 "indicators": [
-                    "outdated", "old", "deprecated", "cve-",
-                    "version", "1.0.", "2.4.", "unsupported",
+                    "outdated",
+                    "old",
+                    "deprecated",
+                    "cve-",
+                    "version",
+                    "1.0.",
+                    "2.4.",
+                    "unsupported",
                 ],
             },
             # ── Credential Chain ──
@@ -204,8 +235,14 @@ class Correlator:
                 "tags": ["credentials", "auth", "multi-source"],
                 "sources": ["hydra", "metasploit", "crackmapexec", "burp", "nmap", "findings"],
                 "indicators": [
-                    "password", "credentials", "login", "auth",
-                    "brute", "default", "hash", "session",
+                    "password",
+                    "credentials",
+                    "login",
+                    "auth",
+                    "brute",
+                    "default",
+                    "hash",
+                    "session",
                 ],
             },
         ]
@@ -245,9 +282,7 @@ class Correlator:
             all_sources["findings"] = findings
 
         # Track tool coverage
-        tool_coverage = {
-            tool: len(items) for tool, items in all_sources.items()
-        }
+        tool_coverage = {tool: len(items) for tool, items in all_sources.items()}
 
         # Flatten all findings from all tools
         all_flat = []
@@ -266,19 +301,21 @@ class Correlator:
         for rule in self._correlation_rules:
             matching = self._find_matching(all_flat, rule, used_indices)
             if matching and len(matching) >= rule["min_sources"]:
-                correlated.append({
-                    "title": self._build_title(matching, rule),
-                    "severity": rule["severity"],
-                    "description": self._build_description(matching, rule),
-                    "source_tools": list(set(m["_source_tool"] for m in matching)),
-                    "source_count": len(matching),
-                    "confidence": min(1.0, len(matching) * 0.3),
-                    "correlation_tags": rule["tags"],
-                    "endpoint": matching[0].get("url", matching[0].get("endpoint", "")),
-                    "evidence": self._build_evidence(matching),
-                    "remediation": self._build_remediation(matching),
-                    "raw_sources": matching,
-                })
+                correlated.append(
+                    {
+                        "title": self._build_title(matching, rule),
+                        "severity": rule["severity"],
+                        "description": self._build_description(matching, rule),
+                        "source_tools": list(set(m["_source_tool"] for m in matching)),
+                        "source_count": len(matching),
+                        "confidence": min(1.0, len(matching) * 0.3),
+                        "correlation_tags": rule["tags"],
+                        "endpoint": matching[0].get("url", matching[0].get("endpoint", "")),
+                        "evidence": self._build_evidence(matching),
+                        "remediation": self._build_remediation(matching),
+                        "raw_sources": matching,
+                    }
+                )
 
                 # Mark used
                 for m in matching:
@@ -286,19 +323,13 @@ class Correlator:
                     used_indices.add(idx)
 
         # Uncorrelated findings
-        uncorrelated = [
-            f for i, f in enumerate(all_flat) if i not in used_indices
-        ]
+        uncorrelated = [f for i, f in enumerate(all_flat) if i not in used_indices]
 
         # Build correlated findings
-        correlated_findings = [
-            CorrelatedFinding(**c) for c in correlated
-        ]
+        correlated_findings = [CorrelatedFinding(**c) for c in correlated]
 
         # Cross-tool insights
-        insights = self._generate_insights(
-            correlated_findings, all_sources, tool_coverage
-        )
+        insights = self._generate_insights(correlated_findings, all_sources, tool_coverage)
 
         result = CorrelationResult(
             correlated_findings=correlated_findings,
@@ -340,9 +371,7 @@ class Correlator:
 
         return matching
 
-    def _build_title(
-        self, matching: list[dict[str, Any]], rule: dict[str, Any]
-    ) -> str:
+    def _build_title(self, matching: list[dict[str, Any]], rule: dict[str, Any]) -> str:
         """Build a descriptive title for a correlated finding."""
         sources = [m["_source_tool"] for m in matching]
         base = rule["description"].split(".")[0]
@@ -351,9 +380,7 @@ class Correlator:
             return f"CORRELATED CRITICAL: {base} ({', '.join(set(sources))})"
         return f"Correlated: {base} ({', '.join(set(sources))})"
 
-    def _build_description(
-        self, matching: list[dict[str, Any]], rule: dict[str, Any]
-    ) -> str:
+    def _build_description(self, matching: list[dict[str, Any]], rule: dict[str, Any]) -> str:
         """Build description from matching sources."""
         parts = [rule["description"]]
         for m in matching:
@@ -379,7 +406,11 @@ class Correlator:
             rem = m.get("remediation", "")
             if rem and rem not in remediations:
                 remediations.append(rem)
-        return "\n".join(remediations[:3]) if remediations else "Review and patch each identified vulnerability."
+        return (
+            "\n".join(remediations[:3])
+            if remediations
+            else "Review and patch each identified vulnerability."
+        )
 
     def _generate_insights(
         self,
@@ -411,17 +442,13 @@ class Correlator:
                 "deployed for confirmed vulnerabilities"
             )
         if "sqlmap" in svc_tools:
-            insights.append(
-                "SQLmap integration active: automated SQL injection "
-                "testing available"
-            )
+            insights.append("SQLmap integration active: automated SQL injection testing available")
 
         # Severity insights
         critical = [f for f in correlated if f.severity == "critical"]
         if critical:
             insights.append(
-                f"{len(critical)} CRITICAL severity findings require "
-                f"immediate attention"
+                f"{len(critical)} CRITICAL severity findings require immediate attention"
             )
 
         if not insights:
@@ -436,39 +463,43 @@ class Correlator:
         items = []
         for host in data.get("hosts", []):
             for port in host.get("ports", []):
-                items.append({
-                    "title": f"Open Port: {port['protocol']}/{port['port']}",
-                    "name": f"{port['service']} ({port.get('version', '')})",
-                    "severity": "info",
-                    "url": f"{port['protocol']}://{host['ip']}:{port['port']}",
-                    "endpoint": host["ip"],
-                    "description": f"Port {port['port']}/{port['protocol']}: "
-                                   f"{port.get('product', port['service'])} "
-                                   f"{port.get('version', '')}",
-                    "evidence": json.dumps(port),
-                    "service": port["service"],
-                    "port": port["port"],
-                    "version": port.get("version", ""),
-                    "remediation": f"Review if {port['port']}/{port['protocol']} should be publicly accessible",
-                })
+                items.append(
+                    {
+                        "title": f"Open Port: {port['protocol']}/{port['port']}",
+                        "name": f"{port['service']} ({port.get('version', '')})",
+                        "severity": "info",
+                        "url": f"{port['protocol']}://{host['ip']}:{port['port']}",
+                        "endpoint": host["ip"],
+                        "description": f"Port {port['port']}/{port['protocol']}: "
+                        f"{port.get('product', port['service'])} "
+                        f"{port.get('version', '')}",
+                        "evidence": json.dumps(port),
+                        "service": port["service"],
+                        "port": port["port"],
+                        "version": port.get("version", ""),
+                        "remediation": f"Review if {port['port']}/{port['protocol']} should be publicly accessible",
+                    }
+                )
         return items
 
     def _normalize_msf(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize Metasploit results to common format."""
         items = []
         for result in results:
-            items.append({
-                "title": f"MSF Module: {result.get('module', 'unknown')}",
-                "name": result.get("module", "unknown"),
-                "severity": "high" if result.get("status") == "completed" else "medium",
-                "output": result.get("output", ""),
-                "endpoint": "",
-                "findings": result.get("findings", []),
-                "evidence": result.get("output", "")[:500],
-                "description": f"Module {result.get('module', '?')} "
-                               f"({result.get('status', '?')})",
-                "remediation": "Verify findings and apply vendor patches",
-            })
+            items.append(
+                {
+                    "title": f"MSF Module: {result.get('module', 'unknown')}",
+                    "name": result.get("module", "unknown"),
+                    "severity": "high" if result.get("status") == "completed" else "medium",
+                    "output": result.get("output", ""),
+                    "endpoint": "",
+                    "findings": result.get("findings", []),
+                    "evidence": result.get("output", "")[:500],
+                    "description": f"Module {result.get('module', '?')} "
+                    f"({result.get('status', '?')})",
+                    "remediation": "Verify findings and apply vendor patches",
+                }
+            )
         return items
 
     def _normalize_sqlmap(self, tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -476,17 +507,19 @@ class Correlator:
         items = []
         for task in tasks:
             for finding in task.get("findings", []):
-                items.append({
-                    "title": finding.get("title", "SQL Injection"),
-                    "name": f"SQLi: {finding.get('parameter', '?')}",
-                    "severity": finding.get("severity", "high"),
-                    "url": finding.get("url", task.get("url", "")),
-                    "endpoint": task.get("url", ""),
-                    "description": f"SQL injection in '{finding.get('parameter', '?')}' "
-                                   f"via {finding.get('technique', '?')}",
-                    "evidence": f"Payload: {finding.get('payload', '')[:300]}",
-                    "parameter": finding.get("parameter", ""),
-                    "technique": finding.get("technique", ""),
-                    "remediation": "Use parameterized queries and input validation",
-                })
+                items.append(
+                    {
+                        "title": finding.get("title", "SQL Injection"),
+                        "name": f"SQLi: {finding.get('parameter', '?')}",
+                        "severity": finding.get("severity", "high"),
+                        "url": finding.get("url", task.get("url", "")),
+                        "endpoint": task.get("url", ""),
+                        "description": f"SQL injection in '{finding.get('parameter', '?')}' "
+                        f"via {finding.get('technique', '?')}",
+                        "evidence": f"Payload: {finding.get('payload', '')[:300]}",
+                        "parameter": finding.get("parameter", ""),
+                        "technique": finding.get("technique", ""),
+                        "remediation": "Use parameterized queries and input validation",
+                    }
+                )
         return items

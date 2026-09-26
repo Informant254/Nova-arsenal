@@ -4,6 +4,7 @@ Incremental Testing Engine — XBOW-inspired delta-only testing.
 Only tests what changed between versions, reducing test time
 and focusing on new or modified attack surfaces.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ChangeType(Enum):
     """Types of changes that can be detected."""
+
     ADDED = "added"
     MODIFIED = "modified"
     DELETED = "deleted"
@@ -29,6 +31,7 @@ class ChangeType(Enum):
 
 class TestPriority(Enum):
     """Priority levels for incremental tests."""
+
     CRITICAL = 1
     HIGH = 2
     MEDIUM = 3
@@ -39,6 +42,7 @@ class TestPriority(Enum):
 @dataclass
 class DeltaItem:
     """A detected change between versions."""
+
     item_id: str
     path: str
     change_type: ChangeType
@@ -65,6 +69,7 @@ class DeltaItem:
 @dataclass
 class TestPlan:
     """A plan for testing only changed components."""
+
     plan_id: str
     baseline_version: str
     target_version: str
@@ -94,6 +99,7 @@ class TestPlan:
 @dataclass
 class TestResult:
     """Result of an incremental test."""
+
     test_id: str
     delta_item_id: str
     status: str
@@ -197,23 +203,27 @@ class IncrementalTester:
         test_cases: list[dict[str, Any]] = []
         skipped = 0
         priority_matrix: dict[str, list[str]] = {
-            "critical": [], "high": [], "medium": [], "low": [],
+            "critical": [],
+            "high": [],
+            "medium": [],
+            "low": [],
         }
 
         for delta in deltas:
             priority = self._delta_to_priority(delta)
             tests_for_delta: list[dict[str, Any]] = [
-                t for t in all_tests
-                if self._test_applies_to_delta(t, delta)
+                t for t in all_tests if self._test_applies_to_delta(t, delta)
             ]
 
             if not tests_for_delta:
-                tests_for_delta = [{
-                    "test_id": str(uuid.uuid4()),
-                    "description": f"Test change in {delta.path}",
-                    "delta_item_id": delta.item_id,
-                    "type": "incremental",
-                }]
+                tests_for_delta = [
+                    {
+                        "test_id": str(uuid.uuid4()),
+                        "description": f"Test change in {delta.path}",
+                        "delta_item_id": delta.item_id,
+                        "type": "incremental",
+                    }
+                ]
 
             for test in tests_for_delta:
                 test["priority"] = priority.value
@@ -292,8 +302,17 @@ class IncrementalTester:
         """Calculate impact score for a change (0.0-1.0)."""
         score = 0.0
         high_risk_patterns = [
-            "auth", "login", "password", "crypto", "key", "token",
-            "exploit", "vulnerability", "injection", "xss", "sqli",
+            "auth",
+            "login",
+            "password",
+            "crypto",
+            "key",
+            "token",
+            "exploit",
+            "vulnerability",
+            "injection",
+            "xss",
+            "sqli",
         ]
         for pattern in high_risk_patterns:
             if pattern in path.lower() or pattern in new_content.lower():
@@ -369,6 +388,7 @@ class IncrementalTester:
             "pass_rate": passed / total_tests if total_tests > 0 else 0.0,
             "avg_duration_ms": (
                 sum(r.duration_ms for r in self._test_results) / total_tests
-                if total_tests > 0 else 0.0
+                if total_tests > 0
+                else 0.0
             ),
         }

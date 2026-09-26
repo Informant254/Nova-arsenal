@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ToolSuggestion:
     """A suggested tool with reasoning."""
+
     tool_name: str
     tool_type: str
     command: str
@@ -572,7 +573,9 @@ class ToolSelector:
                             )
 
                         suggestion.command = suggestion.command.replace("{target}", target)
-                        suggestion.command = suggestion.command.replace("{domain}", domain if domain else target)
+                        suggestion.command = suggestion.command.replace(
+                            "{domain}", domain if domain else target
+                        )
                         suggestions[key] = suggestion
 
         # Phase 2: Finding-based suggestions
@@ -582,7 +585,10 @@ class ToolSelector:
                 if any(match in title for match in rule["title_match"]):
                     for suggestion in rule["suggestions"]:
                         key = suggestion.tool_name
-                        if key not in suggestions or suggestion.priority > suggestions[key].priority:
+                        if (
+                            key not in suggestions
+                            or suggestion.priority > suggestions[key].priority
+                        ):
                             suggestion.params["target"] = target
                             suggestions[key] = suggestion
 
@@ -665,9 +671,7 @@ class ToolSelector:
 
         if "burp" in by_type:
             strategy["burp_targets"] = [
-                s.params.get("url", "")
-                for s in by_type["burp"]
-                if s.params.get("url")
+                s.params.get("url", "") for s in by_type["burp"] if s.params.get("url")
             ]
 
         return strategy

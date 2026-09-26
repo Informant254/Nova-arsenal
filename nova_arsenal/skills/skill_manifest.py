@@ -196,7 +196,9 @@ class SkillRegistry:
         self._loaded[skill_name] = loaded
         return loaded
 
-    def load_all(self, credentials: dict[str, dict[str, str]] | None = None) -> dict[str, LoadedSkill]:
+    def load_all(
+        self, credentials: dict[str, dict[str, str]] | None = None
+    ) -> dict[str, LoadedSkill]:
         """Load every discovered skill. credentials is keyed by skill name."""
         credentials = credentials or {}
         for name in self._manifests:

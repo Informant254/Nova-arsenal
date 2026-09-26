@@ -95,7 +95,9 @@ class NoveltyScorer:
             score -= 0.15
 
         # Boost novelty for sanitizer crashes / variant language without CVE ids
-        if any(k in text for k in ("use-after-free", "heap-buffer", "asan", "variant", "patch gap")):
+        if any(
+            k in text for k in ("use-after-free", "heap-buffer", "asan", "variant", "patch gap")
+        ):
             if not matched:
                 score += 0.1
                 reasons.append("Crash/variant language without known CVE fingerprint")

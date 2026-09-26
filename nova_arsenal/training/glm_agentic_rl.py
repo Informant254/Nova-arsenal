@@ -43,6 +43,7 @@ class TITOConfig:
     re-tokenization mismatches in token boundaries, whitespace/normalization,
     truncation, or special-token placement.
     """
+
     enabled: bool = True
     max_tokens_per_step: int = 8192
     stream_fragments: bool = True
@@ -59,6 +60,7 @@ class DoubledSidedISConfig:
     - Double-sided clipping: [1 - ϵ_ℓ, 1 + ϵ_h]
     - Tokens outside interval are masked from gradient computation
     """
+
     epsilon_low: float = 0.2
     epsilon_high: float = 0.2
     use_token_level_clipping: bool = True
@@ -74,6 +76,7 @@ class OffPolicyDropConfig:
     - Drop samples where environment failure is the cause
     - For GRPO groups: pad by repeating valid if > half valid, else drop entire group
     """
+
     version_staleness_threshold: int = 5
     drop_env_failures: bool = True
     pad_incomplete_groups: bool = True
@@ -89,6 +92,7 @@ class DPAwareRoutingConfig:
     - Stable mapping across turns eliminates cross-rank cache misses
     - Lightweight dynamic load rebalancing over hash space
     """
+
     num_dp_ranks: int = 64
     use_consistent_hashing: bool = True
     rebalance_interval: int = 100
@@ -119,16 +123,16 @@ class TITOGateway:
             return
         if rollout_id not in self._fragments:
             self._fragments[rollout_id] = []
-        self._fragments[rollout_id].append({
-            "token_ids": token_ids,
-            "log_probs": log_probs,
-            "metadata": metadata or {},
-            "timestamp": time.time(),
-        })
+        self._fragments[rollout_id].append(
+            {
+                "token_ids": token_ids,
+                "log_probs": log_probs,
+                "metadata": metadata or {},
+                "timestamp": time.time(),
+            }
+        )
 
-    def get_trajectory_tokens(
-        self, rollout_id: str
-    ) -> tuple[list[int], list[float]]:
+    def get_trajectory_tokens(self, rollout_id: str) -> tuple[list[int], list[float]]:
         fragments = self._fragments.pop(rollout_id, [])
         all_tokens: list[int] = []
         all_log_probs: list[float] = []
@@ -236,9 +240,7 @@ class OffPolicySampleDropper:
         self._current_version += 1
         return self._current_version
 
-    def should_drop_by_version(
-        self, rollout_versions: list[int]
-    ) -> bool:
+    def should_drop_by_version(self, rollout_versions: list[int]) -> bool:
         if not rollout_versions:
             return False
         w_0 = min(rollout_versions)
@@ -248,9 +250,15 @@ class OffPolicySampleDropper:
         if not self.config.drop_env_failures or not failure_reason:
             return False
         env_failure_keywords = [
-            "environment crash", "sandbox timeout", "docker error",
-            "container crash", "network error", "connection refused",
-            "resource exhausted", "out of memory", "disk full",
+            "environment crash",
+            "sandbox timeout",
+            "docker error",
+            "container crash",
+            "network error",
+            "connection refused",
+            "resource exhausted",
+            "out of memory",
+            "disk full",
         ]
         return any(kw in failure_reason.lower() for kw in env_failure_keywords)
 
@@ -302,9 +310,7 @@ class DPAwareRouter:
     def __init__(self, config: DPAwareRoutingConfig | None = None):
         self.config = config or DPAwareRoutingConfig()
         self._routing_table: dict[str, int] = {}
-        self._load_counts: dict[int, int] = {
-            i: 0 for i in range(self.config.num_dp_ranks)
-        }
+        self._load_counts: dict[int, int] = {i: 0 for i in range(self.config.num_dp_ranks)}
         self._step_counter = 0
 
     def get_rank(self, rollout_id: str) -> int:
@@ -398,9 +404,7 @@ class TaskService:
                 return result
             except Exception as e:
                 self._stats["errors"] += 1
-                logger.warning(
-                    f"{self.task_type.value} rollout failed: {e}"
-                )
+                logger.warning(f"{self.task_type.value} rollout failed: {e}")
                 return None
 
     def compute_reward(
@@ -491,12 +495,14 @@ class MultiTaskRolloutOrchestrator:
 
         result = await service.execute_rollout(prompt, context)
         if result:
-            self._unified_trajectories.append({
-                "task_type": task_type.value,
-                "prompt": prompt,
-                "result": result,
-                "timestamp": time.time(),
-            })
+            self._unified_trajectories.append(
+                {
+                    "task_type": task_type.value,
+                    "prompt": prompt,
+                    "result": result,
+                    "timestamp": time.time(),
+                }
+            )
             self._stats["total_rollouts"] += 1
 
         return result
@@ -541,9 +547,7 @@ class MultiTaskRolloutOrchestrator:
     def stats(self) -> dict[str, Any]:
         s = dict(self._stats)
         s["registered_tasks"] = list(self._services.keys())
-        s["service_stats"] = {
-            k: v.stats for k, v in self._services.items()
-        }
+        s["service_stats"] = {k: v.stats for k, v in self._services.items()}
         return s
 
 
@@ -561,14 +565,11 @@ class AgenticEnvironment:
         self.name = name or f"{task_type.value}-env"
         self._stats = {"total_tasks": 0, "completed": 0, "failed": 0}
 
-    async def setup(self) -> None:
-        ...
+    async def setup(self) -> None: ...
 
-    async def teardown(self) -> None:
-        ...
+    async def teardown(self) -> None: ...
 
-    async def execute(self, action: str) -> dict[str, Any]:
-        ...
+    async def execute(self, action: str) -> dict[str, Any]: ...
 
     def verify(self, response: str, ground_truth: str) -> float:
         return 0.0
@@ -613,15 +614,13 @@ class SWEEnvironment(AgenticEnvironment):
             score += 0.5
 
         has_implementation = any(
-            kw in response.lower()
-            for kw in ["def ", "class ", "function ", "impl ", "fn "]
+            kw in response.lower() for kw in ["def ", "class ", "function ", "impl ", "fn "]
         )
         if has_implementation:
             score += 0.3
 
         has_tests = any(
-            f"test_{t}" in response or f"test_{t.lower()}" in response
-            for t in self._f2p_tests
+            f"test_{t}" in response or f"test_{t.lower()}" in response for t in self._f2p_tests
         )
         if has_tests:
             score += 0.2
@@ -698,7 +697,8 @@ class SearchEnvironment(AgenticEnvironment):
             score += 0.3
 
         hops_covered = sum(
-            1 for hop in range(1, self.num_hops + 1)
+            1
+            for hop in range(1, self.num_hops + 1)
             if f"step {hop}" in response.lower() or f"hop {hop}" in response.lower()
         )
         score += 0.3 * (hops_covered / max(self.num_hops, 1))
@@ -780,9 +780,7 @@ class AsyncAgenticRLTrainer:
                         rollout_id=rollout_id,
                         prompt=prompt_data["prompt"],
                         ground_truth=prompt_data.get("ground_truth", ""),
-                        task_type=AgenticTaskType(
-                            prompt_data.get("task_type", "swe")
-                        ),
+                        task_type=AgenticTaskType(prompt_data.get("task_type", "swe")),
                         dp_rank=dp_rank,
                     )
                 )
@@ -792,10 +790,12 @@ class AsyncAgenticRLTrainer:
 
         for result in results:
             if isinstance(result, dict) and result.get("response"):
-                self._pending_trajectories.append({
-                    **result,
-                    "rollout_versions": [traj_version],
-                })
+                self._pending_trajectories.append(
+                    {
+                        **result,
+                        "rollout_versions": [traj_version],
+                    }
+                )
                 self._stats["rollouts_generated"] += 1
 
         self.dp_router.on_step_end()
@@ -838,17 +838,15 @@ class AsyncAgenticRLTrainer:
         if len(self._pending_trajectories) < self.trajectory_threshold:
             return []
 
-        batch = self._pending_trajectories[:self.trajectory_threshold]
-        self._pending_trajectories = self._pending_trajectories[self.trajectory_threshold:]
+        batch = self._pending_trajectories[: self.trajectory_threshold]
+        self._pending_trajectories = self._pending_trajectories[self.trajectory_threshold :]
 
         filtered = self._filter_batch(batch)
         self._stats["trajectories_consumed"] += len(filtered)
 
         return filtered
 
-    def _filter_batch(
-        self, batch: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def _filter_batch(self, batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Apply off-policy filtering to batch.
 
         Drops stale trajectories and env failures, handles incomplete groups.
@@ -879,10 +877,7 @@ class AsyncAgenticRLTrainer:
         """
         self._weight_version = self.sample_dropper.advance_version()
         self._stats["weight_syncs"] += 1
-        logger.info(
-            f"Weight sync #{self._stats['weight_syncs']}: "
-            f"version={self._weight_version}"
-        )
+        logger.info(f"Weight sync #{self._stats['weight_syncs']}: version={self._weight_version}")
 
     async def train_step(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
         """Execute one training step on consumed trajectories.

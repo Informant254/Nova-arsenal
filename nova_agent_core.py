@@ -64,11 +64,13 @@ class NovaAgent:
         """Record an agent step."""
         self.state.step += 1
         self.state.actions_taken.append(action)
-        self._history.append({
-            "step": self.state.step,
-            "action": action,
-            "result": result,
-        })
+        self._history.append(
+            {
+                "step": self.state.step,
+                "action": action,
+                "result": result,
+            }
+        )
 
     def add_finding(self, finding: dict[str, Any]) -> None:
         """Record a security finding."""

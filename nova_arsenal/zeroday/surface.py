@@ -54,10 +54,33 @@ _HIGH_YIELD_SERVICES = {
 }
 
 _DANGEROUS_PATH_HINTS = (
-    "upload", "import", "export", "parse", "xml", "svg", "pdf", "zip",
-    "admin", "debug", "internal", "graphql", "rpc", "deserialize",
-    "eval", "exec", "shell", "cmd", "webhook", "callback", "proxy",
-    "file", "path", "template", "render", "preview", "convert",
+    "upload",
+    "import",
+    "export",
+    "parse",
+    "xml",
+    "svg",
+    "pdf",
+    "zip",
+    "admin",
+    "debug",
+    "internal",
+    "graphql",
+    "rpc",
+    "deserialize",
+    "eval",
+    "exec",
+    "shell",
+    "cmd",
+    "webhook",
+    "callback",
+    "proxy",
+    "file",
+    "path",
+    "template",
+    "render",
+    "preview",
+    "convert",
 )
 
 _VERSION_RE = re.compile(
@@ -339,7 +362,9 @@ class AttackSurfaceMapper:
         path_l = (ep.path or "").lower()
         danger_hits = sum(1 for h in _DANGEROUS_PATH_HINTS if h in path_l)
         param_boost = min(3.0, 0.4 * len(ep.params))
-        method_boost = 0.5 if any(m.upper() in {"POST", "PUT", "PATCH"} for m in ep.methods) else 0.0
+        method_boost = (
+            0.5 if any(m.upper() in {"POST", "PUT", "PATCH"} for m in ep.methods) else 0.0
+        )
         tech_boost = min(2.0, 0.25 * len(ep.technologies))
 
         version_factor = 1.0
@@ -367,7 +392,9 @@ class AttackSurfaceMapper:
         if any(t in {"upload", "parser", "file"} for t in ep.tags):
             fuzz += 1.5
 
-        priority = (base + danger_hits * 1.5 + param_boost + method_boost + tech_boost) * version_factor
+        priority = (
+            base + danger_hits * 1.5 + param_boost + method_boost + tech_boost
+        ) * version_factor
         priority += blast * 0.3 + fuzz * 0.2
         priority *= 0.85 + 0.3 * ep.novelty_prior
 

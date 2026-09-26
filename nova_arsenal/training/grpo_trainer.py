@@ -36,7 +36,7 @@ def compute_group_advantage(rewards: list[float]) -> list[float]:
         return []
     mean_r = sum(rewards) / len(rewards)
     var_r = sum((r - mean_r) ** 2 for r in rewards) / len(rewards)
-    std_r = var_r ** 0.5 if var_r > 0 else 1.0
+    std_r = var_r**0.5 if var_r > 0 else 1.0
     return [(r - mean_r) / std_r for r in rewards]
 
 
@@ -320,12 +320,14 @@ class GRPOTrainer:
             group_id=group_id,
             total_reward=reward,
         )
-        trajectory.steps.append(TrajectoryStep(
-            tokens=[],
-            log_probs=[],
-            reward=reward,
-            response_text=response,
-        ))
+        trajectory.steps.append(
+            TrajectoryStep(
+                tokens=[],
+                log_probs=[],
+                reward=reward,
+                response_text=response,
+            )
+        )
         return trajectory
 
     async def train(
@@ -369,6 +371,7 @@ class GRPOTrainer:
             return []
 
         import random
+
         batch = random.sample(all_data, min(self.config.batch_size, len(all_data)))
         return batch
 

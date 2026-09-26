@@ -35,7 +35,10 @@ class MutationResult:
 
 # Research-oriented mutation *descriptions* and request shapes (not weaponized payloads).
 _MUTATIONS: list[dict[str, Any]] = [
-    {"name": "duplicate_content_length", "headers": {"Content-Length": "0", "Content-Length ": "5"}},
+    {
+        "name": "duplicate_content_length",
+        "headers": {"Content-Length": "0", "Content-Length ": "5"},
+    },
     {"name": "tab_in_header_name", "headers": {"X-Test\tName": "1"}},
     {"name": "obs_fold_hint", "headers": {"X-Fold": "start\r\n folded"}},
     {"name": "absolute_form_path", "path_suffix": ""},
@@ -98,13 +101,19 @@ class HttpMutator:
             ]
 
         results: list[MutationResult] = []
-        async with httpx.AsyncClient(timeout=timeout, verify=False, follow_redirects=False) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout, verify=False, follow_redirects=False
+        ) as client:
             for p in plans:
                 t0 = time.perf_counter()
                 try:
                     # Only send relatively safe GET-like probes; skip grotesque methods on execute
                     method = p["method"] if len(p["method"]) <= 16 else "GET"
-                    headers = {k: v for k, v in p.get("headers", {}).items() if "\r" not in k and "\n" not in k}
+                    headers = {
+                        k: v
+                        for k, v in p.get("headers", {}).items()
+                        if "\r" not in k and "\n" not in k
+                    }
                     r = await client.request(method, url, headers=headers)
                     results.append(
                         MutationResult(

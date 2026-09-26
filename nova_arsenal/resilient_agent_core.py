@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResilientAgentConfig:
     """Configuration for resilient agent."""
+
     step_timeout: float = 120.0  # Timeout per step
     total_timeout: float = 600.0  # Total execution timeout
     max_retries: int = 3
@@ -109,11 +110,13 @@ class ResilientNovaAgent(NovaAgent):
         super().step(action, result)
         if error:
             self.state.errors.append(error)
-            self.add_execution_error({
-                "step": self.state.step,
-                "action": action,
-                "error": error,
-            })
+            self.add_execution_error(
+                {
+                    "step": self.state.step,
+                    "action": action,
+                    "error": error,
+                }
+            )
 
     async def run_autonomous_with_resilience(
         self,
@@ -155,11 +158,13 @@ class ResilientNovaAgent(NovaAgent):
 
         except Exception as e:
             logger.error(f"Agent execution failed: {e}", exc_info=True)
-            self.add_execution_error({
-                "type": "execution_error",
-                "message": str(e),
-                "error_class": e.__class__.__name__,
-            })
+            self.add_execution_error(
+                {
+                    "type": "execution_error",
+                    "message": str(e),
+                    "error_class": e.__class__.__name__,
+                }
+            )
 
             # Return partial results
             return {
@@ -179,8 +184,10 @@ class ResilientNovaAgent(NovaAgent):
             "total_errors": len(self.state.errors),
             "execution_errors": len(self._execution_errors),
             "circuit_breaker_state": self.circuit_breaker.state.value,
-            "resource_status": dict(zip(
-                ["active_tasks", "total_tool_calls"],
-                [self.resource_tracker.active_tasks, self.resource_tracker.total_tool_calls],
-            )),
+            "resource_status": dict(
+                zip(
+                    ["active_tasks", "total_tool_calls"],
+                    [self.resource_tracker.active_tasks, self.resource_tracker.total_tool_calls],
+                )
+            ),
         }

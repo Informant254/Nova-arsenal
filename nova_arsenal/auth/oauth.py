@@ -141,16 +141,13 @@ def extract_pkce_verifier(state: str) -> str | None:
 
 class BaseOAuthProvider(ABC):
     @abstractmethod
-    def get_authorize_url(self, state: str, code_challenge: str | None = None) -> str:
-        ...
+    def get_authorize_url(self, state: str, code_challenge: str | None = None) -> str: ...
 
     @abstractmethod
-    async def exchange_code(self, code: str, code_verifier: str | None = None) -> OAuthUserInfo:
-        ...
+    async def exchange_code(self, code: str, code_verifier: str | None = None) -> OAuthUserInfo: ...
 
     @abstractmethod
-    def provider_name(self) -> str:
-        ...
+    def provider_name(self) -> str: ...
 
 
 class GitHubOAuthProvider(BaseOAuthProvider):
@@ -200,7 +197,9 @@ class GitHubOAuthProvider(BaseOAuthProvider):
             token_data = token_resp.json()
 
             if "error" in token_data:
-                raise ValueError(f"GitHub OAuth error: {token_data.get('error_description', token_data['error'])}")
+                raise ValueError(
+                    f"GitHub OAuth error: {token_data.get('error_description', token_data['error'])}"
+                )
 
             access_token = token_data["access_token"]
 
@@ -282,7 +281,9 @@ class GoogleOAuthProvider(BaseOAuthProvider):
             token_data = token_resp.json()
 
             if "error" in token_data:
-                raise ValueError(f"Google OAuth error: {token_data.get('error_description', token_data['error'])}")
+                raise ValueError(
+                    f"Google OAuth error: {token_data.get('error_description', token_data['error'])}"
+                )
 
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")

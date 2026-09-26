@@ -1,4 +1,5 @@
 """Tests for swarm recon → zeroday researcher wiring."""
+
 import asyncio
 import os
 import sys

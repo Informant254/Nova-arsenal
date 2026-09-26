@@ -224,9 +224,7 @@ class NovaScheduler:
         active = sum(1 for e in self._entries if e.status == ScheduleStatus.ACTIVE)
         total_runs = sum(e.run_count for e in self._entries)
         total_findings = sum(
-            e.last_result.get("findings_count", 0)
-            for e in self._entries
-            if e.last_result
+            e.last_result.get("findings_count", 0) for e in self._entries if e.last_result
         )
 
         return {
@@ -244,7 +242,8 @@ class NovaScheduler:
             try:
                 now = datetime.now(timezone.utc)
                 due_entries = [
-                    e for e in self._entries
+                    e
+                    for e in self._entries
                     if e.status == ScheduleStatus.ACTIVE
                     and e.next_run is not None
                     and now >= e.next_run
@@ -286,7 +285,9 @@ class NovaScheduler:
             entry.next_run = cron.next_match(from_time=start_time)
 
             self._run_history.append(result)
-            logger.info(f"Completed scheduled task: {entry.name} ({'success' if result.success else 'failed'})")
+            logger.info(
+                f"Completed scheduled task: {entry.name} ({'success' if result.success else 'failed'})"
+            )
 
         except Exception as e:
             result.error = str(e)

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SqlmapFinding:
     """A SQL injection finding from sqlmap."""
+
     url: str
     parameter: str
     technique: str
@@ -46,6 +47,7 @@ class SqlmapFinding:
 @dataclass
 class SqlmapTask:
     """A sqlmap scan task."""
+
     task_id: str
     url: str
     status: str = "not_running"
@@ -138,7 +140,9 @@ class SQLmapAPI:
 
             async with aiohttp.ClientSession() as session:
                 async with session.request(
-                    method, url, json=data,
+                    method,
+                    url,
+                    json=data,
                     timeout=aiohttp.ClientTimeout(total=timeout or self.timeout),
                 ) as resp:
                     if resp.status in (200, 201):
@@ -172,15 +176,14 @@ class SQLmapAPI:
             **self._build_options(options or {}),
         }
 
-        set_result = await self._request(
-            "POST", f"option/{task_id}/set", scan_options
-        )
+        set_result = await self._request("POST", f"option/{task_id}/set", scan_options)
         if set_result and "error" in set_result:
             logger.warning(f"Error setting sqlmap options: {set_result}")
 
         # Start scan
         start_result = await self._request(
-            "POST", f"scan/{task_id}/start",
+            "POST",
+            f"scan/{task_id}/start",
             {},
             timeout=30,
         )
@@ -259,9 +262,7 @@ class SQLmapAPI:
 
         return task
 
-    def _parse_findings(
-        self, items: list[dict[str, Any]], url: str
-    ) -> list[SqlmapFinding]:
+    def _parse_findings(self, items: list[dict[str, Any]], url: str) -> list[SqlmapFinding]:
         """Parse raw sqlmap data items into structured findings."""
         findings = []
 
@@ -286,16 +287,18 @@ class SQLmapAPI:
             title = item.get("title", f"SQL injection in '{parameter}' via {technique}")
 
             if technique or payload:
-                findings.append(SqlmapFinding(
-                    url=url,
-                    parameter=str(parameter),
-                    technique=str(technique),
-                    title=str(title),
-                    payload=str(payload)[:500],
-                    dbms=str(dbms),
-                    severity="high",
-                    vector=str(item.get("vector", "")),
-                ))
+                findings.append(
+                    SqlmapFinding(
+                        url=url,
+                        parameter=str(parameter),
+                        technique=str(technique),
+                        title=str(title),
+                        payload=str(payload)[:500],
+                        dbms=str(dbms),
+                        severity="high",
+                        vector=str(item.get("vector", "")),
+                    )
+                )
 
         return findings
 

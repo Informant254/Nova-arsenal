@@ -19,6 +19,7 @@ class CodeLanguage(Enum):
 @dataclass
 class GeneratedCode:
     """A piece of generated code."""
+
     language: CodeLanguage
     code: str
     description: str
@@ -87,7 +88,6 @@ def main():
 if __name__ == "__main__":
     main()
 ''',
-
             "subdomain_enum": '''#!/usr/bin/env python3
 """Subdomain enumeration using DNS resolution."""
 
@@ -140,7 +140,6 @@ def main():
 if __name__ == "__main__":
     main()
 ''',
-
             "web_screenshot": '''#!/usr/bin/env python3
 """Take screenshots of web pages using requests + Pillow."""
 
@@ -186,7 +185,6 @@ def main():
 if __name__ == "__main__":
     main()
 ''',
-
             "nmap_parser": '''#!/usr/bin/env python3
 """Parse nmap XML output into structured findings."""
 
@@ -244,7 +242,6 @@ def main():
 if __name__ == "__main__":
     main()
 ''',
-
             "param_fuzzer": '''#!/usr/bin/env python3
 """Fuzz URL parameters for injection points."""
 

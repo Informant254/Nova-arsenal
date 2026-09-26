@@ -157,7 +157,9 @@ def resolve_model(provider: str, explicit: str = "") -> str:
         return explicit
     # Global LLM_MODEL wins when provider matches LLM_PROVIDER or primary unset
     global_model = os.getenv("LLM_MODEL", "").strip() or os.getenv("NOVA_LLM_MODEL", "").strip()
-    preferred = normalize_provider(os.getenv("LLM_PROVIDER", "") or os.getenv("NOVA_LLM_PROVIDER", ""))
+    preferred = normalize_provider(
+        os.getenv("LLM_PROVIDER", "") or os.getenv("NOVA_LLM_PROVIDER", "")
+    )
     prov = normalize_provider(provider)
     if global_model and (not preferred or preferred == prov):
         return global_model

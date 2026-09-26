@@ -36,10 +36,10 @@ _EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
 
 def _is_production_environment() -> bool:
     value = (
-        os.getenv("NOVA_ENV", "")
-        or os.getenv("ENVIRONMENT", "")
-        or os.getenv("ENV", "")
-    ).strip().lower()
+        (os.getenv("NOVA_ENV", "") or os.getenv("ENVIRONMENT", "") or os.getenv("ENV", ""))
+        .strip()
+        .lower()
+    )
     return value in {"prod", "production"}
 
 
@@ -238,7 +238,11 @@ def _account_preferred_primary() -> LLMProviderConfig | None:
             if not acc:
                 continue
             meta = acc.meta or {}
-            if meta.get("prefer_as_primary") or meta.get("subscription_auth") or acc.auth_type == "oauth":
+            if (
+                meta.get("prefer_as_primary")
+                or meta.get("subscription_auth")
+                or acc.auth_type == "oauth"
+            ):
                 if acc.access_token and not acc.is_expired():
                     return _cfg_for(name, acc)
     except Exception:  # noqa: BLE001
@@ -407,7 +411,9 @@ def load_config(config_path: str | None = None) -> NovaConfig:
     yaml_llm = LLMConfig(
         primary=_provider_from_dict(primary_raw) if primary_raw else LLMProviderConfig(),
         fallbacks=[_provider_from_dict(fb) for fb in fallbacks_raw if isinstance(fb, dict)],
-        routing_strategy=str(routing.get("strategy") or llm_raw.get("routing_strategy") or "balanced"),
+        routing_strategy=str(
+            routing.get("strategy") or llm_raw.get("routing_strategy") or "balanced"
+        ),
         fallback_threshold=int(routing.get("fallback_threshold") or 3),
         max_retries=int(routing.get("max_retries") or 3),
     )

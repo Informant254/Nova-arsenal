@@ -128,8 +128,11 @@ async def agent_websocket(websocket: WebSocket, agent_id: int):
 
 async def emit_agent_event(agent_id: int, event_type: str, data: dict):
     """Emit an agent event to all subscribers."""
-    await manager.send_to_agent(agent_id, {
-        "type": event_type,
-        "agent_id": agent_id,
-        "data": data,
-    })
+    await manager.send_to_agent(
+        agent_id,
+        {
+            "type": event_type,
+            "agent_id": agent_id,
+            "data": data,
+        },
+    )

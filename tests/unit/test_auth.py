@@ -9,6 +9,7 @@ import pytest
 
 # ── OAuth State Tests ─────────────────────────────────────────────────────────
 
+
 class TestOAuthState:
     def test_generate_and_verify_state(self):
         from nova_arsenal.auth.oauth import generate_oauth_state, verify_oauth_state
@@ -81,9 +82,11 @@ class TestPKCE:
         from nova_arsenal.auth.oauth import PKCEChallenge
 
         pkce = PKCEChallenge.generate()
-        expected = base64.urlsafe_b64encode(
-            hashlib.sha256(pkce.code_verifier.encode("ascii")).digest()
-        ).rstrip(b"=").decode("ascii")
+        expected = (
+            base64.urlsafe_b64encode(hashlib.sha256(pkce.code_verifier.encode("ascii")).digest())
+            .rstrip(b"=")
+            .decode("ascii")
+        )
         assert pkce.code_challenge == expected
 
 
@@ -143,6 +146,7 @@ class TestOAuthProviders:
 
 # ── Audit Logging Tests ──────────────────────────────────────────────────────
 
+
 class TestAuditLogging:
     def test_audit_event_to_dict(self):
         from nova_arsenal.auth.audit import AuditEvent, AuditEventType
@@ -169,6 +173,7 @@ class TestAuditLogging:
             audit_subscription_upgraded,
             audit_unauthorized,
         )
+
         # Just verify they don't raise
         audit_login_success(1, "test@test.com", "127.0.0.1")
         audit_login_failure("test@test.com", "127.0.0.1", "bad password")
@@ -180,6 +185,7 @@ class TestAuditLogging:
 
 
 # ── Rate Limiter Tests ───────────────────────────────────────────────────────
+
 
 class TestRateLimiter:
     def test_token_bucket_consume(self):
@@ -214,6 +220,7 @@ class TestRateLimiter:
 
 # ── API Key Tests ─────────────────────────────────────────────────────────────
 
+
 class TestAPIKeyGeneration:
     def test_generate_api_key(self):
         from nova_arsenal.auth.routes import generate_api_key
@@ -221,7 +228,7 @@ class TestAPIKeyGeneration:
         full_key, prefix, key_hash = generate_api_key()
         assert full_key.startswith("na_")
         assert len(full_key) == 67  # na_ + 64 hex chars
-        assert len(prefix) == 19    # na_ + 16 hex chars
+        assert len(prefix) == 19  # na_ + 16 hex chars
         assert len(key_hash) == 64  # SHA256 hex
         assert full_key[:19] == prefix
 
@@ -241,14 +248,17 @@ class TestAPIKeyGeneration:
 
 # ── Cleanup Tests ─────────────────────────────────────────────────────────────
 
+
 class TestCleanup:
     def test_cleanup_task_exists(self):
         from nova_arsenal.auth.cleanup import cleanup_expired_api_keys, start_cleanup_task
+
         assert callable(cleanup_expired_api_keys)
         assert callable(start_cleanup_task)
 
 
 # ── JWT / dependency regression tests ────────────────────────────────────────
+
 
 class TestJWTRegression:
     def test_access_token_uses_string_subject(self):
@@ -280,6 +290,7 @@ class TestJWTRegression:
 
 
 # ── Auth hardening regressions ───────────────────────────────────────────────
+
 
 class TestAuthHardening:
     def test_pat_does_not_reuse_github_token(self, monkeypatch):

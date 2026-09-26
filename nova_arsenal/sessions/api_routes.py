@@ -120,11 +120,7 @@ async def list_sessions(
     sessions = manager.list_sessions()[:50]
     if current_user.role.value != "admin":
         sessions = [session for session in sessions if _can_access(session, current_user)]
-    return {
-        "sessions": [
-            _public_session(session, include_events=False) for session in sessions
-        ]
-    }
+    return {"sessions": [_public_session(session, include_events=False) for session in sessions]}
 
 
 @router.get("/{session_id}")

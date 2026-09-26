@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BurpIssue:
     """A security issue found by Burp Suite."""
+
     name: str
     severity: str
     confidence: str
@@ -50,6 +51,7 @@ class BurpIssue:
 @dataclass
 class BurpScanJob:
     """Represents a scan job in Burp."""
+
     scan_id: str
     url: str
     status: str
@@ -112,7 +114,9 @@ class BurpAPI:
 
             async with aiohttp.ClientSession(headers=self._headers) as session:
                 async with session.request(
-                    method, url, json=data,
+                    method,
+                    url,
+                    json=data,
                     timeout=aiohttp.ClientTimeout(total=timeout or self.timeout),
                 ) as resp:
                     if resp.status in (200, 201):
@@ -176,10 +180,14 @@ class BurpAPI:
             }
         }
         """
-        result = await self._request("POST", "graphql", {
-            "query": mutation,
-            "variables": {"urls": [url]},
-        })
+        result = await self._request(
+            "POST",
+            "graphql",
+            {
+                "query": mutation,
+                "variables": {"urls": [url]},
+            },
+        )
 
         if result and "data" in result:
             scan_data = result["data"].get("start_scan", {})

@@ -79,13 +79,15 @@ class ManifoldConstrainedHyperConnection(nn.Module):
         self.nhc = nhc
         self.tmax = tmax
 
-        self.branches = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim, bias=False),
-                nn.LayerNorm(hidden_dim),
-            )
-            for _ in range(nhc)
-        ])
+        self.branches = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim, bias=False),
+                    nn.LayerNorm(hidden_dim),
+                )
+                for _ in range(nhc)
+            ]
+        )
 
         self.weight_proj = nn.Linear(hidden_dim, nhc * nhc, bias=False)
         self.gate = nn.Parameter(torch.ones(1, nhc, 1))
@@ -128,15 +130,11 @@ class MultimodalProjection(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
 
-        self.projectors = nn.ModuleDict({
-            name: nn.Linear(dim, hidden_dim, bias=False)
-            for name, dim in modal_dims.items()
-        })
+        self.projectors = nn.ModuleDict(
+            {name: nn.Linear(dim, hidden_dim, bias=False) for name, dim in modal_dims.items()}
+        )
 
-        self.norms = nn.ModuleDict({
-            name: nn.LayerNorm(hidden_dim)
-            for name in modal_dims
-        })
+        self.norms = nn.ModuleDict({name: nn.LayerNorm(hidden_dim) for name in modal_dims})
 
     def forward(
         self,
@@ -151,7 +149,9 @@ class MultimodalProjection(nn.Module):
 
         if not projected:
             return torch.zeros(
-                inputs[next(iter(inputs))].shape[0], 1, self.hidden_dim,
+                inputs[next(iter(inputs))].shape[0],
+                1,
+                self.hidden_dim,
                 device=next(iter(inputs.values())).device,
             )
 
@@ -222,9 +222,7 @@ class AnticipatoryRouter(nn.Module):
         self._stats["total_tokens"] += B * L
         self._stats["conflicts_detected"] += conflicts.sum().item()
         total = self._stats["total_tokens"]
-        self._stats["conflict_rate"] = (
-            self._stats["conflicts_detected"] / max(total, 1)
-        )
+        self._stats["conflict_rate"] = self._stats["conflicts_detected"] / max(total, 1)
 
         return indices, weights
 

@@ -212,9 +212,8 @@ class SkillAuthor:
             raise SkillAuthoringError(f"No pending skill named '{name}' found at {src}")
 
         import shutil
+
         rejected_log = self.pending_dir / "_rejected.log"
         with rejected_log.open("a") as f:
-            f.write(
-                f"{datetime.now(timezone.utc).isoformat()} | {name} | {reason}\n"
-            )
+            f.write(f"{datetime.now(timezone.utc).isoformat()} | {name} | {reason}\n")
         shutil.rmtree(src)

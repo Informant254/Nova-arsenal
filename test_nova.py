@@ -31,9 +31,9 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
     print(f"🎯 Target: {target}")
     print(f"🎯 Objective: {objective}")
     print(f"🎯 Max Steps: {max_steps}")
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("NOVA-ARSENAL TEST RUN")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Initialize blueprint (loads all 230 tools)
     print("📂 Loading Kali Linux knowledge base...")
@@ -57,14 +57,14 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
 
     # Run agent
     print("🚀 Starting autonomous testing...")
-    print("-"*60)
+    print("-" * 60)
 
     result = await runner.run()
 
-    print("-"*60)
-    print("\n" + "="*60)
+    print("-" * 60)
+    print("\n" + "=" * 60)
     print("TEST RESULTS")
-    print("="*60)
+    print("=" * 60)
     print(f"Status: {result.get('status', 'unknown')}")
     print(f"Steps taken: {result.get('steps_taken', 0)}")
     print(f"Findings: {len(result.get('findings', []))}")

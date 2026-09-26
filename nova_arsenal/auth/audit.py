@@ -59,11 +59,16 @@ class AuditEvent:
 def audit_log(event: AuditEvent) -> None:
     """Emit a structured audit log entry."""
     data = event.to_dict()
-    level = logging.WARNING if event.event_type in (
-        AuditEventType.LOGIN_FAILURE,
-        AuditEventType.UNAUTHORIZED_ACCESS,
-        AuditEventType.QUOTA_EXCEEDED,
-    ) else logging.INFO
+    level = (
+        logging.WARNING
+        if event.event_type
+        in (
+            AuditEventType.LOGIN_FAILURE,
+            AuditEventType.UNAUTHORIZED_ACCESS,
+            AuditEventType.QUOTA_EXCEEDED,
+        )
+        else logging.INFO
+    )
     logger.log(level, "auth_audit %s", data)
 
 
@@ -75,12 +80,19 @@ def audit_login_failure(email: str, ip: str, reason: str = "") -> None:
     audit_log(AuditEvent(AuditEventType.LOGIN_FAILURE, email=email, ip_address=ip, detail=reason))
 
 
-def audit_oauth_login(provider: str, user_id: int, email: str, ip: str, is_new: bool = False) -> None:
-    audit_log(AuditEvent(
-        AuditEventType.OAUTH_LOGIN,
-        user_id=user_id, email=email, ip_address=ip, provider=provider,
-        detail="new_user" if is_new else "existing_user",
-    ))
+def audit_oauth_login(
+    provider: str, user_id: int, email: str, ip: str, is_new: bool = False
+) -> None:
+    audit_log(
+        AuditEvent(
+            AuditEventType.OAUTH_LOGIN,
+            user_id=user_id,
+            email=email,
+            ip_address=ip,
+            provider=provider,
+            detail="new_user" if is_new else "existing_user",
+        )
+    )
 
 
 def audit_api_key_created(user_id: int, key_prefix: str) -> None:

@@ -36,8 +36,14 @@ class NovaMcpServer:
                 "type": "object",
                 "properties": {
                     "target": {"type": "string", "description": "Target IP or hostname"},
-                    "ports": {"type": "string", "description": "Port range (e.g. '80,443' or '1-1000')"},
-                    "flags": {"type": "string", "description": "Additional nmap flags (e.g. '-sV -sC')"},
+                    "ports": {
+                        "type": "string",
+                        "description": "Port range (e.g. '80,443' or '1-1000')",
+                    },
+                    "flags": {
+                        "type": "string",
+                        "description": "Additional nmap flags (e.g. '-sV -sC')",
+                    },
                 },
                 "required": ["target"],
             },
@@ -49,7 +55,11 @@ class NovaMcpServer:
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "Target URL to scan"},
-                    "scope": {"type": "array", "items": {"type": "string"}, "description": "URL scope patterns"},
+                    "scope": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "URL scope patterns",
+                    },
                 },
                 "required": ["url"],
             },
@@ -90,7 +100,10 @@ class NovaMcpServer:
             input_schema={
                 "type": "object",
                 "properties": {
-                    "service": {"type": "string", "description": "Service type (http, smb, ssh, etc.)"},
+                    "service": {
+                        "type": "string",
+                        "description": "Service type (http, smb, ssh, etc.)",
+                    },
                     "version": {"type": "string", "description": "Service version string"},
                 },
                 "required": ["service"],
@@ -126,7 +139,11 @@ class NovaMcpServer:
                 "properties": {
                     "finding_type": {"type": "string", "description": "Type of finding"},
                     "description": {"type": "string", "description": "Finding description"},
-                    "severity": {"type": "string", "description": "Finding severity (low, medium, high, critical)", "default": "medium"},
+                    "severity": {
+                        "type": "string",
+                        "description": "Finding severity (low, medium, high, critical)",
+                        "default": "medium",
+                    },
                 },
                 "required": ["finding_type"],
             },
@@ -137,14 +154,31 @@ class NovaMcpServer:
             input_schema={
                 "type": "object",
                 "properties": {
-                    "challenge_name": {"type": "string", "description": "Challenge name or identifier"},
+                    "challenge_name": {
+                        "type": "string",
+                        "description": "Challenge name or identifier",
+                    },
                     "challenge_type": {
                         "type": "string",
-                        "enum": ["web", "crypto", "stego", "forensics", "reversing", "pwn", "osint", "recon", "misc"],
+                        "enum": [
+                            "web",
+                            "crypto",
+                            "stego",
+                            "forensics",
+                            "reversing",
+                            "pwn",
+                            "osint",
+                            "recon",
+                            "misc",
+                        ],
                         "description": "Type of CTF challenge",
                     },
                     "url": {"type": "string", "description": "Challenge URL"},
-                    "files": {"type": "array", "items": {"type": "string"}, "description": "Challenge file paths"},
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Challenge file paths",
+                    },
                 },
                 "required": ["challenge_name"],
             },
@@ -195,8 +229,7 @@ class NovaMcpServer:
             },
         )
 
-    def _register_tool(self, name: str, description: str,
-                       input_schema: dict[str, Any]) -> None:
+    def _register_tool(self, name: str, description: str, input_schema: dict[str, Any]) -> None:
         self._tools[name] = {
             "name": name,
             "description": description,
@@ -225,8 +258,7 @@ class NovaMcpServer:
             "application/json",
         )
 
-    def _register_resource(self, uri: str, description: str,
-                           mime_type: str) -> None:
+    def _register_resource(self, uri: str, description: str, mime_type: str) -> None:
         self._resources[uri] = {
             "uri": uri,
             "description": description,
@@ -239,8 +271,7 @@ class NovaMcpServer:
     def get_resource_list(self) -> list[dict[str, Any]]:
         return list(self._resources.values())
 
-    async def handle_tool_call(self, tool_name: str,
-                               arguments: dict[str, Any]) -> str:
+    async def handle_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> str:
         from nova_arsenal.compliance import ComplianceMapper
         from nova_arsenal.ctf_solver import ChallengeType, CtfSolver
         from nova_arsenal.intelligence import CveResearch, OsintChain
@@ -266,27 +297,34 @@ class NovaMcpServer:
             elif tool_name == "osint_investigate":
                 chain = OsintChain()
                 result = await chain.investigate(arguments["domain"])
-                return json.dumps({
-                    "subdomains": result.subdomains[:20],
-                    "emails": result.emails[:20],
-                    "technologies": result.technologies,
-                    "summary": result.summary,
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "subdomains": result.subdomains[:20],
+                        "emails": result.emails[:20],
+                        "technologies": result.technologies,
+                        "summary": result.summary,
+                    },
+                    indent=2,
+                )
 
             elif tool_name == "cve_lookup":
                 researcher = CveResearch()
                 service = arguments["service"]
                 version = arguments.get("version", "")
                 result = await researcher.research(service, version, 0)
-                return json.dumps({
-                    "cves": [c.to_dict() for c in result.cves],
-                    "risk_score": result.risk_score,
-                    "has_exploit": result.has_exploit,
-                    "cve_count": len(result.cves),
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "cves": [c.to_dict() for c in result.cves],
+                        "risk_score": result.risk_score,
+                        "has_exploit": result.has_exploit,
+                        "cve_count": len(result.cves),
+                    },
+                    indent=2,
+                )
 
             elif tool_name == "payload_generate":
                 from nova_arsenal.payload_generator import PayloadLanguage, PayloadType
+
                 generator = PayloadGenerator()
                 ptype_str = arguments["payload_type"]
                 lhost = arguments["lhost"]
@@ -304,10 +342,13 @@ class NovaMcpServer:
                     except ValueError:
                         return json.dumps({"error": f"Invalid language: {lang_str}"})
                     payload = generator.generate(ptype_enum, lang_enum, lhost, lport)
-                    return json.dumps({
-                        ptype_str: {lang_str: payload.code},
-                        "description": payload.description,
-                    }, indent=2)
+                    return json.dumps(
+                        {
+                            ptype_str: {lang_str: payload.code},
+                            "description": payload.description,
+                        },
+                        indent=2,
+                    )
                 else:
                     chain = generator.generate_chain(lhost, lport)
                     result = {}
@@ -326,10 +367,13 @@ class NovaMcpServer:
                     arguments.get("description", ""),
                     severity,
                 )
-                return json.dumps({
-                    "controls": [c.to_dict() for c in result.controls],
-                    "frameworks_affected": list(result.frameworks_affected),
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "controls": [c.to_dict() for c in result.controls],
+                        "frameworks_affected": list(result.frameworks_affected),
+                    },
+                    indent=2,
+                )
 
             elif tool_name == "ctf_solve":
                 solver = CtfSolver()
@@ -346,12 +390,15 @@ class NovaMcpServer:
                 )
                 flag = await solver.solve_challenge(challenge)
                 if flag:
-                    return json.dumps({
-                        "solved": True,
-                        "flag": flag.flag,
-                        "method": flag.method,
-                        "confidence": flag.confidence,
-                    }, indent=2)
+                    return json.dumps(
+                        {
+                            "solved": True,
+                            "flag": flag.flag,
+                            "method": flag.method,
+                            "confidence": flag.confidence,
+                        },
+                        indent=2,
+                    )
                 return json.dumps({"solved": False, "reason": "Flag not found"}, indent=2)
 
             elif tool_name == "swarm_scan":
@@ -366,32 +413,39 @@ class NovaMcpServer:
                     dry_run_fuzz=bool(arguments.get("dry_run_fuzz", True)),
                 )
                 result = await swarm.run_swarm()
-                return json.dumps({
-                    "findings": [
-                        {
-                            "title": f.title,
-                            "severity": f.severity,
-                            "agent_role": f.agent_role.value if hasattr(f.agent_role, "value") else f.agent_role,
-                            "confidence": f.confidence,
-                        }
-                        for f in result.findings
-                    ],
-                    "summary": result.summary,
-                    "phases": result.phases,
-                    "zeroday_candidates": (
-                        (result.zeroday_hunt or {}).get("candidate_count")
-                        if result.zeroday_hunt
-                        else 0
-                    ),
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "findings": [
+                            {
+                                "title": f.title,
+                                "severity": f.severity,
+                                "agent_role": f.agent_role.value
+                                if hasattr(f.agent_role, "value")
+                                else f.agent_role,
+                                "confidence": f.confidence,
+                            }
+                            for f in result.findings
+                        ],
+                        "summary": result.summary,
+                        "phases": result.phases,
+                        "zeroday_candidates": (
+                            (result.zeroday_hunt or {}).get("candidate_count")
+                            if result.zeroday_hunt
+                            else 0
+                        ),
+                    },
+                    indent=2,
+                )
 
             elif tool_name == "zeroday_hunt":
                 from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter
 
                 if not arguments.get("authorized"):
-                    return json.dumps({
-                        "error": "zeroday_hunt requires authorized=true and a valid authorization_ref",
-                    })
+                    return json.dumps(
+                        {
+                            "error": "zeroday_hunt requires authorized=true and a valid authorization_ref",
+                        }
+                    )
                 hunter = ZeroDayHunter()
                 result = await hunter.hunt(
                     target=arguments["target"],
@@ -422,19 +476,23 @@ class NovaMcpServer:
 
         mcp_tools = []
         for t in self._tools.values():
-            mcp_tools.append(Tool(
-                name=t["name"],
-                description=t["description"],
-                inputSchema=t["inputSchema"],
-            ))
+            mcp_tools.append(
+                Tool(
+                    name=t["name"],
+                    description=t["description"],
+                    inputSchema=t["inputSchema"],
+                )
+            )
 
         mcp_resources = []
         for r in self._resources.values():
-            mcp_resources.append(Resource(
-                uri=r["uri"],
-                description=r["description"],
-                mimeType=r["mimeType"],
-            ))
+            mcp_resources.append(
+                Resource(
+                    uri=r["uri"],
+                    description=r["description"],
+                    mimeType=r["mimeType"],
+                )
+            )
 
         server = MCPServer(
             name="nova-arsenal",
@@ -448,12 +506,11 @@ class NovaMcpServer:
 
     async def _run_fallback(self) -> None:
         import sys
+
         logger.info("Starting MCP fallback mode (JSON-RPC over stdio)")
         while True:
             try:
-                line = await asyncio.get_event_loop().run_in_executor(
-                    None, sys.stdin.readline
-                )
+                line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
                 if not line:
                     break
                 request = json.loads(line)

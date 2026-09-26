@@ -29,10 +29,7 @@ logger = logging.getLogger(__name__)
 
 def _configured_pat_token() -> str:
     """Return Nova's own PAT, never an unrelated service credential."""
-    return (
-        os.environ.get("NOVA_PAT_TOKEN", "").strip()
-        or os.environ.get("PAT_TOKEN", "").strip()
-    )
+    return os.environ.get("NOVA_PAT_TOKEN", "").strip() or os.environ.get("PAT_TOKEN", "").strip()
 
 
 def _pat_matches(candidate: str | None, configured: str) -> bool:
@@ -155,9 +152,7 @@ async def get_current_user(
 
     token = credentials.credentials
     try:
-        payload = jwt.decode(
-            token, config.auth.jwt_secret, algorithms=["HS256"]
-        )
+        payload = jwt.decode(token, config.auth.jwt_secret, algorithms=["HS256"])
         if payload.get("type") != "access":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -210,6 +205,7 @@ def require_role(*roles: UserRole):
     Returns:
         Dependency function
     """
+
     async def check_role(
         current_user: User = Depends(get_current_user),
     ) -> User:
@@ -219,6 +215,7 @@ def require_role(*roles: UserRole):
                 detail=f"Role {current_user.role.value} not in required roles: {[r.value for r in roles]}",
             )
         return current_user
+
     return check_role
 
 

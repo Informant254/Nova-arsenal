@@ -37,6 +37,7 @@ class TeacherSnapshot:
     - Training prompts sampled from teacher's RL training set
     - Teachers mixed in proportion to their stage's data volume
     """
+
     stage: RLStage
     model_name: str
     sampling_weight: float = 1.0
@@ -52,6 +53,7 @@ class CrossStageDistillationConfig:
     - batch_size = 1024 (feasible because no group estimation needed)
     - Multiple teachers mixed proportionally
     """
+
     use_inference_engine_for_teacher: bool = True
     group_size: int = 1
     batch_size: int = 1024
@@ -74,6 +76,7 @@ class TeacherLogitCache:
     many samples. Caching logits for identical prefixes reduces
     inference cost.
     """
+
     cache: dict[str, list[float]] = field(default_factory=dict)
     hits: int = 0
     misses: int = 0
@@ -178,8 +181,7 @@ class CrossStageDistillationTrainer:
         )
         self._teachers.append(teacher)
         logger.info(
-            f"Registered teacher for stage {stage.value}: {model_name} "
-            f"(weight={sampling_weight})"
+            f"Registered teacher for stage {stage.value}: {model_name} (weight={sampling_weight})"
         )
         return teacher
 
@@ -209,6 +211,7 @@ class CrossStageDistillationTrainer:
 
         normalized = [w / total for w in weights]
         import random
+
         return random.choices(eligible, weights=normalized, k=1)[0]
 
     async def fetch_teacher_log_probs(
@@ -259,9 +262,7 @@ class CrossStageDistillationTrainer:
             return log_probs
 
         except Exception as e:
-            logger.warning(
-                f"Failed to fetch teacher logprobs for {teacher.model_name}: {e}"
-            )
+            logger.warning(f"Failed to fetch teacher logprobs for {teacher.model_name}: {e}")
             return None
 
     async def distill_step(
@@ -315,9 +316,7 @@ class CrossStageDistillationTrainer:
 
         self._stats["distill_steps"] += 1
         self._stats["total_advantage"] += avg_adv
-        self._stats["avg_advantage"] = (
-            self._stats["total_advantage"] / self._stats["distill_steps"]
-        )
+        self._stats["avg_advantage"] = self._stats["total_advantage"] / self._stats["distill_steps"]
         self._stats["total_loss"] += loss
         self._stats["cache_hit_rate"] = self._logit_cache.hit_rate
 
@@ -402,25 +401,19 @@ class CrossStageDistillationTrainer:
         if self.config.distill_reasoning and reasoning_prompts:
             self.config.distill_agentic = False
             self.config.distill_general = False
-            results["reasoning"] = await self.distill(
-                reasoning_prompts, system_prompt
-            )
+            results["reasoning"] = await self.distill(reasoning_prompts, system_prompt)
             self.config.distill_reasoning = True
 
         if self.config.distill_agentic and agentic_prompts:
             self.config.distill_reasoning = False
             self.config.distill_general = False
-            results["agentic"] = await self.distill(
-                agentic_prompts, system_prompt
-            )
+            results["agentic"] = await self.distill(agentic_prompts, system_prompt)
             self.config.distill_agentic = True
 
         if self.config.distill_general and general_prompts:
             self.config.distill_reasoning = False
             self.config.distill_agentic = False
-            results["general"] = await self.distill(
-                general_prompts, system_prompt
-            )
+            results["general"] = await self.distill(general_prompts, system_prompt)
             self.config.distill_general = True
 
         self.config.distill_reasoning = True

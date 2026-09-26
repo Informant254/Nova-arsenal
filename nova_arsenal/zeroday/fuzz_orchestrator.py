@@ -265,7 +265,11 @@ class FuzzOrchestrator:
         base_pri = ep.fuzz_affinity + ep.priority * 0.1
 
         if ep.service in {"http", "https", "http-proxy"}:
-            url = ep.path if ep.path.startswith("http") else f"http://{target}:{ep.port or 80}{ep.path or '/'}"
+            url = (
+                ep.path
+                if ep.path.startswith("http")
+                else f"http://{target}:{ep.port or 80}{ep.path or '/'}"
+            )
             wordlist = "/usr/share/seclists/Discovery/Web-Content/raft-small-words.txt"
             jobs.append(
                 FuzzJob(

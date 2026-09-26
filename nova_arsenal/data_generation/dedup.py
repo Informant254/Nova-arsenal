@@ -17,7 +17,7 @@ def word_trigrams(text: str) -> set[str]:
     words = text.split()
     if len(words) < 3:
         return {w.lower() for w in words}
-    return {" ".join(words[i:i+3]).lower() for i in range(len(words) - 2)}
+    return {" ".join(words[i : i + 3]).lower() for i in range(len(words) - 2)}
 
 
 def jaccard_similarity(a: set[str], b: set[str]) -> float:

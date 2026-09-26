@@ -169,8 +169,13 @@ class SessionMemory:
                    (user_id, task_type, target, outcome, summary, detail_json, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    self.user_id, task_type, target, outcome, summary,
-                    json.dumps(detail or {}), _now(),
+                    self.user_id,
+                    task_type,
+                    target,
+                    outcome,
+                    summary,
+                    json.dumps(detail or {}),
+                    _now(),
                 ),
             )
             if cur.lastrowid is None:
@@ -186,8 +191,11 @@ class SessionMemory:
             ).fetchall()
         return [
             TaskEntry(
-                id=r["id"], task_type=r["task_type"], target=r["target"],
-                outcome=r["outcome"], summary=r["summary"],
+                id=r["id"],
+                task_type=r["task_type"],
+                target=r["target"],
+                outcome=r["outcome"],
+                summary=r["summary"],
                 detail=json.loads(r["detail_json"] or "{}"),
                 created_at=r["created_at"],
             )
@@ -235,8 +243,7 @@ class SessionMemory:
                        (user_id, target_id, platform, name, status, last_score,
                         notes, first_seen_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (self.user_id, target_id, platform, name, status,
-                     last_score, notes, now, now),
+                    (self.user_id, target_id, platform, name, status, last_score, notes, now, now),
                 )
 
     def active_targets(self) -> list[TargetEntry]:
@@ -262,8 +269,12 @@ class SessionMemory:
     @staticmethod
     def _row_to_target(r: sqlite3.Row) -> TargetEntry:
         return TargetEntry(
-            target_id=r["target_id"], platform=r["platform"], name=r["name"],
-            status=r["status"], last_score=r["last_score"], notes=r["notes"],
+            target_id=r["target_id"],
+            platform=r["platform"],
+            name=r["name"],
+            status=r["status"],
+            last_score=r["last_score"],
+            notes=r["notes"],
             updated_at=r["updated_at"],
         )
 
@@ -285,8 +296,14 @@ class SessionMemory:
                     detail_json, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    self.user_id, target_id, platform, title, severity,
-                    status, json.dumps(detail or {}), _now(),
+                    self.user_id,
+                    target_id,
+                    platform,
+                    title,
+                    severity,
+                    status,
+                    json.dumps(detail or {}),
+                    _now(),
                 ),
             )
             if cur.lastrowid is None:

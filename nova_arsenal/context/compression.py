@@ -34,6 +34,7 @@ class DSAConfig:
     - deterministic_topk: use torch.topk for consistency
     - freeze_indexer: freeze indexer params during RL training
     """
+
     compressed_latent_dim: int = 256
     top_k: int = 2048
     num_heads: int = 8
@@ -56,6 +57,7 @@ class DSAIndexer:
     For the Nova context: adapted as a content relevance scorer
     that selects the most important segments of long security tool outputs.
     """
+
     top_k: int = 2048
     deterministic: bool = True
     _score_cache: dict[str, list[float]] = field(default_factory=dict)
@@ -79,13 +81,11 @@ class DSAIndexer:
             top_k_scores = heapq.nlargest(self.top_k, scores, key=lambda x: x[1])
         else:
             sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
-            top_k_scores = sorted_scores[:self.top_k]
+            top_k_scores = sorted_scores[: self.top_k]
 
         return [idx for idx, _ in top_k_scores]
 
-    def _cosine_similarity(
-        self, a: list[float], b: list[float]
-    ) -> float:
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
         dot = sum(x * y for x, y in zip(a, b))
         norm_a = math.sqrt(sum(x * x for x in a))
         norm_b = math.sqrt(sum(x * x for x in b))
@@ -106,6 +106,7 @@ class CompressedLatent:
     - Use compressed latent for top-k selection instead of full KV
     - Reduces storage and compute for long-context attention
     """
+
     compressed_keys: list[list[float]] = field(default_factory=list)
     compressed_values: list[list[float]] = field(default_factory=list)
     original_indices: list[int] = field(default_factory=list)
@@ -193,9 +194,7 @@ class ContentCompressor:
                 scores.append((idx, 0.0))
                 continue
 
-            matched_keywords = sum(
-                1 for kw in keyword_set if kw in seg_lower
-            )
+            matched_keywords = sum(1 for kw in keyword_set if kw in seg_lower)
             score += matched_keywords / max(len(keyword_set), 1)
 
             cve_count = seg_lower.count("cve-")
@@ -271,8 +270,8 @@ class ContentCompressor:
 
         self._stats["total_chars_processed"] += len(content)
         self._stats["compressed_chars"] += len(compressed)
-        self._stats["compression_ratio"] = (
-            self._stats["compressed_chars"] / max(self._stats["total_chars_processed"], 1)
+        self._stats["compression_ratio"] = self._stats["compressed_chars"] / max(
+            self._stats["total_chars_processed"], 1
         )
         self._stats["segments_processed"] += len(segments)
 
@@ -308,9 +307,7 @@ class ContentCompressor:
             compression_ratio=len(compressed_keys) / max(len(segments), 1),
         )
 
-    def _project_to_latent(
-        self, text: str, dims: int
-    ) -> list[float]:
+    def _project_to_latent(self, text: str, dims: int) -> list[float]:
         """Simple frequency-based projection to latent space.
 
         In production, this would be a learned projection matrix.
@@ -329,11 +326,32 @@ class ContentCompressor:
         _word_set = set(words)
 
         security_terms = [
-            "cve", "vulnerability", "exploit", "attack", "breach",
-            "malware", "ransomware", "phishing", "backdoor", "trojan",
-            "port", "service", "protocol", "ssl", "tls", "http",
-            "sql", "injection", "xss", "csrf", "authentication",
-            "authorization", "bypass", "escalation", "payload", "shell",
+            "cve",
+            "vulnerability",
+            "exploit",
+            "attack",
+            "breach",
+            "malware",
+            "ransomware",
+            "phishing",
+            "backdoor",
+            "trojan",
+            "port",
+            "service",
+            "protocol",
+            "ssl",
+            "tls",
+            "http",
+            "sql",
+            "injection",
+            "xss",
+            "csrf",
+            "authentication",
+            "authorization",
+            "bypass",
+            "escalation",
+            "payload",
+            "shell",
         ]
 
         for i, term in enumerate(security_terms):

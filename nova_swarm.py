@@ -39,12 +39,14 @@ class KnowledgeGraph:
         agent: str = "",
     ) -> None:
         """Add an edge between two nodes."""
-        self.graph["edges"].append({
-            "source": source,
-            "target": target,
-            "relation": relation,
-            "agent": agent,
-        })
+        self.graph["edges"].append(
+            {
+                "source": source,
+                "target": target,
+                "relation": relation,
+                "agent": agent,
+            }
+        )
 
     def add_finding(
         self,
@@ -57,11 +59,7 @@ class KnowledgeGraph:
 
     def get_nodes_by_type(self, node_type: str) -> dict[str, Any]:
         """Get all nodes of a given type."""
-        return {
-            nid: node
-            for nid, node in self.graph["nodes"].items()
-            if node["type"] == node_type
-        }
+        return {nid: node for nid, node in self.graph["nodes"].items() if node["type"] == node_type}
 
 
 @dataclass

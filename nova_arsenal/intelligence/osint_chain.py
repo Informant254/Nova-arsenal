@@ -128,41 +128,49 @@ class OsintChain:
         try:
             whois_data = await self._run(f"whois {target} 2>/dev/null | head -40")
             if whois_data:
-                result.artifacts.append(OsintArtifact(
-                    phase=OsintPhase.DOMAIN_DISCOVERY,
-                    type="whois",
-                    value=target,
-                    source="whois",
-                    metadata={"raw": whois_data[:500]},
-                ))
+                result.artifacts.append(
+                    OsintArtifact(
+                        phase=OsintPhase.DOMAIN_DISCOVERY,
+                        type="whois",
+                        value=target,
+                        source="whois",
+                        metadata={"raw": whois_data[:500]},
+                    )
+                )
         except Exception as e:
             logger.warning(f"Domain discovery failed for {target}: {e}")
 
         try:
-            dns_data = await self._run(f"dig {target} ANY +short 2>/dev/null || echo 'dig unavailable'")
+            dns_data = await self._run(
+                f"dig {target} ANY +short 2>/dev/null || echo 'dig unavailable'"
+            )
             if dns_data and "dig unavailable" not in dns_data:
                 for line in dns_data.strip().split("\n"):
                     line = line.strip()
                     if line and not line.startswith(";"):
-                        result.artifacts.append(OsintArtifact(
-                            phase=OsintPhase.DOMAIN_DISCOVERY,
-                            type="dns_record",
-                            value=line,
-                            source="dig",
-                        ))
+                        result.artifacts.append(
+                            OsintArtifact(
+                                phase=OsintPhase.DOMAIN_DISCOVERY,
+                                type="dns_record",
+                                value=line,
+                                source="dig",
+                            )
+                        )
         except Exception as e:
             logger.warning(f"DNS lookup failed for {target}: {e}")
 
         try:
             ns_data = await self._run(f"nslookup {target} 2>/dev/null | head -20")
             if ns_data:
-                result.artifacts.append(OsintArtifact(
-                    phase=OsintPhase.DOMAIN_DISCOVERY,
-                    type="nameserver",
-                    value=target,
-                    source="nslookup",
-                    metadata={"raw": ns_data[:500]},
-                ))
+                result.artifacts.append(
+                    OsintArtifact(
+                        phase=OsintPhase.DOMAIN_DISCOVERY,
+                        type="nameserver",
+                        value=target,
+                        source="nslookup",
+                        metadata={"raw": ns_data[:500]},
+                    )
+                )
         except Exception as e:
             logger.warning(f"NS lookup failed for {target}: {e}")
 
@@ -174,12 +182,14 @@ class OsintChain:
                     s = s.strip()
                     if s:
                         result.subdomains.append(s)
-                        result.artifacts.append(OsintArtifact(
-                            phase=OsintPhase.SUBDOMAIN_ENUM,
-                            type="subdomain",
-                            value=s,
-                            source="subfinder",
-                        ))
+                        result.artifacts.append(
+                            OsintArtifact(
+                                phase=OsintPhase.SUBDOMAIN_ENUM,
+                                type="subdomain",
+                                value=s,
+                                source="subfinder",
+                            )
+                        )
         except Exception as e:
             logger.warning(f"Subdomain enumeration failed for {target}: {e}")
 
@@ -195,12 +205,14 @@ class OsintChain:
                         s = s.strip()
                         if s and s not in result.subdomains:
                             result.subdomains.append(s)
-                            result.artifacts.append(OsintArtifact(
-                                phase=OsintPhase.SUBDOMAIN_ENUM,
-                                type="subdomain",
-                                value=s,
-                                source="crt.sh",
-                            ))
+                            result.artifacts.append(
+                                OsintArtifact(
+                                    phase=OsintPhase.SUBDOMAIN_ENUM,
+                                    type="subdomain",
+                                    value=s,
+                                    source="crt.sh",
+                                )
+                            )
             except Exception as e:
                 logger.warning(f"Certificate transparency search failed: {e}")
 
@@ -210,19 +222,32 @@ class OsintChain:
             if whatweb_data:
                 techs = set()
                 for line in whatweb_data.split("\n"):
-                    for tech in ["Apache", "Nginx", "PHP", "jQuery", "React",
-                                 "WordPress", "Drupal", "Joomla", "Django",
-                                 "Ruby on Rails", "Express", "Node.js"]:
+                    for tech in [
+                        "Apache",
+                        "Nginx",
+                        "PHP",
+                        "jQuery",
+                        "React",
+                        "WordPress",
+                        "Drupal",
+                        "Joomla",
+                        "Django",
+                        "Ruby on Rails",
+                        "Express",
+                        "Node.js",
+                    ]:
                         if tech.lower() in line.lower():
                             techs.add(tech)
                 if techs:
                     result.technologies["web"] = sorted(techs)
-                    result.artifacts.append(OsintArtifact(
-                        phase=OsintPhase.TECH_DETECTION,
-                        type="technology",
-                        value=", ".join(sorted(techs)),
-                        source="whatweb",
-                    ))
+                    result.artifacts.append(
+                        OsintArtifact(
+                            phase=OsintPhase.TECH_DETECTION,
+                            type="technology",
+                            value=", ".join(sorted(techs)),
+                            source="whatweb",
+                        )
+                    )
         except Exception as e:
             logger.warning(f"Tech detection failed for {target}: {e}")
 
@@ -231,13 +256,15 @@ class OsintChain:
                 f"nmap -sV --top-ports 100 {target} 2>/dev/null | grep -E 'open|service' | head -20"
             )
             if nmap_tech:
-                result.artifacts.append(OsintArtifact(
-                    phase=OsintPhase.TECH_DETECTION,
-                    type="service_scan",
-                    value=target,
-                    source="nmap",
-                    metadata={"raw": nmap_tech[:500]},
-                ))
+                result.artifacts.append(
+                    OsintArtifact(
+                        phase=OsintPhase.TECH_DETECTION,
+                        type="service_scan",
+                        value=target,
+                        source="nmap",
+                        metadata={"raw": nmap_tech[:500]},
+                    )
+                )
         except Exception as e:
             logger.warning(f"Nmap tech detection failed: {e}")
 
@@ -251,16 +278,18 @@ class OsintChain:
                 for line in harvester.strip().split("\n"):
                     line = line.strip()
                     if line and "@" in line:
-                        emails = re.findall(r'[\w.+-]+@[\w-]+\.[\w.]+', line)
+                        emails = re.findall(r"[\w.+-]+@[\w-]+\.[\w.]+", line)
                         for e in emails:
                             if e not in result.emails:
                                 result.emails.append(e)
-                                result.artifacts.append(OsintArtifact(
-                                    phase=OsintPhase.EMAIL_HARVEST,
-                                    type="email",
-                                    value=e,
-                                    source="theHarvester",
-                                ))
+                                result.artifacts.append(
+                                    OsintArtifact(
+                                        phase=OsintPhase.EMAIL_HARVEST,
+                                        type="email",
+                                        value=e,
+                                        source="theHarvester",
+                                    )
+                                )
         except Exception as e:
             logger.warning(f"Email harvest failed for {target}: {e}")
 
@@ -276,12 +305,14 @@ class OsintChain:
         for site, url in social_sites:
             try:
                 result.social_accounts.append(f"https://{url}")
-                result.artifacts.append(OsintArtifact(
-                    phase=OsintPhase.SOCIAL_DISCOVERY,
-                    type="social_profile",
-                    value=f"https://{url}",
-                    source=site,
-                ))
+                result.artifacts.append(
+                    OsintArtifact(
+                        phase=OsintPhase.SOCIAL_DISCOVERY,
+                        type="social_profile",
+                        value=f"https://{url}",
+                        source=site,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Social discovery for {site} failed: {e}")
 
@@ -295,13 +326,15 @@ class OsintChain:
                 )
                 if "pwned" in check.lower():
                     result.breached_accounts.append(email)
-                    result.artifacts.append(OsintArtifact(
-                        phase=OsintPhase.BREACH_SEARCH,
-                        type="breach",
-                        value=email,
-                        source="haveibeenpwned",
-                        metadata={"status": "potentially compromised"},
-                    ))
+                    result.artifacts.append(
+                        OsintArtifact(
+                            phase=OsintPhase.BREACH_SEARCH,
+                            type="breach",
+                            value=email,
+                            source="haveibeenpwned",
+                            metadata={"status": "potentially compromised"},
+                        )
+                    )
             except Exception as e:
                 logger.warning(f"Breach search for {email} failed: {e}")
 

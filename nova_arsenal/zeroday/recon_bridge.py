@@ -70,8 +70,7 @@ def findings_to_services(
                 "evidence": getattr(f, "evidence", ""),
             }
         text = " ".join(
-            str(d.get(k, ""))
-            for k in ("title", "description", "evidence", "endpoint", "severity")
+            str(d.get(k, "")) for k in ("title", "description", "evidence", "endpoint", "severity")
         )
         _absorb_text(services, text)
 

@@ -15,6 +15,7 @@ from typing import Any
 @dataclass
 class ToolSchema:
     """A tool definition with JSON Schema parameters."""
+
     name: str
     description: str
     parameters: dict[str, Any]
@@ -485,8 +486,12 @@ NOVA_SECURITY_TOOLS: list[ToolSchema] = [
                     "items": {
                         "type": "string",
                         "enum": [
-                            "domain_discovery", "subdomain_enum", "tech_detection",
-                            "email_harvest", "social_discovery", "breach_search",
+                            "domain_discovery",
+                            "subdomain_enum",
+                            "tech_detection",
+                            "email_harvest",
+                            "social_discovery",
+                            "breach_search",
                         ],
                     },
                     "description": "OSINT phases to execute",
@@ -577,8 +582,15 @@ NOVA_SECURITY_TOOLS: list[ToolSchema] = [
                 "challenge_type": {
                     "type": "string",
                     "enum": [
-                        "web", "crypto", "stego", "forensics",
-                        "reversing", "pwn", "osint", "recon", "misc",
+                        "web",
+                        "crypto",
+                        "stego",
+                        "forensics",
+                        "reversing",
+                        "pwn",
+                        "osint",
+                        "recon",
+                        "misc",
                     ],
                     "description": "Type of CTF challenge",
                 },
@@ -672,7 +684,7 @@ NOVA_SECURITY_TOOLS: list[ToolSchema] = [
                 },
                 "services": {
                     "type": "object",
-                    "description": "Detected services map, e.g. {\"https\": {\"ports\": [443], \"version\": \"nginx 1.25\"}}",
+                    "description": 'Detected services map, e.g. {"https": {"ports": [443], "version": "nginx 1.25"}}',
                     "additionalProperties": True,
                 },
                 "max_candidates": {
@@ -710,14 +722,16 @@ def tools_to_openai_format(tools: list[ToolSchema]) -> list[dict[str, Any]]:
     """Convert tool schemas to OpenAI-compatible tool definitions."""
     result = []
     for tool in tools:
-        result.append({
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.parameters,
-            },
-        })
+        result.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+        )
     return result
 
 
@@ -725,11 +739,13 @@ def tools_to_anthropic_format(tools: list[ToolSchema]) -> list[dict[str, Any]]:
     """Convert tool schemas to Anthropic-compatible tool definitions."""
     result = []
     for tool in tools:
-        result.append({
-            "name": tool.name,
-            "description": tool.description,
-            "input_schema": tool.parameters,
-        })
+        result.append(
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters,
+            }
+        )
     return result
 
 

@@ -45,10 +45,12 @@ class TestResilientNovaAgent:
         """Test agent tracks execution errors."""
         agent = ResilientNovaAgent(target="example.com")
 
-        agent.add_execution_error({
-            "type": "test_error",
-            "message": "Test error message",
-        })
+        agent.add_execution_error(
+            {
+                "type": "test_error",
+                "message": "Test error message",
+            }
+        )
 
         errors = agent.get_execution_errors()
         assert len(errors) == 1
@@ -89,10 +91,12 @@ class TestResilientNovaAgent:
 
         # Add many errors
         for i in range(150):
-            agent.add_execution_error({
-                "id": i,
-                "message": f"Error {i}",
-            })
+            agent.add_execution_error(
+                {
+                    "id": i,
+                    "message": f"Error {i}",
+                }
+            )
 
         errors = agent.get_execution_errors()
         # Should keep only last 100

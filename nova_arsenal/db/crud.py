@@ -24,15 +24,13 @@ from nova_arsenal.db.models import (
 
 # ── Chat Session CRUD ─────────────────────────────────────────────────────────
 
+
 async def get_chat_session(
     db: AsyncSession,
     session_id: str,
 ) -> ChatSession | None:
-    result = await db.execute(
-        select(ChatSession).where(ChatSession.session_id == session_id)
-    )
+    result = await db.execute(select(ChatSession).where(ChatSession.session_id == session_id))
     return result.scalar_one_or_none()
-
 
 
 async def get_or_create_chat_session(
@@ -132,9 +130,7 @@ async def list_chat_sessions(
     rows: list[dict[str, Any]] = []
     for session in sessions:
         count_result = await db.execute(
-            select(func.count(ChatMessage.id)).where(
-                ChatMessage.session_id == session.session_id
-            )
+            select(func.count(ChatMessage.id)).where(ChatMessage.session_id == session.session_id)
         )
         rows.append(
             {
@@ -149,6 +145,7 @@ async def list_chat_sessions(
 
 
 # ── Agent Run Result CRUD ────────────────────────────────────────────────────
+
 
 async def create_agent_run(
     db: AsyncSession,
@@ -174,9 +171,7 @@ async def complete_agent_run(
     summary: str | None = None,
     result_dict: dict[str, Any] | None = None,
 ) -> AgentRunResult | None:
-    result = await db.execute(
-        select(AgentRunResult).where(AgentRunResult.id == run_id)
-    )
+    result = await db.execute(select(AgentRunResult).where(AgentRunResult.id == run_id))
     run = result.scalar_one_or_none()
     if not run:
         return None
@@ -205,6 +200,7 @@ async def get_agent_run_history(
 
 
 # ── Finding CRUD ─────────────────────────────────────────────────────────────
+
 
 async def persist_finding(
     db: AsyncSession,
@@ -268,6 +264,7 @@ async def persist_findings_batch(
 
 # ── Schedule Entry CRUD ──────────────────────────────────────────────────────
 
+
 async def list_schedule_entries(db: AsyncSession) -> list[ScheduleEntryModel]:
     result = await db.execute(
         select(ScheduleEntryModel).order_by(ScheduleEntryModel.created_at.desc())
@@ -276,9 +273,7 @@ async def list_schedule_entries(db: AsyncSession) -> list[ScheduleEntryModel]:
 
 
 async def get_schedule_entry(db: AsyncSession, name: str) -> ScheduleEntryModel | None:
-    result = await db.execute(
-        select(ScheduleEntryModel).where(ScheduleEntryModel.name == name)
-    )
+    result = await db.execute(select(ScheduleEntryModel).where(ScheduleEntryModel.name == name))
     return result.scalar_one_or_none()
 
 
@@ -348,11 +343,20 @@ async def update_entry_run_stats(
 
 
 __all__ = [
-    "get_chat_session", "get_or_create_chat_session", "add_chat_message",
-    "get_chat_messages", "delete_chat_session", "list_chat_sessions",
-    "create_agent_run", "complete_agent_run", "get_agent_run_history",
-    "persist_finding", "persist_findings_batch",
-    "list_schedule_entries", "get_schedule_entry",
-    "upsert_schedule_entry", "delete_schedule_entry",
+    "get_chat_session",
+    "get_or_create_chat_session",
+    "add_chat_message",
+    "get_chat_messages",
+    "delete_chat_session",
+    "list_chat_sessions",
+    "create_agent_run",
+    "complete_agent_run",
+    "get_agent_run_history",
+    "persist_finding",
+    "persist_findings_batch",
+    "list_schedule_entries",
+    "get_schedule_entry",
+    "upsert_schedule_entry",
+    "delete_schedule_entry",
     "update_entry_run_stats",
 ]

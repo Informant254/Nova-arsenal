@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NmapPort:
     """A discovered open port."""
+
     port: int
     protocol: str
     state: str
@@ -51,6 +52,7 @@ class NmapPort:
 @dataclass
 class NmapHost:
     """A discovered host."""
+
     ip: str
     hostname: str = ""
     state: str = "up"
@@ -78,6 +80,7 @@ class NmapHost:
 @dataclass
 class NmapScanResult:
     """Complete parsed nmap scan."""
+
     cmdline: str = ""
     start_time: str = ""
     runtime: str = ""
@@ -138,9 +141,7 @@ class NmapParser:
 
         # Extract scan metadata
         result.cmdline = NmapParser._extract(xml_content, r'<nmaprun[^>]* args="([^"]*)"')
-        result.start_time = NmapParser._extract(
-            xml_content, r'<nmaprun[^>]* start="(\d+)"'
-        )
+        result.start_time = NmapParser._extract(xml_content, r'<nmaprun[^>]* start="(\d+)"')
         if result.start_time:
             try:
                 ts = int(result.start_time)
@@ -159,8 +160,7 @@ class NmapParser:
                 result.hosts.append(host)
 
         logger.info(
-            f"Parsed nmap scan: {len(result.hosts)} hosts, "
-            f"{result.total_open_ports} open ports"
+            f"Parsed nmap scan: {len(result.hosts)} hosts, {result.total_open_ports} open ports"
         )
         return result
 
@@ -198,13 +198,11 @@ class NmapParser:
         """Parse a single host section."""
         # Extract IP address
         ip = NmapParser._extract(
-            host_xml,
-            r'<address[^>]* addr="(\d+\.\d+\.\d+\.\d+)"[^>]* addrtype="ipv4"'
+            host_xml, r'<address[^>]* addr="(\d+\.\d+\.\d+\.\d+)"[^>]* addrtype="ipv4"'
         )
         if not ip:
             ip = NmapParser._extract(
-                host_xml,
-                r'<address[^>]* addr="([^"]*)"[^>]* addrtype="ipv[46]"'
+                host_xml, r'<address[^>]* addr="([^"]*)"[^>]* addrtype="ipv[46]"'
             )
         if not ip:
             return None
@@ -224,10 +222,7 @@ class NmapParser:
         )
 
         # OS detection
-        os_match = re.search(
-            r'<osmatch[^>]* name="([^"]*)"[^>]* accuracy="(\d+)"',
-            host_xml
-        )
+        os_match = re.search(r'<osmatch[^>]* name="([^"]*)"[^>]* accuracy="(\d+)"', host_xml)
         if os_match:
             host.os = os_match.group(1)
             host.os_accuracy = int(os_match.group(2))
@@ -245,10 +240,12 @@ class NmapParser:
             script_id = NmapParser._extract(script_xml, r'id="([^"]*)"')
             script_output = NmapParser._extract(script_xml, r'output="([^"]*)"')
             if script_id:
-                host.scripts.append({
-                    "id": script_id,
-                    "output": script_output,
-                })
+                host.scripts.append(
+                    {
+                        "id": script_id,
+                        "output": script_output,
+                    }
+                )
 
         return host
 
@@ -276,14 +273,14 @@ class NmapParser:
 
         # Service details
         service_section = NmapParser._extract(
-            port_xml, r'(<service[^>]*/>|<service[^>]*>.*?</service>)'
+            port_xml, r"(<service[^>]*/>|<service[^>]*>.*?</service>)"
         )
         if service_section:
             port.service = NmapParser._extract(service_section, r'name="([^"]*)"')
             port.product = NmapParser._extract(service_section, r'product="([^"]*)"')
             port.version = NmapParser._extract(service_section, r'version="([^"]*)"')
             port.extra_info = NmapParser._extract(service_section, r'extrainfo="([^"]*)"')
-            port.cpe = NmapParser._extract(service_section, r'<cpe>[^<]*</cpe>')
+            port.cpe = NmapParser._extract(service_section, r"<cpe>[^<]*</cpe>")
 
         return port
 
@@ -295,37 +292,45 @@ class NmapParser:
         # Map service names to port numbers
         for svc, ports in result.services.items():
             if svc in ("http", "https", "http-proxy"):
-                findings.append({
-                    "title": f"Web Service Detected ({svc.upper()})",
-                    "severity": "info",
-                    "description": f"Web service running on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": f"Web Service Detected ({svc.upper()})",
+                        "severity": "info",
+                        "description": f"Web service running on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
             elif svc in ("smb", "microsoft-ds", "netbios-ssn"):
-                findings.append({
-                    "title": "SMB Service Detected",
-                    "severity": "medium",
-                    "description": f"SMB service on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": "SMB Service Detected",
+                        "severity": "medium",
+                        "description": f"SMB service on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
             elif svc in ("mysql", "postgresql", "ms-sql-s", "oracle-tns"):
-                findings.append({
-                    "title": f"Database Service Detected ({svc})",
-                    "severity": "medium",
-                    "description": f"Database service on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": f"Database Service Detected ({svc})",
+                        "severity": "medium",
+                        "description": f"Database service on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
             elif svc in ("ssh",):
-                findings.append({
-                    "title": "SSH Service Detected",
-                    "severity": "low",
-                    "description": f"SSH service on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": "SSH Service Detected",
+                        "severity": "low",
+                        "description": f"SSH service on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
 
         # Check for outdated versions
         for port in result.all_ports:
@@ -333,12 +338,14 @@ class NmapParser:
                 version_str = f"{port.product} {port.version}".lower()
                 outdated = ["2.4.", "1.0.", "0.9.", "old", "deprecated"]
                 if any(x in version_str for x in outdated):
-                    findings.append({
-                        "title": f"Potentially Outdated Service: {port.service}",
-                        "severity": "medium",
-                        "description": f"{port.product} {port.version} on port {port.port}",
-                        "ports": [port.port],
-                        "service": port.service,
-                    })
+                    findings.append(
+                        {
+                            "title": f"Potentially Outdated Service: {port.service}",
+                            "severity": "medium",
+                            "description": f"{port.product} {port.version} on port {port.port}",
+                            "ports": [port.port],
+                            "service": port.service,
+                        }
+                    )
 
         return findings

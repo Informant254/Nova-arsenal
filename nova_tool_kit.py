@@ -107,9 +107,12 @@ class GovernedTool:
     def schema_str(self) -> str:
         """Return schema as JSON string."""
         import json
+
         return json.dumps(self.schema, indent=2)
 
-    def call(self, args: dict[str, Any], profile: PermissionProfile = PermissionProfile.FULL) -> str:
+    def call(
+        self, args: dict[str, Any], profile: PermissionProfile = PermissionProfile.FULL
+    ) -> str:
         """Execute the tool with given arguments and permission profile."""
         if profile not in self._allowed_profiles:
             return f"BLOCKED: Tool '{self.name}' is not allowed under {profile.value} profile"
@@ -196,7 +199,11 @@ class NovaToolKit:
                     },
                     "required": ["path"],
                 },
-                allowed_profiles=[PermissionProfile.READ_ONLY, PermissionProfile.SCOPED, PermissionProfile.FULL],
+                allowed_profiles=[
+                    PermissionProfile.READ_ONLY,
+                    PermissionProfile.SCOPED,
+                    PermissionProfile.FULL,
+                ],
             ),
             GovernedTool(
                 name="grep_code",
@@ -210,7 +217,11 @@ class NovaToolKit:
                     },
                     "required": ["pattern"],
                 },
-                allowed_profiles=[PermissionProfile.READ_ONLY, PermissionProfile.SCOPED, PermissionProfile.FULL],
+                allowed_profiles=[
+                    PermissionProfile.READ_ONLY,
+                    PermissionProfile.SCOPED,
+                    PermissionProfile.FULL,
+                ],
             ),
             GovernedTool(
                 name="write_file",

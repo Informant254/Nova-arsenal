@@ -4,6 +4,7 @@ MITRE ATT&CK Mapping — technique identification and attack path mapping.
 Maps observed behaviors to ATT&CK techniques, builds kill chains,
 and provides coverage analysis.
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class Tactic(Enum):
     """MITRE ATT&CK Tactic identifiers."""
+
     RECONNAISSANCE = "TA0043"
     RESOURCE_DEVELOPMENT = "TA0042"
     INITIAL_ACCESS = "TA0001"
@@ -53,6 +55,7 @@ TACTIC_ORDER = [
 @dataclass
 class Technique:
     """A MITRE ATT&CK technique."""
+
     technique_id: str
     name: str
     tactic: Tactic
@@ -81,6 +84,7 @@ class Technique:
 @dataclass
 class ObservedBehavior:
     """A behavior observed during testing."""
+
     behavior_id: str
     description: str
     technique_id: str | None = None
@@ -93,6 +97,7 @@ class ObservedBehavior:
 @dataclass
 class KillChain:
     """An attack kill chain built from observed techniques."""
+
     chain_id: str
     stages: list[dict]
     coverage: float
@@ -112,167 +117,233 @@ class KillChain:
 # Common techniques database
 TECHNIQUES: dict[str, Technique] = {
     "T1078": Technique(
-        "T1078", "Valid Accounts", Tactic.INITIAL_ACCESS,
+        "T1078",
+        "Valid Accounts",
+        Tactic.INITIAL_ACCESS,
         description="Adversaries may obtain and abuse credentials of existing accounts.",
         platforms=["Linux", "Windows", "macOS", "SaaS"],
     ),
     "T1059": Technique(
-        "T1059", "Command and Scripting Interpreter", Tactic.EXECUTION,
+        "T1059",
+        "Command and Scripting Interpreter",
+        Tactic.EXECUTION,
         description="Adversaries may abuse command and script interpreters to execute commands.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1053": Technique(
-        "T1053", "Scheduled Task/Job", Tactic.PERSISTENCE,
+        "T1053",
+        "Scheduled Task/Job",
+        Tactic.PERSISTENCE,
         description="Adversaries may abuse task scheduling functionality.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1055": Technique(
-        "T1055", "Process Injection", Tactic.DEFENSE_EVASION,
+        "T1055",
+        "Process Injection",
+        Tactic.DEFENSE_EVASION,
         description="Adversaries may inject code into processes in order to evade process-based defenses.",
         platforms=["Windows", "macOS"],
     ),
     "T1003": Technique(
-        "T1003", "OS Credential Dumping", Tactic.CREDENTIAL_ACCESS,
+        "T1003",
+        "OS Credential Dumping",
+        Tactic.CREDENTIAL_ACCESS,
         description="Adversaries may attempt to dump credentials to obtain account login and credential material.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1087": Technique(
-        "T1087", "Account Discovery", Tactic.DISCOVERY,
+        "T1087",
+        "Account Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to get a listing of accounts.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1021": Technique(
-        "T1021", "Remote Services", Tactic.LATERAL_MOVEMENT,
+        "T1021",
+        "Remote Services",
+        Tactic.LATERAL_MOVEMENT,
         description="Adversaries may use Valid Accounts to log into a service for remote access.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1566": Technique(
-        "T1566", "Phishing", Tactic.INITIAL_ACCESS,
+        "T1566",
+        "Phishing",
+        Tactic.INITIAL_ACCESS,
         description="Adversaries may send phishing messages to gain access to victim systems.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1190": Technique(
-        "T1190", "Exploit Public-Facing Application", Tactic.INITIAL_ACCESS,
+        "T1190",
+        "Exploit Public-Facing Application",
+        Tactic.INITIAL_ACCESS,
         description="Adversaries may attempt to take advantage of a weakness in an Internet-facing computer or program.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1068": Technique(
-        "T1068", "Exploitation for Privilege Escalation", Tactic.PRIVILEGE_ESCALATION,
+        "T1068",
+        "Exploitation for Privilege Escalation",
+        Tactic.PRIVILEGE_ESCALATION,
         description="Adversaries may exploit software vulnerabilities to escalate privileges.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1110": Technique(
-        "T1110", "Brute Force", Tactic.CREDENTIAL_ACCESS,
+        "T1110",
+        "Brute Force",
+        Tactic.CREDENTIAL_ACCESS,
         description="Adversaries may use brute force techniques to gain access to accounts.",
         platforms=["Linux", "Windows", "macOS", "SaaS"],
     ),
     "T1046": Technique(
-        "T1046", "Network Service Discovery", Tactic.DISCOVERY,
+        "T1046",
+        "Network Service Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to get a listing of services running on remote hosts.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1048": Technique(
-        "T1048", "Exfiltration Over Alternative Protocol", Tactic.EXFILTRATION,
+        "T1048",
+        "Exfiltration Over Alternative Protocol",
+        Tactic.EXFILTRATION,
         description="Adversaries may steal data by exfiltrating it over a different protocol.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1486": Technique(
-        "T1486", "Data Encrypted for Impact", Tactic.IMPACT,
+        "T1486",
+        "Data Encrypted for Impact",
+        Tactic.IMPACT,
         description="Adversaries may encrypt data on target systems to interrupt availability.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1027": Technique(
-        "T1027", "Obfuscated Files or Information", Tactic.DEFENSE_EVASION,
+        "T1027",
+        "Obfuscated Files or Information",
+        Tactic.DEFENSE_EVASION,
         description="Adversaries may attempt to make an executable or file difficult to discover or analyze.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1547": Technique(
-        "T1547", "Boot or Logon Autostart Execution", Tactic.PERSISTENCE,
+        "T1547",
+        "Boot or Logon Autostart Execution",
+        Tactic.PERSISTENCE,
         description="Adversaries may configure system settings to automatically execute a program during system boot or logon.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1070": Technique(
-        "T1070", "Indicator Removal", Tactic.DEFENSE_EVASION,
+        "T1070",
+        "Indicator Removal",
+        Tactic.DEFENSE_EVASION,
         description="Adversaries may delete or modify artifacts generated within systems to remove evidence.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1018": Technique(
-        "T1018", "Remote System Discovery", Tactic.DISCOVERY,
+        "T1018",
+        "Remote System Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to get a listing of other systems by IP address or hostname.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1082": Technique(
-        "T1082", "System Information Discovery", Tactic.DISCOVERY,
+        "T1082",
+        "System Information Discovery",
+        Tactic.DISCOVERY,
         description="An adversary may attempt to get detailed information about the operating system and hardware.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1083": Technique(
-        "T1083", "File and Directory Discovery", Tactic.DISCOVERY,
+        "T1083",
+        "File and Directory Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may enumerate files and directories to find specific information.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1057": Technique(
-        "T1057", "Process Discovery", Tactic.DISCOVERY,
+        "T1057",
+        "Process Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to get information about running processes on a system.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1518": Technique(
-        "T1518", "Software Discovery", Tactic.DISCOVERY,
+        "T1518",
+        "Software Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to get information about installed software.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1049": Technique(
-        "T1049", "System Network Connections Discovery", Tactic.DISCOVERY,
+        "T1049",
+        "System Network Connections Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to get a listing of network connections to or from the compromised system.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1016": Technique(
-        "T1016", "System Network Configuration Discovery", Tactic.DISCOVERY,
+        "T1016",
+        "System Network Configuration Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may look for details about the network configuration and settings.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1135": Technique(
-        "T1135", "Network Share Discovery", Tactic.DISCOVERY,
+        "T1135",
+        "Network Share Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may look for folders and drives shared on remote systems.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1069": Technique(
-        "T1069", "Permission Groups Discovery", Tactic.DISCOVERY,
+        "T1069",
+        "Permission Groups Discovery",
+        Tactic.DISCOVERY,
         description="Adversaries may attempt to discover security groups and permissions.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1497": Technique(
-        "T1497", "Virtualization/Sandbox Evasion", Tactic.DEFENSE_EVASION,
+        "T1497",
+        "Virtualization/Sandbox Evasion",
+        Tactic.DEFENSE_EVASION,
         description="Adversaries may employ means to detect and avoid virtualization and analysis environments.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1071": Technique(
-        "T1071", "Application Layer Protocol", Tactic.COMMAND_AND_CONTROL,
+        "T1071",
+        "Application Layer Protocol",
+        Tactic.COMMAND_AND_CONTROL,
         description="Adversaries may communicate using OSI application layer protocols to avoid detection.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1573": Technique(
-        "T1573", "Encrypted Channel", Tactic.COMMAND_AND_CONTROL,
+        "T1573",
+        "Encrypted Channel",
+        Tactic.COMMAND_AND_CONTROL,
         description="Adversaries may employ a known encryption algorithm to conceal command and control traffic.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1105": Technique(
-        "T1105", "Ingress Tool Transfer", Tactic.COMMAND_AND_CONTROL,
+        "T1105",
+        "Ingress Tool Transfer",
+        Tactic.COMMAND_AND_CONTROL,
         description="Adversaries may transfer tools or other files from an external system into a compromised environment.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1560": Technique(
-        "T1560", "Archive Collected Data", Tactic.COLLECTION,
+        "T1560",
+        "Archive Collected Data",
+        Tactic.COLLECTION,
         description="An adversary may compress and/or encrypt data that is collected prior to exfiltration.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1005": Technique(
-        "T1005", "Data from Local System", Tactic.COLLECTION,
+        "T1005",
+        "Data from Local System",
+        Tactic.COLLECTION,
         description="Adversaries may search local system sources to find files of interest.",
         platforms=["Linux", "Windows", "macOS"],
     ),
     "T1039": Technique(
-        "T1039", "Data from Network Shared Drive", Tactic.COLLECTION,
+        "T1039",
+        "Data from Network Shared Drive",
+        Tactic.COLLECTION,
         description="Adversaries may search network shares on computers they have compromised.",
         platforms=["Linux", "Windows", "macOS"],
     ),
@@ -373,22 +444,26 @@ class MITREMapper:
             if obs.technique_id and obs.technique_id in self.techniques:
                 tech = self.techniques[obs.technique_id]
                 mapped.add(obs.technique_id)
-                stages[tech.tactic.value].append({
-                    "technique_id": obs.technique_id,
-                    "name": tech.name,
-                    "behavior": obs.description,
-                    "evidence": obs.evidence[:200],
-                })
+                stages[tech.tactic.value].append(
+                    {
+                        "technique_id": obs.technique_id,
+                        "name": tech.name,
+                        "behavior": obs.description,
+                        "evidence": obs.evidence[:200],
+                    }
+                )
 
         chain_stages = []
         for tactic in TACTIC_ORDER:
             stage_techniques = stages[tactic.value]
-            chain_stages.append({
-                "tactic": tactic.value,
-                "tactic_name": tactic.name,
-                "techniques": stage_techniques,
-                "covered": len(stage_techniques) > 0,
-            })
+            chain_stages.append(
+                {
+                    "tactic": tactic.value,
+                    "tactic_name": tactic.name,
+                    "techniques": stage_techniques,
+                    "covered": len(stage_techniques) > 0,
+                }
+            )
 
         total = len(self.techniques)
         coverage = len(mapped) / total if total > 0 else 0.0
@@ -417,7 +492,9 @@ class MITREMapper:
                 covered_ids.add(obs.technique_id)
         for tid, tech in self.techniques.items():
             if tid not in covered_ids:
-                uncovered.append({"technique_id": tid, "name": tech.name, "tactic": tech.tactic.value})
+                uncovered.append(
+                    {"technique_id": tid, "name": tech.name, "tactic": tech.tactic.value}
+                )
 
         return {
             "total_techniques": kill_chain.total_techniques,
@@ -438,11 +515,14 @@ class MITREMapper:
 
     def get_all_observations(self) -> list[dict]:
         """Return all observations as dicts."""
-        return [{
-            "behavior_id": obs.behavior_id,
-            "description": obs.description,
-            "technique_id": obs.technique_id,
-            "evidence": obs.evidence,
-            "target": obs.target,
-            "timestamp": obs.timestamp.isoformat(),
-        } for obs in self._observations]
+        return [
+            {
+                "behavior_id": obs.behavior_id,
+                "description": obs.description,
+                "technique_id": obs.technique_id,
+                "evidence": obs.evidence,
+                "target": obs.target,
+                "timestamp": obs.timestamp.isoformat(),
+            }
+            for obs in self._observations
+        ]

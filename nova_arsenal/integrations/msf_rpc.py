@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MsfModuleResult:
     """Structured result from a Metasploit module execution."""
+
     module: str
     module_type: str
     status: str
@@ -238,9 +239,7 @@ class MetasploitRPC:
 
         return result
 
-    def _extract_findings(
-        self, raw: dict[str, Any], module: str
-    ) -> list[dict[str, Any]]:
+    def _extract_findings(self, raw: dict[str, Any], module: str) -> list[dict[str, Any]]:
         """Extract security findings from module output."""
         findings = []
         output_text = json.dumps(raw).lower()
@@ -256,12 +255,14 @@ class MetasploitRPC:
 
         for indicator, severity in vuln_indicators.items():
             if indicator in output_text:
-                findings.append({
-                    "title": f"MSF {module}: {indicator.title()}",
-                    "severity": severity,
-                    "module": module,
-                    "indicator": indicator,
-                })
+                findings.append(
+                    {
+                        "title": f"MSF {module}: {indicator.title()}",
+                        "severity": severity,
+                        "module": module,
+                        "indicator": indicator,
+                    }
+                )
 
         return findings
 

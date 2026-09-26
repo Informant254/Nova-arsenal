@@ -4,6 +4,7 @@ Deterministic Validation Engine — XBOW-inspired zero-false-positive validation
 Every finding MUST be proven exploitable. Validation methods confirm vulnerability
 existence, not just detection. Separates exploration from verification.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ValidationMethod(Enum):
     """Methods to deterministically validate a finding."""
+
     EXPLOIT_CONFIRMED = "exploit_confirmed"
     RESPONSE_ANALYZED = "response_analyzed"
     VULN_EXISTS = "vuln_exists"
@@ -34,6 +36,7 @@ class ValidationMethod(Enum):
 @dataclass
 class ValidationResult:
     """Result of a single validation attempt."""
+
     finding_id: str
     method: ValidationMethod
     validated: bool
@@ -67,6 +70,7 @@ class ValidationResult:
 @dataclass
 class Finding:
     """A security finding awaiting validation."""
+
     finding_id: str
     title: str
     description: str
@@ -127,6 +131,7 @@ class Finding:
 @dataclass
 class ComplianceReport:
     """Compliance report for a specific framework."""
+
     framework: str
     findings: list[Finding]
     generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -166,25 +171,68 @@ class DeterministicValidationEngine:
             ValidationMethod.CHAIN_COMPLETED: self._validate_chain_completed,
         }
         self._compliance_frameworks: dict[str, dict] = {
-            "SOC2": {"name": "SOC 2 Type II", "controls": [
-                "CC6.1", "CC6.2", "CC6.3", "CC6.6", "CC6.7", "CC6.8",
-                "CC7.1", "CC7.2", "CC8.1",
-            ]},
-            "ISO27001": {"name": "ISO/IEC 27001:2022", "controls": [
-                "A.5.1", "A.5.2", "A.8.1", "A.8.2", "A.8.3", "A.8.5",
-            ]},
-            "HIPAA": {"name": "HIPAA Security Rule", "controls": [
-                "164.312(a)(1)", "164.312(a)(2)(iv)", "164.312(b)",
-            ]},
-            "GDPR": {"name": "GDPR Article 32", "controls": [
-                "32(1)(a)", "32(1)(b)", "32(1)(c)", "32(1)(d)",
-            ]},
-            "PCI_DSS": {"name": "PCI DSS v4.0", "controls": [
-                "2.2.1", "6.2.1", "6.2.2", "6.2.3", "8.3.1", "8.3.2",
-            ]},
-            "NIST_CSF": {"name": "NIST CSF 2.0", "controls": [
-                "DE.CM-1", "DE.AE-2", "RS.RP-1", "RC.RP-1",
-            ]},
+            "SOC2": {
+                "name": "SOC 2 Type II",
+                "controls": [
+                    "CC6.1",
+                    "CC6.2",
+                    "CC6.3",
+                    "CC6.6",
+                    "CC6.7",
+                    "CC6.8",
+                    "CC7.1",
+                    "CC7.2",
+                    "CC8.1",
+                ],
+            },
+            "ISO27001": {
+                "name": "ISO/IEC 27001:2022",
+                "controls": [
+                    "A.5.1",
+                    "A.5.2",
+                    "A.8.1",
+                    "A.8.2",
+                    "A.8.3",
+                    "A.8.5",
+                ],
+            },
+            "HIPAA": {
+                "name": "HIPAA Security Rule",
+                "controls": [
+                    "164.312(a)(1)",
+                    "164.312(a)(2)(iv)",
+                    "164.312(b)",
+                ],
+            },
+            "GDPR": {
+                "name": "GDPR Article 32",
+                "controls": [
+                    "32(1)(a)",
+                    "32(1)(b)",
+                    "32(1)(c)",
+                    "32(1)(d)",
+                ],
+            },
+            "PCI_DSS": {
+                "name": "PCI DSS v4.0",
+                "controls": [
+                    "2.2.1",
+                    "6.2.1",
+                    "6.2.2",
+                    "6.2.3",
+                    "8.3.1",
+                    "8.3.2",
+                ],
+            },
+            "NIST_CSF": {
+                "name": "NIST CSF 2.0",
+                "controls": [
+                    "DE.CM-1",
+                    "DE.AE-2",
+                    "RS.RP-1",
+                    "RC.RP-1",
+                ],
+            },
         }
 
     async def validate_finding(
@@ -297,8 +345,9 @@ class DeterministicValidationEngine:
 
     def get_pending_findings(self) -> list[Finding]:
         """Return all findings awaiting validation."""
-        return [f for f in self._findings.values()
-                if not f.is_validated and not f.is_false_positive]
+        return [
+            f for f in self._findings.values() if not f.is_validated and not f.is_false_positive
+        ]
 
     def generate_report(self) -> dict:
         """Generate a summary report of all findings."""
@@ -319,12 +368,9 @@ class DeterministicValidationEngine:
             "pending": len(pending),
             "severity_breakdown": severity_counts,
             "avg_confidence": (
-                sum(f.max_confidence for f in validated) / len(validated)
-                if validated else 0.0
+                sum(f.max_confidence for f in validated) / len(validated) if validated else 0.0
             ),
-            "validations_total": sum(
-                len(f.validation_results) for f in all_findings
-            ),
+            "validations_total": sum(len(f.validation_results) for f in all_findings),
         }
 
     def export_compliance_report(self, framework: str = "SOC2") -> ComplianceReport:
@@ -404,9 +450,7 @@ class DeterministicValidationEngine:
             severity=finding.severity,
         )
 
-    async def _validate_vuln_exists(
-        self, finding: Finding, target_info: dict
-    ) -> ValidationResult:
+    async def _validate_vuln_exists(self, finding: Finding, target_info: dict) -> ValidationResult:
         version = finding.raw_data.get("version", "")
         vulnerable_versions = finding.raw_data.get("vulnerable_versions", [])
         if version and vulnerable_versions:

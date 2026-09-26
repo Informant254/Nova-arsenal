@@ -259,8 +259,7 @@ class LiveFuzzWorker:
                     engine=job.engine,
                     status="skipped_missing",
                     command=job.command,
-                    note=(eng.note if eng else "engine unavailable")
-                    or "filtered by only_engines",
+                    note=(eng.note if eng else "engine unavailable") or "filtered by only_engines",
                 )
             )
 
@@ -280,8 +279,8 @@ class LiveFuzzWorker:
                     )
                 )
             notes.append(
-                f"Dry-run: {sum(1 for r in results if r.status=='planned')} runnable, "
-                f"{sum(1 for r in results if r.status=='skipped_missing')} skipped"
+                f"Dry-run: {sum(1 for r in results if r.status == 'planned')} runnable, "
+                f"{sum(1 for r in results if r.status == 'skipped_missing')} skipped"
             )
             return LiveCampaignResult(
                 target=campaign.target,
@@ -296,14 +295,12 @@ class LiveFuzzWorker:
             timeout = min(timeout, 90)
 
         sem = asyncio.Semaphore(self.workers)
-        live_results = await asyncio.gather(
-            *[self._run_job(job, timeout, sem) for job in runnable]
-        )
+        live_results = await asyncio.gather(*[self._run_job(job, timeout, sem) for job in runnable])
         results.extend(live_results)
 
         crashes = self.collect_crashes(campaign.target, results)
         notes.append(
-            f"Live run complete: {sum(1 for r in live_results if r.status in {'ran','finished','timeout'})} executed, "
+            f"Live run complete: {sum(1 for r in live_results if r.status in {'ran', 'finished', 'timeout'})} executed, "
             f"{len(crashes)} crash artifacts"
         )
         return LiveCampaignResult(
@@ -364,7 +361,9 @@ class LiveFuzzWorker:
                     engine=self._guess_engine(path),
                     signal="UNKNOWN",
                     stack_trace="",
-                    reproducer=data[:200].hex() if self._looks_binary(data) else data.decode(errors="replace")[:500],
+                    reproducer=data[:200].hex()
+                    if self._looks_binary(data)
+                    else data.decode(errors="replace")[:500],
                     stderr="",
                     target=target,
                     metadata={"path": str(path)},
@@ -427,7 +426,9 @@ class LiveFuzzWorker:
                         stdout_b, stderr_b = b"", b""
                     status = "timeout"
                     rc = None
-                    note = f"Stopped after {timeout}s (fuzzers are long-running; artifacts may remain)"
+                    note = (
+                        f"Stopped after {timeout}s (fuzzers are long-running; artifacts may remain)"
+                    )
 
                 stdout = stdout_b.decode(errors="replace") if stdout_b else ""
                 stderr = stderr_b.decode(errors="replace") if stderr_b else ""
@@ -493,9 +494,21 @@ class LiveFuzzWorker:
             fallback.write_text(
                 "\n".join(
                     [
-                        "admin", "api", "login", "upload", "backup", "config",
-                        "debug", "test", "v1", "v2", "graphql", "health",
-                        "robots.txt", "swagger", "internal",
+                        "admin",
+                        "api",
+                        "login",
+                        "upload",
+                        "backup",
+                        "config",
+                        "debug",
+                        "test",
+                        "v1",
+                        "v2",
+                        "graphql",
+                        "health",
+                        "robots.txt",
+                        "swagger",
+                        "internal",
                     ]
                 )
                 + "\n"

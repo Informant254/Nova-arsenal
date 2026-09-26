@@ -1,4 +1,5 @@
 """Unit tests for the zero-day research pipeline."""
+
 import asyncio
 import os
 import sys
@@ -55,7 +56,13 @@ class TestVariantAnalyzer:
         va = VariantAnalyzer()
         assert "rce" in va.classify("remote code execution via template")
         hyps = va.analyze(
-            [{"cve_id": "CVE-2021-41773", "description": "path traversal in Apache", "severity": "high"}],
+            [
+                {
+                    "cve_id": "CVE-2021-41773",
+                    "description": "path traversal in Apache",
+                    "severity": "high",
+                }
+            ],
             services={"http": [80]},
         )
         assert len(hyps) >= 1
@@ -254,7 +261,10 @@ class TestZeroDayHunter:
         assert result.fuzz_campaign is not None
         assert result.fuzz_campaign["job_count"] >= 1
         assert len(result.candidates) >= 1
-        assert any(c.source_stage in {"variant", "static", "crash_triage", "surface"} for c in result.candidates)
+        assert any(
+            c.source_stage in {"variant", "static", "crash_triage", "surface"}
+            for c in result.candidates
+        )
         d = result.to_dict()
         assert "disclaimer" in d
         assert d["candidate_count"] == len(result.candidates)

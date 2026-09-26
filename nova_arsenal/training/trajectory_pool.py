@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TrajectoryStep:
     """A single step within a trajectory."""
+
     tokens: list[int]
     log_probs: list[float]
     reward: float = 0.0
@@ -26,6 +27,7 @@ class Trajectory:
     Group-relative advantages are computed across trajectories
     that share the same prompt (rollout_repeat_n per prompt).
     """
+
     prompt: str
     prompt_tokens: list[int]
     steps: list[TrajectoryStep] = field(default_factory=list)
@@ -66,8 +68,8 @@ class TrajectoryPool:
 
     def get_batch(self) -> list[Trajectory]:
         """Get a batch of trajectories and remove them from the pool."""
-        batch = self._trajectories[:self.batch_size]
-        self._trajectories = self._trajectories[self.batch_size:]
+        batch = self._trajectories[: self.batch_size]
+        self._trajectories = self._trajectories[self.batch_size :]
         self._stats["batched"] += len(batch)
         return batch
 
@@ -82,9 +84,7 @@ class TrajectoryPool:
         self._stats["groups_computed"] += len(groups)
         return groups
 
-    def compute_group_advantages(
-        self, group: list[Trajectory]
-    ) -> list[float]:
+    def compute_group_advantages(self, group: list[Trajectory]) -> list[float]:
         """Compute group-relative advantages using z-score normalization.
 
         Ported from NexRL's compute_grpo_advantage_for_trajectories.
@@ -96,7 +96,7 @@ class TrajectoryPool:
 
         mean_r = sum(rewards) / len(rewards)
         var_r = sum((r - mean_r) ** 2 for r in rewards) / len(rewards)
-        std_r = var_r ** 0.5 if var_r > 0 else 1.0
+        std_r = var_r**0.5 if var_r > 0 else 1.0
 
         advantages = [(r - mean_r) / std_r for r in rewards]
         return advantages

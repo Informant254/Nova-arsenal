@@ -739,8 +739,10 @@ Ported from **GLM-5.1** (arXiv 2602.15763, Sections 3.3 & 4.1). Fully asynchrono
 
 ```python
 from nova_arsenal.training import (
-    MultiTaskRolloutOrchestrator, AsyncAgenticRLTrainer,
-    AgenticTaskType, SWEEnvironment,
+    MultiTaskRolloutOrchestrator,
+    AsyncAgenticRLTrainer,
+    AgenticTaskType,
+    SWEEnvironment,
 )
 
 orchestrator = MultiTaskRolloutOrchestrator()
@@ -872,9 +874,10 @@ Reference implementation of **Manifold-Constrained Hyper-Connections** and **Ant
 ```python
 from nova_arsenal.arch import (
     ManifoldConstrainedHyperConnection,  # nhc=4, Sinkhorn-Knopp tmax=20
-    AnticipatoryRouter,                   # Route conflict detection + knowledge transfer
-    sinkhorn_knopp,                        # Doubly-stochastic normalization
+    AnticipatoryRouter,  # Route conflict detection + knowledge transfer
+    sinkhorn_knopp,  # Doubly-stochastic normalization
 )
+
 mhc = ManifoldConstrainedHyperConnection(hidden_dim=4096, nhc=4)
 output = mhc(hidden_states)
 ```

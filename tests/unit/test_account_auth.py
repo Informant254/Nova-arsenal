@@ -1,4 +1,5 @@
 """Tests for account-style AI login (Codex / Claude Code)."""
+
 import json
 import sys
 from pathlib import Path

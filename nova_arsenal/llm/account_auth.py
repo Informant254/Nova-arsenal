@@ -94,9 +94,7 @@ class AccountCredential:
     source: str = "manual"
     # Optional routing metadata (local URL, preferred model, account id, …)
     meta: dict[str, Any] = field(default_factory=dict)
-    updated_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def is_expired(self) -> bool:
         if not self.expires_at:
@@ -165,9 +163,7 @@ class AccountAuthStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "version": 1,
-            "accounts": {
-                name: asdict(acc) for name, acc in self._accounts.items()
-            },
+            "accounts": {name: asdict(acc) for name, acc in self._accounts.items()},
         }
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -364,11 +360,15 @@ class AccountAuthStore:
         Requires a Google Cloud OAuth client (Desktop or Web) with redirect
         http://127.0.0.1:<port>/callback
         """
-        client_id = client_id or os.getenv("GOOGLE_OAUTH_CLIENT_ID", "") or os.getenv(
-            "GOOGLE_CLIENT_ID", ""
+        client_id = (
+            client_id
+            or os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+            or os.getenv("GOOGLE_CLIENT_ID", "")
         )
-        client_secret = client_secret or os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "") or os.getenv(
-            "GOOGLE_CLIENT_SECRET", ""
+        client_secret = (
+            client_secret
+            or os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+            or os.getenv("GOOGLE_CLIENT_SECRET", "")
         )
         if not client_id:
             raise ValueError(
@@ -631,9 +631,7 @@ class AccountAuthStore:
             timeout=45,
         )
         if resp.status_code >= 400:
-            raise RuntimeError(
-                f"Token exchange failed ({resp.status_code}): {resp.text[:400]}"
-            )
+            raise RuntimeError(f"Token exchange failed ({resp.status_code}): {resp.text[:400]}")
         tok = resp.json()
         return self._store_openai_tokens(tok, source="openai_codex_oauth", client_id=cid)
 
@@ -686,7 +684,9 @@ class AccountAuthStore:
             print(f"2. Enter code: {user_code}")
         print("3. Approve access, then return here…\n")
         try:
-            webbrowser.open(verify_url if verify_url.startswith("http") else f"https://{verify_url}")
+            webbrowser.open(
+                verify_url if verify_url.startswith("http") else f"https://{verify_url}"
+            )
         except Exception:  # noqa: BLE001
             pass
 
@@ -771,9 +771,7 @@ class AccountAuthStore:
         expires_in = int(tok.get("expires_in") or tok.get("expires") or 3600)
         # expires may be absolute ms in some responses
         if expires_in > 10_000_000:
-            expires_at = datetime.fromtimestamp(
-                expires_in / 1000.0, tz=timezone.utc
-            ).isoformat()
+            expires_at = datetime.fromtimestamp(expires_in / 1000.0, tz=timezone.utc).isoformat()
         else:
             expires_at = datetime.fromtimestamp(
                 time.time() + expires_in, tz=timezone.utc
@@ -807,9 +805,7 @@ class AccountAuthStore:
                 "client_id": client_id or DEFAULT_CODEX_CLIENT_ID,
                 "account_id": account_id,
                 "subscription_auth": True,
-                "id_token": (tok.get("id_token") or "")[:20] + "…"
-                if tok.get("id_token")
-                else "",
+                "id_token": (tok.get("id_token") or "")[:20] + "…" if tok.get("id_token") else "",
             },
         )
         self.set_account(cred)
@@ -862,9 +858,7 @@ class AccountAuthStore:
                         ep = ep2
                         kind = "openai_compatible"
                     else:
-                        raise RuntimeError(
-                            f"Local LLM not reachable at {url}: {ep.error}"
-                        )
+                        raise RuntimeError(f"Local LLM not reachable at {url}: {ep.error}")
                 else:
                     kind = "ollama"
                 model = model or ep.preferred_model
@@ -874,9 +868,7 @@ class AccountAuthStore:
                     # last try ollama API on that host
                     ep = probe_ollama(url)
                     if not ep.healthy:
-                        raise RuntimeError(
-                            f"Local LLM not reachable at {url}: {ep.error}"
-                        )
+                        raise RuntimeError(f"Local LLM not reachable at {url}: {ep.error}")
                     kind = "ollama"
                 else:
                     kind = "openai_compatible"
@@ -1045,20 +1037,17 @@ def account_status() -> dict[str, Any]:
                 "export CLAUDE_CODE_OAUTH_TOKEN=... from `claude setup-token`"
             ),
             "codex_import": (
-                "Sign in with Codex (`codex login`), then: "
-                "nova-agent login --import-existing"
+                "Sign in with Codex (`codex login`), then: nova-agent login --import-existing"
             ),
             "google": (
                 "Set GOOGLE_OAUTH_CLIENT_ID (and secret), then: "
                 "nova-agent login --provider gemini --oauth"
             ),
             "local_ollama": (
-                "Install Ollama, pull a model, then: "
-                "nova-agent login --provider ollama"
+                "Install Ollama, pull a model, then: nova-agent login --provider ollama"
             ),
             "local_custom": (
-                "nova-agent login --provider ollama --url http://127.0.0.1:11434 "
-                "--model llama3.2"
+                "nova-agent login --provider ollama --url http://127.0.0.1:11434 --model llama3.2"
             ),
             "api_key_still_works": (
                 "API keys via OPENAI_API_KEY / ANTHROPIC_API_KEY etc. still work "

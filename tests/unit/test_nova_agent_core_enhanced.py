@@ -100,10 +100,12 @@ class TestNovaAgentCore:
         agent = NovaAgent(target="example.com")
 
         for i in range(10):
-            agent.add_finding({
-                "id": i,
-                "severity": "high",
-            })
+            agent.add_finding(
+                {
+                    "id": i,
+                    "severity": "high",
+                }
+            )
 
         assert len(agent.state.findings) == 10
 

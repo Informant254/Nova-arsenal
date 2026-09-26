@@ -108,7 +108,9 @@ def list_skills():
                 requires_credentials=manifest.requires_credentials,
                 is_loaded=loaded is not None,
                 is_ready=loaded.is_ready if loaded else False,
-                missing_credentials=loaded.missing_credentials if loaded else manifest.requires_credentials,
+                missing_credentials=loaded.missing_credentials
+                if loaded
+                else manifest.requires_credentials,
             )
         )
     return out

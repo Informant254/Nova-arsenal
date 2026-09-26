@@ -65,6 +65,7 @@ from nova_arsenal.db.models import (
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create an access token."""
     config = get_config()
@@ -209,9 +210,7 @@ async def refresh_token(
 
     config = get_config()
     try:
-        payload = jwt.decode(
-            token_value, config.auth.jwt_secret, algorithms=["HS256"]
-        )
+        payload = jwt.decode(token_value, config.auth.jwt_secret, algorithms=["HS256"])
         if payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -316,6 +315,7 @@ async def update_user_role(
 
 # ── OAuth Routes ─────────────────────────────────────────────────────────────
 
+
 @router.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, redirect: str = ""):
     """Redirect to OAuth provider for authentication.
@@ -381,9 +381,7 @@ async def oauth_callback(
             existing_account.expires_at = user_info.expires_at
     else:
         # Check if user exists with this email
-        result = await db.execute(
-            select(User).where(User.email == user_info.email)
-        )
+        result = await db.execute(select(User).where(User.email == user_info.email))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -444,9 +442,7 @@ async def list_oauth_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """List OAuth accounts linked to current user."""
-    result = await db.execute(
-        select(OAuthAccount).where(OAuthAccount.user_id == current_user.id)
-    )
+    result = await db.execute(select(OAuthAccount).where(OAuthAccount.user_id == current_user.id))
     accounts = result.scalars().all()
     return [
         OAuthAccountResponse(
@@ -499,15 +495,14 @@ async def unlink_oauth_account(
 
 # ── Subscription Routes ──────────────────────────────────────────────────────
 
+
 @router.get("/subscription", response_model=SubscriptionResponse)
 async def get_subscription(
     current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get current user's subscription details."""
-    result = await db.execute(
-        select(Subscription).where(Subscription.user_id == current_user.id)
-    )
+    result = await db.execute(select(Subscription).where(Subscription.user_id == current_user.id))
     sub = result.scalar_one_or_none()
 
     if not sub:
@@ -547,6 +542,7 @@ async def upgrade_subscription(
 
 # ── API Key Routes ───────────────────────────────────────────────────────────
 
+
 def generate_api_key() -> tuple[str, str, str]:
     """Generate a new API key. Returns (full_key, key_prefix, key_hash).
 
@@ -567,9 +563,7 @@ async def create_api_key(
 ):
     """Generate a new API key for subscription-based access."""
     # Check subscription exists
-    result = await db.execute(
-        select(Subscription).where(Subscription.user_id == current_user.id)
-    )
+    result = await db.execute(select(Subscription).where(Subscription.user_id == current_user.id))
     sub = result.scalar_one_or_none()
     if not sub or not sub.is_active:
         raise HTTPException(
@@ -658,9 +652,7 @@ async def get_api_key_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Get API key usage statistics."""
-    result = await db.execute(
-        select(ApiKey).where(ApiKey.user_id == current_user.id)
-    )
+    result = await db.execute(select(ApiKey).where(ApiKey.user_id == current_user.id))
     keys = result.scalars().all()
     total = len(keys)
     active = sum(1 for k in keys if k.is_active)

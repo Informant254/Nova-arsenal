@@ -1,4 +1,5 @@
 """Tests for bring-your-own-key LLM configuration."""
+
 import os
 import sys
 from pathlib import Path

@@ -81,7 +81,9 @@ class LLMRouter:
             )
             if provider:
                 # Avoid duplicate provider/model pairs
-                if any(p.name == provider.name and p.model == provider.model for p in self.providers):
+                if any(
+                    p.name == provider.name and p.model == provider.model for p in self.providers
+                ):
                     continue
                 self.providers.append(provider)
 

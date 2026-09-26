@@ -19,6 +19,7 @@ async def cleanup_expired_api_keys():
     """Deactivate API keys that have passed their expiry date."""
     try:
         from nova_arsenal.db.session import get_session_factory
+
         factory = get_session_factory()
         async with factory() as db:
             result = await db.execute(

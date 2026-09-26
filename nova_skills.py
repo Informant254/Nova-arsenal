@@ -158,7 +158,9 @@ class SkillLibrary:
         if extra_skills:
             self._skills.update(extra_skills)
 
-    def list_skills(self, category: str | None = None, tag: str | None = None) -> list[dict[str, Any]]:
+    def list_skills(
+        self, category: str | None = None, tag: str | None = None
+    ) -> list[dict[str, Any]]:
         """List available skills, optionally filtered by category or tag."""
         results = []
         for skill in self._skills.values():

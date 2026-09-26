@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecResult:
     """Result of a command execution."""
+
     command: str
     stdout: str
     stderr: str
@@ -128,9 +129,9 @@ class SandboxExecutor:
 
         # Truncate large output
         if len(result.stdout) > self.max_output:
-            result.stdout = result.stdout[:self.max_output] + "\n... [TRUNCATED]"
+            result.stdout = result.stdout[: self.max_output] + "\n... [TRUNCATED]"
         if len(result.stderr) > self.max_output:
-            result.stderr = result.stderr[:self.max_output] + "\n... [TRUNCATED]"
+            result.stderr = result.stderr[: self.max_output] + "\n... [TRUNCATED]"
 
         self._history.append(result)
         return result
@@ -150,9 +151,7 @@ class SandboxExecutor:
             cmd = f"bash -c '{escaped}'"
             return await self.execute(cmd, working_dir, timeout)
         elif self.mode == "local":
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=f"_{filename}", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=f"_{filename}", delete=False) as f:
                 f.write(script)
                 f.flush()
                 try:
@@ -174,7 +173,9 @@ class SandboxExecutor:
         try:
             if self.mode == "docker":
                 proc = await asyncio.create_subprocess_exec(
-                    "docker", "cp", local_path,
+                    "docker",
+                    "cp",
+                    local_path,
                     f"{self.container_name}:{remote_path}",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -183,6 +184,7 @@ class SandboxExecutor:
                 return proc.returncode == 0
             elif self.mode == "local":
                 import shutil
+
                 shutil.copy2(local_path, remote_path)
                 return True
             return False
@@ -199,8 +201,10 @@ class SandboxExecutor:
         try:
             if self.mode == "docker":
                 proc = await asyncio.create_subprocess_exec(
-                    "docker", "cp",
-                    f"{self.container_name}:{remote_path}", local_path,
+                    "docker",
+                    "cp",
+                    f"{self.container_name}:{remote_path}",
+                    local_path,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -208,6 +212,7 @@ class SandboxExecutor:
                 return proc.returncode == 0
             elif self.mode == "local":
                 import shutil
+
                 shutil.copy2(remote_path, local_path)
                 return True
             return False
@@ -265,9 +270,7 @@ class SandboxExecutor:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return ExecResult(
             command=command,
@@ -287,9 +290,12 @@ class SandboxExecutor:
         """Execute via SSH."""
         ssh_args = [
             "ssh",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null",
-            "-p", str(self.ssh_port),
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-p",
+            str(self.ssh_port),
         ]
 
         if self.ssh_key:
@@ -304,9 +310,7 @@ class SandboxExecutor:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return ExecResult(
             command=command,
@@ -336,9 +340,7 @@ class SandboxExecutor:
             env=full_env,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return ExecResult(
             command=command,

@@ -59,7 +59,7 @@ The Ollama provider (`nova_arsenal/llm/ollama.py`) sets `num_ctx` via its HTTP c
 
 ```python
 # In nova config / environment:
-OLLAMA_MODEL="qwythos-9b:1m"  # or your custom YaRN model
+OLLAMA_MODEL = "qwythos-9b:1m"  # or your custom YaRN model
 # No code changes needed — Ollama handles rope params server-side
 ```
 

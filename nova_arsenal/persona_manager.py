@@ -6,7 +6,6 @@ knowledge, tactics, and focus areas. This transforms Nova from a
 general security agent into a team of specialists.
 """
 
-
 PERSONA_MAP: dict[str, dict[str, str]] = {
     "init": {
         "role": "Strategic Security Planner",
@@ -123,12 +122,11 @@ class PersonaManager:
         lines.append(f"Focus: {persona['focus']}")
         lines.append(f"Personality: {persona['personality']}")
         lines.append("")
-        lines.append("Embody this persona fully. Think, plan, and execute as this specialist would.")
+        lines.append(
+            "Embody this persona fully. Think, plan, and execute as this specialist would."
+        )
 
         return "\n".join(lines)
 
     def list_personas(self) -> dict[str, str]:
-        return {
-            phase: info["role"]
-            for phase, info in PERSONA_MAP.items()
-        }
+        return {phase: info["role"] for phase, info in PERSONA_MAP.items()}

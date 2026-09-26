@@ -114,7 +114,10 @@ _CLASS_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("ssrf", ("ssrf", "server-side request")),
     ("sqli", ("sql injection", "sqli")),
     ("xss", ("cross-site scripting", "xss")),
-    ("memory_corruption", ("buffer overflow", "use after free", "uaf", "heap overflow", "out-of-bounds")),
+    (
+        "memory_corruption",
+        ("buffer overflow", "use after free", "uaf", "heap overflow", "out-of-bounds"),
+    ),
     ("privilege_escalation", ("privilege escalation", "privesc", "elevation of privilege")),
 ]
 
@@ -233,6 +236,8 @@ class VariantAnalyzer:
 
     def _extract_components(self, text: str) -> list[str]:
         # Lightweight: product-like tokens and module paths
-        comps = re.findall(r"\b(?:mod_|lib|module|plugin|handler|parser|servlet)[\w.-]+\b", text, re.I)
+        comps = re.findall(
+            r"\b(?:mod_|lib|module|plugin|handler|parser|servlet)[\w.-]+\b", text, re.I
+        )
         products = re.findall(r"\b[A-Z][A-Za-z0-9.+-]{2,20}\b", text)
         return list(dict.fromkeys([*comps, *products]))[:10]

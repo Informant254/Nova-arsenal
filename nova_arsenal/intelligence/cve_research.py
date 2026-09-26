@@ -61,38 +61,98 @@ class ServiceCveResult:
 
 SERVICE_CVE_MAP: dict[str, list[tuple[str, str, str, str, float, str]]] = {
     "http": [
-        (r"apache httpd (\d+\.\d+\.\d+)", "Apache HTTPD {version} vulnerable to path traversal",
-         "CVE-2021-41773", "high", 7.5, "Exploit available: curl http://target/cgi-bin/.%2e/%2e%2e/..."),
-        (r"apache httpd (\d+\.\d+\.\d+)", "Apache HTTPD {version} vulnerable to SSRF",
-         "CVE-2021-40438", "medium", 6.4, "Metasploit auxiliary/server/http_ssrf"),
+        (
+            r"apache httpd (\d+\.\d+\.\d+)",
+            "Apache HTTPD {version} vulnerable to path traversal",
+            "CVE-2021-41773",
+            "high",
+            7.5,
+            "Exploit available: curl http://target/cgi-bin/.%2e/%2e%2e/...",
+        ),
+        (
+            r"apache httpd (\d+\.\d+\.\d+)",
+            "Apache HTTPD {version} vulnerable to SSRF",
+            "CVE-2021-40438",
+            "medium",
+            6.4,
+            "Metasploit auxiliary/server/http_ssrf",
+        ),
     ],
     "smb": [
-        (r"samba (\d+\.\d+\.\d+)", "Samba {version} vulnerable to remote code execution",
-         "CVE-2021-44142", "critical", 9.9, "Metasploit exploit/linux/samba/is_known_pipename"),
-        (r"microsoft-ds", "SMB vulnerable to EternalBlue",
-         "CVE-2017-0144", "critical", 9.3, "Metasploit exploit/windows/smb/ms17_010_eternalblue"),
+        (
+            r"samba (\d+\.\d+\.\d+)",
+            "Samba {version} vulnerable to remote code execution",
+            "CVE-2021-44142",
+            "critical",
+            9.9,
+            "Metasploit exploit/linux/samba/is_known_pipename",
+        ),
+        (
+            r"microsoft-ds",
+            "SMB vulnerable to EternalBlue",
+            "CVE-2017-0144",
+            "critical",
+            9.3,
+            "Metasploit exploit/windows/smb/ms17_010_eternalblue",
+        ),
     ],
     "ssh": [
-        (r"openssh (\d+\.\d+)", "OpenSSH {version} - potential vulnerabilities",
-         "", "medium", 5.0, "Check for CVE-2024-6387 (regreSSHion) if version 8.5p1-9.7p1"),
-        (r"libssh (\d+\.\d+\.\d+)", "libSSH {version} vulnerable to authentication bypass",
-         "CVE-2018-10933", "critical", 9.1, "Metasploit auxiliary/scanner/ssh/libssh_auth_bypass"),
+        (
+            r"openssh (\d+\.\d+)",
+            "OpenSSH {version} - potential vulnerabilities",
+            "",
+            "medium",
+            5.0,
+            "Check for CVE-2024-6387 (regreSSHion) if version 8.5p1-9.7p1",
+        ),
+        (
+            r"libssh (\d+\.\d+\.\d+)",
+            "libSSH {version} vulnerable to authentication bypass",
+            "CVE-2018-10933",
+            "critical",
+            9.1,
+            "Metasploit auxiliary/scanner/ssh/libssh_auth_bypass",
+        ),
     ],
     "mysql": [
-        (r"mysql (\d+\.\d+\.\d+)", "MySQL {version} - check for known vulnerabilities",
-         "", "medium", 5.0, "Run nmap --script mysql-* for comprehensive checks"),
+        (
+            r"mysql (\d+\.\d+\.\d+)",
+            "MySQL {version} - check for known vulnerabilities",
+            "",
+            "medium",
+            5.0,
+            "Run nmap --script mysql-* for comprehensive checks",
+        ),
     ],
     "postgresql": [
-        (r"postgresql (\d+\.\d+\.\d+)", "PostgreSQL {version} - check for known vulnerabilities",
-         "", "medium", 5.0, "Run nmap --script pgsql-* for comprehensive checks"),
+        (
+            r"postgresql (\d+\.\d+\.\d+)",
+            "PostgreSQL {version} - check for known vulnerabilities",
+            "",
+            "medium",
+            5.0,
+            "Run nmap --script pgsql-* for comprehensive checks",
+        ),
     ],
     "rdp": [
-        (r"rdp", "RDP vulnerable to BlueKeep",
-         "CVE-2019-0708", "critical", 9.8, "Metasploit exploit/windows/rdp/cve_2019_0708_bluekeep_rce"),
+        (
+            r"rdp",
+            "RDP vulnerable to BlueKeep",
+            "CVE-2019-0708",
+            "critical",
+            9.8,
+            "Metasploit exploit/windows/rdp/cve_2019_0708_bluekeep_rce",
+        ),
     ],
     "kerberos": [
-        (r"kerberos", "Kerberos - check for MS14-068",
-         "CVE-2014-068", "high", 8.0, "Metasploit auxiliary/admin/kerberos/ms14_068_kerberos_checksum"),
+        (
+            r"kerberos",
+            "Kerberos - check for MS14-068",
+            "CVE-2014-068",
+            "high",
+            8.0,
+            "Metasploit auxiliary/admin/kerberos/ms14_068_kerberos_checksum",
+        ),
     ],
 }
 
@@ -158,28 +218,39 @@ class CveResearch:
         if service_key not in SERVICE_CVE_MAP:
             return results
 
-        for pattern, desc_template, cve_id, severity, cvss, remediation in SERVICE_CVE_MAP[service_key]:
+        for pattern, desc_template, cve_id, severity, cvss, remediation in SERVICE_CVE_MAP[
+            service_key
+        ]:
             match = re.search(pattern, version, re.IGNORECASE)
             if match or (not pattern.startswith(r"\d") and pattern == service_key):
                 ver_str = match.group(1) if match else version
                 description = desc_template.format(version=ver_str)
-                has_exploit = bool(remediation and ("Metasploit" in remediation or "Exploit available" in remediation))
+                has_exploit = bool(
+                    remediation
+                    and ("Metasploit" in remediation or "Exploit available" in remediation)
+                )
                 exploit_source = ""
                 if "Metasploit" in remediation:
-                    exploit_source = remediation.split("Metasploit")[1].strip().split()[0] if "Metasploit" in remediation else ""
+                    exploit_source = (
+                        remediation.split("Metasploit")[1].strip().split()[0]
+                        if "Metasploit" in remediation
+                        else ""
+                    )
                 elif "Exploit available" in remediation:
                     exploit_source = remediation
 
-                results.append(CveResult(
-                    cve_id=cve_id if cve_id else "N/A",
-                    description=description,
-                    severity=severity,
-                    cvss_score=cvss,
-                    exploit_available=has_exploit,
-                    exploit_source=exploit_source,
-                    affected_versions=ver_str,
-                    remediation=remediation,
-                ))
+                results.append(
+                    CveResult(
+                        cve_id=cve_id if cve_id else "N/A",
+                        description=description,
+                        severity=severity,
+                        cvss_score=cvss,
+                        exploit_available=has_exploit,
+                        exploit_source=exploit_source,
+                        affected_versions=ver_str,
+                        remediation=remediation,
+                    )
+                )
 
         return results
 
@@ -189,29 +260,51 @@ class CveResearch:
 
         for exploit_name, indicators in KNOWN_EXPLOIT_PATTERNS.items():
             if any(ind in combined for ind in indicators):
-                cve_id = next((i for i in indicators if i.startswith("CVE-")), f"{exploit_name.title()}")
+                cve_id = next(
+                    (i for i in indicators if i.startswith("CVE-")), f"{exploit_name.title()}"
+                )
 
                 severity_map = {
-                    "eternalblue": ("critical", 9.3, "Metasploit: exploit/windows/smb/ms17_010_eternalblue"),
-                    "bluekeep": ("critical", 9.8, "Metasploit: exploit/windows/rdp/ms17_010_eternalblue"),
+                    "eternalblue": (
+                        "critical",
+                        9.3,
+                        "Metasploit: exploit/windows/smb/ms17_010_eternalblue",
+                    ),
+                    "bluekeep": (
+                        "critical",
+                        9.8,
+                        "Metasploit: exploit/windows/rdp/ms17_010_eternalblue",
+                    ),
                     "log4j": ("critical", 10.0, "Log4Shell - multiple exploit vectors available"),
-                    "zerologon": ("critical", 10.0, "Metasploit: exploit/windows/domain/ms17_010_eternalblue"),
+                    "zerologon": (
+                        "critical",
+                        10.0,
+                        "Metasploit: exploit/windows/domain/ms17_010_eternalblue",
+                    ),
                     "printnightmare": ("critical", 9.0, "Multiple PoCs available"),
-                    "regresshion": ("high", 8.1, "Check OpenSSH version 8.5p1-9.7p1 - signal handler race condition"),
+                    "regresshion": (
+                        "high",
+                        8.1,
+                        "Check OpenSSH version 8.5p1-9.7p1 - signal handler race condition",
+                    ),
                 }
 
-                severity, cvss, exploit = severity_map.get(exploit_name, ("high", 7.0, "Check exploit-db"))
+                severity, cvss, exploit = severity_map.get(
+                    exploit_name, ("high", 7.0, "Check exploit-db")
+                )
 
-                results.append(CveResult(
-                    cve_id=cve_id,
-                    description=f"Known exploit pattern detected: {exploit_name}",
-                    severity=severity,
-                    cvss_score=cvss,
-                    exploit_available=True,
-                    exploit_source=exploit,
-                    affected_versions=version,
-                    remediation=f"Research {cve_id} on exploit-db and apply vendor patch",
-                ))
+                results.append(
+                    CveResult(
+                        cve_id=cve_id,
+                        description=f"Known exploit pattern detected: {exploit_name}",
+                        severity=severity,
+                        cvss_score=cvss,
+                        exploit_available=True,
+                        exploit_source=exploit,
+                        affected_versions=version,
+                        remediation=f"Research {cve_id} on exploit-db and apply vendor patch",
+                    )
+                )
 
         return results
 

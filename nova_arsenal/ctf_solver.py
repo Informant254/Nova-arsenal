@@ -50,37 +50,39 @@ class CtfChallenge:
 FLAG_GREP_PATTERN = "flag\\{[^}]+\\}|CTF\\{[^}]+\\}"
 
 FLAG_PATTERNS: list[Pattern] = [
-    re.compile(r'(?i)flag\{([^}]+)\}'),
-    re.compile(r'(?i)CTF\{([^}]+)\}'),
-    re.compile(r'(?i)CTF_([a-zA-Z0-9_]+)'),
-    re.compile(r'(?i)FLAG[:\s]+([a-zA-Z0-9_!@#$%^&*()=+\[\]{}|;:,.<>?]+)'),
-    re.compile(r'(?i)([a-zA-Z0-9]{20,40})'),
+    re.compile(r"(?i)flag\{([^}]+)\}"),
+    re.compile(r"(?i)CTF\{([^}]+)\}"),
+    re.compile(r"(?i)CTF_([a-zA-Z0-9_]+)"),
+    re.compile(r"(?i)FLAG[:\s]+([a-zA-Z0-9_!@#$%^&*()=+\[\]{}|;:,.<>?]+)"),
+    re.compile(r"(?i)([a-zA-Z0-9]{20,40})"),
 ]
 
 CHALLENGE_TYPE_PATTERNS: dict[ChallengeType, list[Pattern]] = {
     ChallengeType.WEB: [
-        re.compile(r'(?i)(web|http|XSS|SQL[-\s]?injection|admin|login|cookie|session|csrf|ssrf)'),
+        re.compile(r"(?i)(web|http|XSS|SQL[-\s]?injection|admin|login|cookie|session|csrf|ssrf)"),
     ],
     ChallengeType.CRYPTO: [
-        re.compile(r'(?i)(crypto|cipher|encrypt|decrypt|RSA|AES|hash|md5|sha|base64|XOR|substitution|vigenere|caesar)'),
+        re.compile(
+            r"(?i)(crypto|cipher|encrypt|decrypt|RSA|AES|hash|md5|sha|base64|XOR|substitution|vigenere|caesar)"
+        ),
     ],
     ChallengeType.STEGO: [
-        re.compile(r'(?i)(stego|steganography|LSB|image|hidden|embedded|pixel|exif)'),
+        re.compile(r"(?i)(stego|steganography|LSB|image|hidden|embedded|pixel|exif)"),
     ],
     ChallengeType.FORENSICS: [
-        re.compile(r'(?i)(forensic|memory|dump|pcap|network|traffic|volatility|binwalk|strings)'),
+        re.compile(r"(?i)(forensic|memory|dump|pcap|network|traffic|volatility|binwalk|strings)"),
     ],
     ChallengeType.REVERSING: [
-        re.compile(r'(?i)(reverse|rev|binary|disassem|ghidra|ida|radare|angr|decompile)'),
+        re.compile(r"(?i)(reverse|rev|binary|disassem|ghidra|ida|radare|angr|decompile)"),
     ],
     ChallengeType.PWN: [
-        re.compile(r'(?i)(pwn|binary|exploit|buffer|overflow|ROP|shellcode|format.string|ret2)'),
+        re.compile(r"(?i)(pwn|binary|exploit|buffer|overflow|ROP|shellcode|format.string|ret2)"),
     ],
     ChallengeType.OSINT: [
-        re.compile(r'(?i)(OSINT|recon|social|search|find|locate|people|email|domain)'),
+        re.compile(r"(?i)(OSINT|recon|social|search|find|locate|people|email|domain)"),
     ],
     ChallengeType.RECON: [
-        re.compile(r'(?i)(recon|scan|port|service|enumeration|discover|fingerprint)'),
+        re.compile(r"(?i)(recon|scan|port|service|enumeration|discover|fingerprint)"),
     ],
 }
 
@@ -130,13 +132,15 @@ class CtfSolver:
                 elif "flag{" in raw.lower() or "ctf{" in raw.lower():
                     confidence = 1.0
 
-                flags.append(CtfFlag(
-                    flag=flag_value,
-                    challenge_type=ctype,
-                    confidence=confidence,
-                    method=f"regex:{pat.pattern[:40]}",
-                    source=source,
-                ))
+                flags.append(
+                    CtfFlag(
+                        flag=flag_value,
+                        challenge_type=ctype,
+                        confidence=confidence,
+                        method=f"regex:{pat.pattern[:40]}",
+                        source=source,
+                    )
+                )
 
         return flags
 
@@ -172,8 +176,7 @@ class CtfSolver:
         for filepath in challenge.files:
             try:
                 proc = await asyncio.create_subprocess_shell(
-                    f"cat '{filepath}' 2>/dev/null",
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    f"cat '{filepath}' 2>/dev/null", stdout=subprocess.PIPE, stderr=subprocess.PIPE
                 )
                 stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
                 content = stdout.decode(errors="replace")
@@ -181,12 +184,13 @@ class CtfSolver:
                 if flags:
                     return flags[0]
 
-                if re.search(r'(?i)base64', content):
-                    decoded = re.sub(r'\s', '', content)
+                if re.search(r"(?i)base64", content):
+                    decoded = re.sub(r"\s", "", content)
                     try:
                         import base64
+
                         plain = base64.b64decode(decoded).decode(errors="replace")
-                        for line in plain.split('\n'):
+                        for line in plain.split("\n"):
                             flags = self.extract_flags(line, source="base64_decoded")
                             if flags:
                                 return flags[0]
@@ -296,10 +300,16 @@ class CtfSolver:
             logger.info(f"[CTF] SOLVED: {challenge.name} -> {flag.flag}")
         return flag
 
-    def add_challenge(self, name: str, description: str = "",
-                      challenge_type: ChallengeType | None = None,
-                      points: int = 0, url: str = "", port: int = 0,
-                      files: list[str] | None = None) -> CtfChallenge:
+    def add_challenge(
+        self,
+        name: str,
+        description: str = "",
+        challenge_type: ChallengeType | None = None,
+        points: int = 0,
+        url: str = "",
+        port: int = 0,
+        files: list[str] | None = None,
+    ) -> CtfChallenge:
         if challenge_type is None:
             challenge_type = self.classify_challenge(name, description, url)
 
@@ -322,7 +332,9 @@ class CtfSolver:
             "solved": len(self.solved_challenges),
             "total_points": self.total_points,
             "solved_points": self.solved_points,
-            "completion_pct": round(len(self.solved_challenges) / max(len(self.challenges), 1) * 100, 1),
+            "completion_pct": round(
+                len(self.solved_challenges) / max(len(self.challenges), 1) * 100, 1
+            ),
             "by_type": {
                 ct.value: {
                     "total": sum(1 for c in self.challenges if c.challenge_type == ct),

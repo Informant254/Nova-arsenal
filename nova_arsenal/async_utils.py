@@ -19,14 +19,16 @@ T = TypeVar("T")
 
 class CircuitBreakerState(Enum):
     """Circuit breaker state machine."""
-    CLOSED = "closed"        # Normal operation
-    OPEN = "open"            # Failing, reject requests
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing recovery
 
 
 @dataclass
 class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
+
     failure_threshold: int = 5  # Failures before opening
     recovery_timeout: float = 30.0  # Seconds before half-open
     success_threshold: int = 2  # Successes to close
@@ -52,7 +54,11 @@ class CircuitBreaker:
         if self.state == CircuitBreakerState.OPEN:
             # Check if recovery timeout has passed
             import time
-            if self.last_failure_time and time.time() - self.last_failure_time > self.config.recovery_timeout:
+
+            if (
+                self.last_failure_time
+                and time.time() - self.last_failure_time > self.config.recovery_timeout
+            ):
                 self.state = CircuitBreakerState.HALF_OPEN
                 self.success_count = 0
                 logger.info("Circuit breaker entering HALF_OPEN state")
@@ -80,6 +86,7 @@ class CircuitBreaker:
     def _on_failure(self) -> None:
         """Handle failed call."""
         import time
+
         self.last_failure_time = time.time()
         self.failure_count += 1
         if self.failure_count >= self.config.failure_threshold:
@@ -92,6 +99,7 @@ class CircuitBreaker:
 
 class AsyncTimeoutError(Exception):
     """Raised when an async operation exceeds timeout."""
+
     pass
 
 
@@ -120,14 +128,13 @@ async def async_timeout(
         return result
     except asyncio.TimeoutError:
         logger.error(f"{operation_name} timed out after {timeout_seconds}s")
-        raise AsyncTimeoutError(
-            f"{operation_name} exceeded {timeout_seconds}s timeout"
-        ) from None
+        raise AsyncTimeoutError(f"{operation_name} exceeded {timeout_seconds}s timeout") from None
 
 
 @dataclass
 class RetryConfig:
     """Retry policy configuration."""
+
     max_retries: int = 3
     backoff_base: float = 2.0  # Exponential backoff multiplier
     initial_delay: float = 1.0  # First retry delay in seconds
@@ -167,7 +174,7 @@ async def async_retry(
             last_exception = e
             if attempt < config.max_retries:
                 delay = min(
-                    config.initial_delay * (config.backoff_base ** attempt),
+                    config.initial_delay * (config.backoff_base**attempt),
                     config.max_delay,
                 )
                 logger.warning(
@@ -185,6 +192,7 @@ async def async_retry(
 @dataclass
 class ResourceLimits:
     """Resource limits for agent execution."""
+
     max_concurrent_tasks: int = 5
     max_memory_mb: int = 512
     max_execution_time_seconds: float = 600.0
@@ -203,6 +211,7 @@ class ResourceTracker:
     def start_execution(self) -> None:
         """Mark execution start."""
         import time
+
         self.start_time = time.time()
         self.total_tool_calls = 0
         self.active_tasks = 0
@@ -222,9 +231,13 @@ class ResourceTracker:
 
         if self.start_time:
             import time
+
             elapsed = time.time() - self.start_time
             if elapsed > self.limits.max_execution_time_seconds:
-                return False, f"Execution time exceeded ({elapsed:.1f}s > {self.limits.max_execution_time_seconds}s)"
+                return (
+                    False,
+                    f"Execution time exceeded ({elapsed:.1f}s > {self.limits.max_execution_time_seconds}s)",
+                )
 
         return True, "Within limits"
 

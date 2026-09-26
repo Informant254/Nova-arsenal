@@ -186,7 +186,9 @@ _RULES: list[tuple[str, str, str, float, str, re.Pattern[str], str]] = [
         "high",
         0.6,
         "CWE-1321",
-        re.compile(r"(__proto__|constructor\s*\[|Object\.assign\s*\(\s*\{\}|lodash\.merge|deepMerge)", re.I),
+        re.compile(
+            r"(__proto__|constructor\s*\[|Object\.assign\s*\(\s*\{\}|lodash\.merge|deepMerge)", re.I
+        ),
         "Potential prototype pollution pattern in JS object merge",
     ),
     (
@@ -195,7 +197,9 @@ _RULES: list[tuple[str, str, str, float, str, re.Pattern[str], str]] = [
         "medium",
         0.5,
         "CWE-367",
-        re.compile(r"(os\.path\.exists\s*\(.*\n.*open\s*\(|access\s*\(.*\n.*open\s*\()", re.S | re.I),
+        re.compile(
+            r"(os\.path\.exists\s*\(.*\n.*open\s*\(|access\s*\(.*\n.*open\s*\()", re.S | re.I
+        ),
         "Classic TOCTOU check-then-use pattern",
     ),
     (
@@ -204,7 +208,9 @@ _RULES: list[tuple[str, str, str, float, str, re.Pattern[str], str]] = [
         "medium",
         0.55,
         "CWE-915",
-        re.compile(r"(update\s*\(\s*request\.(json|form|data)|setattr\s*\(.*request|mass.?assign)", re.I),
+        re.compile(
+            r"(update\s*\(\s*request\.(json|form|data)|setattr\s*\(.*request|mass.?assign)", re.I
+        ),
         "Possible mass assignment from request body",
     ),
 ]
@@ -264,5 +270,7 @@ class StaticBugScanner:
         logger.info("Static scan: %d findings across %d files", len(out), len(files))
         return out
 
-    async def scan_files_async(self, files: dict[str, str], max_findings: int = 200) -> list[StaticFinding]:
+    async def scan_files_async(
+        self, files: dict[str, str], max_findings: int = 200
+    ) -> list[StaticFinding]:
         return self.scan_files(files, max_findings=max_findings)

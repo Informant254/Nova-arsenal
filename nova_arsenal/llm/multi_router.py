@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class TaskCategory(Enum):
     """Categories of tasks for provider routing."""
+
     CODE_GENERATION = "code_generation"
     CODE_REVIEW = "code_review"
     SECURITY_ANALYSIS = "security_analysis"
@@ -52,6 +53,7 @@ class ProviderProfile:
 @dataclass
 class RoutingDecision:
     """Decision made by the router."""
+
     provider: str
     model: str
     category: TaskCategory
@@ -177,64 +179,195 @@ PROVIDER_PROFILES: list[ProviderProfile] = [
 
 TASK_KEYWORDS: dict[TaskCategory, list[str]] = {
     TaskCategory.CODE_GENERATION: [
-        "write code", "implement", "function", "class", "script", "program",
-        "create a", "build a", "generate code", "coding", "python", "javascript",
-        "rust", "golang", "java", "c++", "html", "css", "bash",
-        "algorithm", "data structure", "api endpoint", "webhook",
+        "write code",
+        "implement",
+        "function",
+        "class",
+        "script",
+        "program",
+        "create a",
+        "build a",
+        "generate code",
+        "coding",
+        "python",
+        "javascript",
+        "rust",
+        "golang",
+        "java",
+        "c++",
+        "html",
+        "css",
+        "bash",
+        "algorithm",
+        "data structure",
+        "api endpoint",
+        "webhook",
     ],
     TaskCategory.CODE_REVIEW: [
-        "review code", "code review", "audit code", "check code", "lint",
-        "refactor", "optimize code", "code quality", "best practice",
-        "code smell", "technical debt", "code analysis",
+        "review code",
+        "code review",
+        "audit code",
+        "check code",
+        "lint",
+        "refactor",
+        "optimize code",
+        "code quality",
+        "best practice",
+        "code smell",
+        "technical debt",
+        "code analysis",
     ],
     TaskCategory.SECURITY_ANALYSIS: [
-        "vulnerability", "exploit", "penetration test", "security audit",
-        "attack vector", "scan for vulnerability", "nmap", "sqlmap", "nuclei",
-        "brute force", "xss", "sqli", "rce", "lfi", "ssrf", "csrf",
-        "auth bypass", "privilege escalation", "reverse shell", "payload",
-        "cve", "incident response", "forensics", "malware", "threat",
-        "security scan", "pen test", "security assessment", "sql injection",
+        "vulnerability",
+        "exploit",
+        "penetration test",
+        "security audit",
+        "attack vector",
+        "scan for vulnerability",
+        "nmap",
+        "sqlmap",
+        "nuclei",
+        "brute force",
+        "xss",
+        "sqli",
+        "rce",
+        "lfi",
+        "ssrf",
+        "csrf",
+        "auth bypass",
+        "privilege escalation",
+        "reverse shell",
+        "payload",
+        "cve",
+        "incident response",
+        "forensics",
+        "malware",
+        "threat",
+        "security scan",
+        "pen test",
+        "security assessment",
+        "sql injection",
     ],
     TaskCategory.REASONING: [
-        "reason", "think", "logic", "prove", "explain why",
-        "deduce", "compare and contrast", "debate", "argument",
-        "syllogism", "deduction", "induction", "inference", "logical",
+        "reason",
+        "think",
+        "logic",
+        "prove",
+        "explain why",
+        "deduce",
+        "compare and contrast",
+        "debate",
+        "argument",
+        "syllogism",
+        "deduction",
+        "induction",
+        "inference",
+        "logical",
     ],
     TaskCategory.ANALYSIS: [
-        "analyze", "analysis", "examine", "investigate", "study",
-        "assess", "evaluate", "review", "report", "summary",
-        "data analysis", "trend", "pattern", "correlation",
-        "network traffic", "anomalies",
+        "analyze",
+        "analysis",
+        "examine",
+        "investigate",
+        "study",
+        "assess",
+        "evaluate",
+        "review",
+        "report",
+        "summary",
+        "data analysis",
+        "trend",
+        "pattern",
+        "correlation",
+        "network traffic",
+        "anomalies",
     ],
     TaskCategory.CREATIVE: [
-        "write", "story", "poem", "creative", "imagine", "fiction",
-        "narrative", "essay", "article", "blog post", "content",
-        "copywriting", "marketing", "slogan", "tagline",
+        "write",
+        "story",
+        "poem",
+        "creative",
+        "imagine",
+        "fiction",
+        "narrative",
+        "essay",
+        "article",
+        "blog post",
+        "content",
+        "copywriting",
+        "marketing",
+        "slogan",
+        "tagline",
     ],
     TaskCategory.TRANSLATION: [
-        "translate", "translation", "localize", "internationalization",
-        "i18n", "localization", "language", "multilingual",
+        "translate",
+        "translation",
+        "localize",
+        "internationalization",
+        "i18n",
+        "localization",
+        "language",
+        "multilingual",
     ],
     TaskCategory.SUMMARIZATION: [
-        "summarize", "summary", "tldr", "brief", "overview",
-        "condense", "abstract", "executive summary",
+        "summarize",
+        "summary",
+        "tldr",
+        "brief",
+        "overview",
+        "condense",
+        "abstract",
+        "executive summary",
     ],
     TaskCategory.DATA_PROCESSING: [
-        "parse", "extract", "transform", "ETL", "pipeline",
-        "data processing", "csv", "json", "xml", "scrape",
-        "web scraping", "data cleaning", "data wrangling",
+        "parse",
+        "extract",
+        "transform",
+        "ETL",
+        "pipeline",
+        "data processing",
+        "csv",
+        "json",
+        "xml",
+        "scrape",
+        "web scraping",
+        "data cleaning",
+        "data wrangling",
     ],
     TaskCategory.CONVERSATION: [
-        "chat", "talk", "discuss", "conversation", "ask",
-        "question", "help me", "what is", "how to", "explain",
+        "chat",
+        "talk",
+        "discuss",
+        "conversation",
+        "ask",
+        "question",
+        "help me",
+        "what is",
+        "how to",
+        "explain",
     ],
     TaskCategory.RESEARCH: [
-        "research", "find", "search", "discover", "investigate",
-        "literature review", "survey", "state of the art", "benchmark",
+        "research",
+        "find",
+        "search",
+        "discover",
+        "investigate",
+        "literature review",
+        "survey",
+        "state of the art",
+        "benchmark",
     ],
     TaskCategory.PLANNING: [
-        "plan", "strategy", "roadmap", "architecture", "design",
-        "blueprint", "workflow", "pipeline", "process", "methodology",
+        "plan",
+        "strategy",
+        "roadmap",
+        "architecture",
+        "design",
+        "blueprint",
+        "workflow",
+        "pipeline",
+        "process",
+        "methodology",
     ],
 }
 
@@ -258,6 +391,7 @@ def classify_task(prompt: str) -> TaskCategory:
 
 # ── Multi-Provider Router ──────────────────────────────────────────────────
 
+
 class MultiProviderRouter:
     """
     Sakana Fugu-style multi-provider orchestrator.
@@ -277,9 +411,7 @@ class MultiProviderRouter:
     ):
         self._providers = providers or {}
         self._preference = preference
-        self._provider_profiles: dict[str, ProviderProfile] = {
-            p.name: p for p in PROVIDER_PROFILES
-        }
+        self._provider_profiles: dict[str, ProviderProfile] = {p.name: p for p in PROVIDER_PROFILES}
         self._routing_history: list[RoutingDecision] = []
         self._provider_stats: dict[str, dict[str, float]] = {}
 
@@ -349,8 +481,7 @@ class MultiProviderRouter:
         candidates.sort(key=lambda item: item["score"], reverse=True)
         best = candidates[0]
         fallback_chain = [
-            {"provider": item["name"], "model": item["model"]}
-            for item in candidates[1:4]
+            {"provider": item["name"], "model": item["model"]} for item in candidates[1:4]
         ]
 
         decision = RoutingDecision(
@@ -358,10 +489,7 @@ class MultiProviderRouter:
             model=best["model"],
             category=category,
             confidence=best["score"],
-            reason=(
-                f"Capability/runtime match for {category.value} "
-                f"with {pref} preference"
-            ),
+            reason=(f"Capability/runtime match for {category.value} with {pref} preference"),
             fallback_chain=fallback_chain,
         )
         self._routing_history.append(decision)
@@ -415,9 +543,7 @@ class MultiProviderRouter:
                 logger.warning(f"Provider {provider_name} failed: {e}")
                 continue
 
-        raise RuntimeError(
-            f"All providers failed. Tried: {providers_tried}"
-        )
+        raise RuntimeError(f"All providers failed. Tried: {providers_tried}")
 
     async def stream(
         self,

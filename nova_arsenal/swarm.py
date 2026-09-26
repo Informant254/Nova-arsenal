@@ -206,7 +206,9 @@ class SwarmOrchestrator:
         recon_findings: list[SwarmFinding] = []
         if recon_roles:
             result.phases.append("recon")
-            await self._emit("swarm_phase", {"phase": "recon", "roles": [r.value for r in recon_roles]})
+            await self._emit(
+                "swarm_phase", {"phase": "recon", "roles": [r.value for r in recon_roles]}
+            )
             phase1 = await asyncio.gather(
                 *[self._run_agent(by_role[r]) for r in recon_roles],
                 return_exceptions=True,
@@ -342,7 +344,9 @@ class SwarmOrchestrator:
                 SwarmFinding(
                     agent_role=SwarmAgentRole.RESEARCHER,
                     title=c.title,
-                    severity=c.severity if c.severity in {"low", "medium", "high", "critical"} else "medium",
+                    severity=c.severity
+                    if c.severity in {"low", "medium", "high", "critical"}
+                    else "medium",
                     description=c.evidence or c.bug_class,
                     evidence=(
                         f"novelty={c.novelty:.2f}; stage={c.source_stage}; "

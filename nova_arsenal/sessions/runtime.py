@@ -68,7 +68,9 @@ class SessionManager:
             pass
 
     def _from_dict(self, data: dict[str, Any]) -> TaskSession:
-        roles = [SubAgentRole(r) for r in data.get("roles") or [r.value for r in DEFAULT_PARALLEL_ROLES]]
+        roles = [
+            SubAgentRole(r) for r in data.get("roles") or [r.value for r in DEFAULT_PARALLEL_ROLES]
+        ]
         sess = TaskSession(
             session_id=data.get("session_id") or _id("sess_"),
             goal=data.get("goal") or "",

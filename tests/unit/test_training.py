@@ -3,8 +3,8 @@ Tests for Nova-Arsenal Training Pipeline (GRPO, Agentic RL, Distillation).
 """
 
 
-
 # ── GRPO Config Tests ────────────────────────────────────────────────────────
+
 
 class TestGRPOConfig:
     def test_default_config(self):
@@ -27,12 +27,15 @@ class TestGRPOConfig:
 
 # ── Trajectory Pool Tests ────────────────────────────────────────────────────
 
+
 class TestTrajectoryPool:
     def test_trajectory_creation(self):
         from nova_arsenal.training.trajectory_pool import Trajectory, TrajectoryStep
 
         step = TrajectoryStep(tokens=[1, 2, 3], log_probs=[-0.5, -0.3, -0.1])
-        traj = Trajectory(prompt="test prompt", prompt_tokens=[10, 11], steps=[step], total_reward=0.5)
+        traj = Trajectory(
+            prompt="test prompt", prompt_tokens=[10, 11], steps=[step], total_reward=0.5
+        )
         assert traj.prompt == "test prompt"
         assert len(traj.steps) == 1
         assert traj.total_reward == 0.5
@@ -80,6 +83,7 @@ class TestTrajectoryPool:
 
 # ── GLM Agentic RL Tests ─────────────────────────────────────────────────────
 
+
 class TestGLMAgenticRL:
     def test_tito_gateway_exists(self):
         from nova_arsenal.training.glm_agentic_rl import TITOGateway
@@ -126,6 +130,7 @@ class TestGLMAgenticRL:
 
 # ── Cross-Stage Distillation Tests ───────────────────────────────────────────
 
+
 class TestCrossStageDistillation:
     def test_rl_stage_enum(self):
         from nova_arsenal.training.cross_stage_distillation import RLStage
@@ -151,6 +156,7 @@ class TestCrossStageDistillation:
 
 
 # ── Training Config Tests ────────────────────────────────────────────────────
+
 
 class TestTrainingConfig:
     def test_opd_config(self):

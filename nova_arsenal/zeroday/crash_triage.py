@@ -17,7 +17,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-_SIGNAL_RE = re.compile(r"(SIG(?:SEGV|ABRT|BUS|FPE|ILL|SYS|TRAP)|ASAN|UBSAN|MSAN|heap-buffer|stack-buffer|use-after-free|SEGV)", re.I)
+_SIGNAL_RE = re.compile(
+    r"(SIG(?:SEGV|ABRT|BUS|FPE|ILL|SYS|TRAP)|ASAN|UBSAN|MSAN|heap-buffer|stack-buffer|use-after-free|SEGV)",
+    re.I,
+)
 _ADDR_RE = re.compile(r"0x[0-9a-fA-F]+")
 _FRAME_RE = re.compile(r"(?:#\d+\s+0x[0-9a-fA-F]+\s+in\s+(\S+)|at\s+([\w./-]+\.\w+):(\d+))")
 
@@ -191,8 +194,14 @@ class CrashTriageEngine:
     def _sanitizer_hints(self, text: str) -> list[str]:
         hints = []
         t = (text or "").lower()
-        for key in ("heap-buffer-overflow", "stack-buffer-overflow", "use-after-free",
-                    "double-free", "null-deref", "signed-integer-overflow"):
+        for key in (
+            "heap-buffer-overflow",
+            "stack-buffer-overflow",
+            "use-after-free",
+            "double-free",
+            "null-deref",
+            "signed-integer-overflow",
+        ):
             if key in t or key.replace("-", " ") in t:
                 hints.append(key)
         return hints

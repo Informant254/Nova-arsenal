@@ -16,6 +16,7 @@ Qwythos enhancements:
 - CoT node type that forces structured reasoning in agent responses
 - Integration with data_generation.COT_FRAMEWORK
 """
+
 import json
 import logging
 from dataclasses import dataclass, field
@@ -40,6 +41,7 @@ class Scope:
     relative_priority. relative_priority is relative to the parent's priority
     (should be negative to make content lower priority than parent).
     """
+
     children: list[Any] = field(default_factory=list)
     absolute_priority: int | None = None
     relative_priority: int | None = None
@@ -58,18 +60,21 @@ class First:
     Children must be Scope nodes. The first child with absolute_priority >= cutoff
     is rendered; others are skipped.
     """
+
     children: list[Scope] = field(default_factory=list)
 
 
 @dataclass
 class Empty:
     """Reserves token count without adding content."""
+
     token_count: int = 0
 
 
 @dataclass
 class Isolate:
     """Independently bounded subtree with its own token limit."""
+
     token_limit: int
     children: list[Any] = field(default_factory=list)
     _cached_output: Any | None = None
@@ -78,12 +83,14 @@ class Isolate:
 @dataclass
 class Text:
     """Leaf text content node."""
+
     content: str
 
 
 @dataclass
 class ChatMessage:
     """A chat message with a role and content."""
+
     role: str  # system, user, assistant, tool, function
     content: str
     name: str | None = None
@@ -93,6 +100,7 @@ class ChatMessage:
 @dataclass
 class ToolDefinition:
     """A tool/function definition with JSON schema."""
+
     name: str
     description: str
     parameters: dict[str, Any]
@@ -100,11 +108,12 @@ class ToolDefinition:
 
 class ThinkingProfile(Enum):
     """Nex-N2 inspired reasoning depth profiles for Adaptive Thinking."""
-    DEFAULT = "default"         # Model decides autonomously
-    FORCE_ON = "force_on"       # Always reason deeply
-    FORCE_OFF = "force_off"     # Skip reasoning entirely
-    SEARCH = "search"           # Early search strategy → late synthesis
-    SWE = "swe"                 # Densest during bug-localization and fix-verification
+
+    DEFAULT = "default"  # Model decides autonomously
+    FORCE_ON = "force_on"  # Always reason deeply
+    FORCE_OFF = "force_off"  # Skip reasoning entirely
+    SEARCH = "search"  # Early search strategy → late synthesis
+    SWE = "swe"  # Densest during bug-localization and fix-verification
     LONG_HORIZON = "long_horizon"  # Progressively deepening, peaking at result integration
 
 
@@ -122,6 +131,7 @@ class AdaptiveThinking:
     - SWE: dense reasoning during bug-localization and fix-verification
     - LONG_HORIZON: progressively deepening reasoning over many steps
     """
+
     enable_thinking: bool | None = None
     profile: ThinkingProfile = ThinkingProfile.DEFAULT
     content: str = ""
@@ -135,12 +145,23 @@ class ChainOfThought:
     <hypothesis>, <verification>, <conclusion>.
     Each block must be substantive.
     """
+
     content: str = ""
     force_verification: bool = True
     force_conclusion: bool = True
 
 
-PromptNode = Scope | First | Empty | Isolate | Text | ChatMessage | ToolDefinition | ChainOfThought | AdaptiveThinking
+PromptNode = (
+    Scope
+    | First
+    | Empty
+    | Isolate
+    | Text
+    | ChatMessage
+    | ToolDefinition
+    | ChainOfThought
+    | AdaptiveThinking
+)
 
 
 # ── Matcher for node types ──────────────────────────────────────────────────
@@ -252,7 +273,7 @@ def count_text_tokens(text: str, tokenizer: Any | None = None) -> int:
     """Count tokens using tiktoken if available, else character estimate."""
     if tokenizer is not None:
         try:
-            if hasattr(tokenizer, 'encode'):
+            if hasattr(tokenizer, "encode"):
                 return len(tokenizer.encode(text))
             return tokenizer(text)
         except Exception:
@@ -348,7 +369,9 @@ def _hydrate_isolates(nodes: Any, tokenizer: Any | None) -> None:
     if nodes is None:
         return
 
-    if isinstance(nodes, (Text, Empty, ChatMessage, ToolDefinition, ChainOfThought, AdaptiveThinking)):
+    if isinstance(
+        nodes, (Text, Empty, ChatMessage, ToolDefinition, ChainOfThought, AdaptiveThinking)
+    ):
         return
 
     if isinstance(nodes, First):
@@ -456,7 +479,9 @@ def _render_with_level(
         if isinstance(nodes_inner, ChainOfThought):
             parts = ["<hypothesis>", nodes_inner.content or "[Insert hypothesis here]"]
             if nodes_inner.force_verification:
-                parts.append("</hypothesis>\n\n<verification>\n[Walk through evidence step by step]")
+                parts.append(
+                    "</hypothesis>\n\n<verification>\n[Walk through evidence step by step]"
+                )
             else:
                 parts.append("</hypothesis>\n\n<verification>")
                 if nodes_inner.content:
@@ -470,14 +495,24 @@ def _render_with_level(
             return
 
         if isinstance(nodes_inner, AdaptiveThinking):
-            profile_info = ADAPTIVE_THINKING_PROFILES.get(nodes_inner.profile, ADAPTIVE_THINKING_PROFILES[ThinkingProfile.DEFAULT])
+            profile_info = ADAPTIVE_THINKING_PROFILES.get(
+                nodes_inner.profile, ADAPTIVE_THINKING_PROFILES[ThinkingProfile.DEFAULT]
+            )
             if nodes_inner.enable_thinking is False:
                 think_tags = "<think>\n\n</think>\n\n"
             elif nodes_inner.enable_thinking is True:
                 think_tags = "<think>"
             else:
-                think_tags = "<think>\n\n</think>\n\n" if nodes_inner.profile == ThinkingProfile.FORCE_OFF else "<think>"
-            thinking_rule = "Reasoning is optional — use it when the task requires it." if nodes_inner.enable_thinking is None else ""
+                think_tags = (
+                    "<think>\n\n</think>\n\n"
+                    if nodes_inner.profile == ThinkingProfile.FORCE_OFF
+                    else "<think>"
+                )
+            thinking_rule = (
+                "Reasoning is optional — use it when the task requires it."
+                if nodes_inner.enable_thinking is None
+                else ""
+            )
             rendered = ADAPTIVE_THINKING_PROMPT_TEMPLATE.format(
                 profile_instruction=profile_info["instruction"],
                 profile_hint=profile_info["hint"],
@@ -499,7 +534,11 @@ def _render_with_level(
             return
 
         if isinstance(nodes_inner, Scope):
-            p = nodes_inner.absolute_priority if nodes_inner.absolute_priority is not None else level
+            p = (
+                nodes_inner.absolute_priority
+                if nodes_inner.absolute_priority is not None
+                else level
+            )
             if p >= level:
                 _render_inner(nodes_inner.children)
             return
@@ -587,6 +626,7 @@ def render(
 @dataclass
 class RenderResult:
     """Result of rendering a priority prompt."""
+
     text: str = ""
     tokens_reserved: int = 0
     token_count: int = 0
