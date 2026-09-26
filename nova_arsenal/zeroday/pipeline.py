@@ -381,12 +381,13 @@ class ZeroDayHunter:
             if isinstance(meta, dict):
                 version = str(meta.get("version") or "")
                 p = meta.get("port") or meta.get("ports") or 0
-                if isinstance(p, list) and p:
-                    port = int(p[0]) if str(p[0]).isdigit() else 0
-                elif str(p).isdigit():
-                    port = int(p)
+                candidate = p[0] if isinstance(p, list) and p else p
+                if isinstance(candidate, (int, str)) and str(candidate).isdigit():
+                    port = int(candidate)
             elif isinstance(meta, list) and meta:
-                port = int(meta[0]) if str(meta[0]).isdigit() else 0
+                candidate = meta[0]
+                if isinstance(candidate, (int, str)) and str(candidate).isdigit():
+                    port = int(candidate)
             try:
                 result = await researcher.research(str(name), version, port)
                 return [c.to_dict() for c in result.cves]

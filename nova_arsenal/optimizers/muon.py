@@ -14,8 +14,8 @@ import logging
 from collections.abc import Callable, Iterable
 from typing import Any
 
-import torch
-from torch.optim.optimizer import Optimizer
+import torch  # type: ignore[reportMissingImports]
+from torch.optim.optimizer import Optimizer  # type: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 

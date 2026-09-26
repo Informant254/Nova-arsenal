@@ -12,9 +12,9 @@ for future Nova model architecture experiments.
 
 import logging
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import torch  # type: ignore[reportMissingImports]
+import torch.nn as nn  # type: ignore[reportMissingImports]
+import torch.nn.functional as F  # type: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 

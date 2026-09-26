@@ -393,8 +393,8 @@ async def delete_agent(
 # Findings routes
 @router.get("/findings")
 async def list_findings(
-    agent_id: int = None,
-    severity: str = None,
+    agent_id: int | None = None,
+    severity: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -418,7 +418,7 @@ async def list_findings(
             {
                 "id": finding.id,
                 "title": finding.title,
-                "severity": finding.severity.value,
+                "severity": finding.severity.value if finding.severity else None,
                 "endpoint": finding.endpoint,
                 "verified": finding.verified,
                 "created_at": finding.created_at.isoformat(),
@@ -452,7 +452,7 @@ async def get_finding(
     return {
         "id": finding.id,
         "title": finding.title,
-        "severity": finding.severity.value,
+        "severity": finding.severity.value if finding.severity else None,
         "description": finding.description,
         "evidence": finding.evidence,
         "endpoint": finding.endpoint,
@@ -525,7 +525,7 @@ async def list_scope(
 @router.post("/scope", status_code=status.HTTP_201_CREATED)
 async def add_scope(
     target: str,
-    description: str = None,
+    description: str | None = None,
     current_user: User = Depends(require_analyst),
     db: AsyncSession = Depends(get_db),
 ):
@@ -776,7 +776,7 @@ async def agent_findings(
             {
                 "id": f.id,
                 "title": f.title,
-                "severity": f.severity.value,
+                "severity": f.severity.value if f.severity else None,
                 "description": f.description,
                 "evidence": f.evidence,
                 "endpoint": f.endpoint,

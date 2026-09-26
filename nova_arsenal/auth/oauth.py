@@ -113,8 +113,11 @@ def verify_oauth_state(state: str, provider: str) -> bool:
     if not payload or payload.get("provider") != provider:
         return False
 
+    issued_at_value = payload.get("iat")
+    if issued_at_value is None:
+        return False
     try:
-        issued_at = int(payload.get("iat"))
+        issued_at = int(issued_at_value)
     except (TypeError, ValueError):
         return False
 

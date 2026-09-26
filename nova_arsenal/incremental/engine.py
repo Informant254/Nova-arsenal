@@ -190,7 +190,7 @@ class IncrementalTester:
         baseline_version: str,
         target_version: str,
         deltas: list[DeltaItem],
-        all_tests: list[dict] | None = None,
+        all_tests: list[dict[str, Any]] | None = None,
     ) -> TestPlan:
         """Generate a test plan focused only on changed components."""
         all_tests = all_tests or []

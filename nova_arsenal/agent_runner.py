@@ -1374,7 +1374,7 @@ Analysis:"""
 
         self._correlation_result = await self.correlator.correlate(
             nmap_data=nmap_data,
-            burp_issues=self._burp_issues,
+            burp_issues=[issue.to_dict() for issue in self._burp_issues],
             msf_results=self._msf_results,
             sqlmap_tasks=self._sqlmap_results,
             findings=findings_dicts,

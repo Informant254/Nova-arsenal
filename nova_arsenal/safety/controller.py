@@ -9,9 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +121,7 @@ class SafetyController:
         self._active_operations: dict[str, OperationRequest] = {}
         self._audit_log: list[SafetyAuditEntry] = []
         self._emergency_stopped = False
-        self._approval_callbacks: dict[str, callable] = {}
+        self._approval_callbacks: dict[str, Callable[..., Any]] = {}
         self._lock = asyncio.Lock()
 
     @property

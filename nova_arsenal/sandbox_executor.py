@@ -156,7 +156,7 @@ class SandboxExecutor:
                 f.write(script)
                 f.flush()
                 try:
-                    result = await self.execute_local(
+                    result = await self._execute_local(
                         f"bash {f.name}", working_dir, timeout
                     )
                 finally:

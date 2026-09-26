@@ -53,6 +53,7 @@ class RansomwareAction:
     executed: bool = False
     success: bool = False
     duration_ms: float = 0.0
+    start_time: float = 0.0
     evidence: str = ""
     artifacts: list[dict] = field(default_factory=list)
 
@@ -148,7 +149,7 @@ class RansomwareEmulator:
                 action.success = success
                 action.evidence = evidence
                 action.artifacts = artifacts
-                action.duration_ms = (time.monotonic() - getattr(action, 'start_time', time.monotonic())) * 1000
+                action.duration_ms = (time.monotonic() - action.start_time) * 1000
                 actions.append(action)
 
                 if success:

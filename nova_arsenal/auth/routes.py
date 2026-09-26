@@ -224,6 +224,11 @@ async def refresh_token(
         )
 
     raw_user_id = payload.get("sub")
+    if raw_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject",
+        )
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):

@@ -5,9 +5,17 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+MCPServer: Any = None
+Resource: Any = None
+Tool: Any = None
+
 try:
-    from mcp import MCPServer, Resource, Tool
-    MCP_AVAILABLE = True
+    import mcp as _mcp
+
+    MCPServer = getattr(_mcp, "MCPServer", None)
+    Resource = getattr(_mcp, "Resource", None)
+    Tool = getattr(_mcp, "Tool", None)
+    MCP_AVAILABLE = all(item is not None for item in (MCPServer, Resource, Tool))
 except ImportError:
     MCP_AVAILABLE = False
 
@@ -428,14 +436,15 @@ class NovaMcpServer:
                 mimeType=r["mimeType"],
             ))
 
-        self._mcp_server = MCPServer(
+        server = MCPServer(
             name="nova-arsenal",
             version="1.0.0",
             tools=mcp_tools,
             resources=mcp_resources,
             handler=self.handle_tool_call,
         )
-        await self._mcp_server.run()
+        self._mcp_server = server
+        await server.run()
 
     async def _run_fallback(self) -> None:
         import sys
