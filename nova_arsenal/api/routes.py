@@ -102,7 +102,7 @@ async def llm_byok_status():
 
 
 @router.post("/llm/reload")
-async def llm_reload_config():
+async def llm_reload_config(current_user: User = Depends(require_admin)):
     """Reload .env / settings.yaml and re-initialize the LLM router."""
     from nova_arsenal.config import reload_config
     from nova_arsenal.llm.router import get_llm_router, reset_llm_router
@@ -134,7 +134,7 @@ class LlmAccountLoginRequest(BaseModel):
 
 
 @router.get("/llm/accounts")
-async def llm_list_accounts():
+async def llm_list_accounts(current_user: User = Depends(require_admin)):
     """List signed-in AI accounts + local LLM discovery — no secrets."""
     from nova_arsenal.llm.account_auth import account_status
 
@@ -142,7 +142,7 @@ async def llm_list_accounts():
 
 
 @router.get("/llm/local")
-async def llm_local_status():
+async def llm_local_status(current_user: User = Depends(require_analyst)):
     """Discover local Ollama / OpenAI-compatible servers."""
     from nova_arsenal.llm.local_llm import local_llm_status
 
@@ -150,7 +150,10 @@ async def llm_local_status():
 
 
 @router.post("/llm/accounts/login")
-async def llm_account_login(body: LlmAccountLoginRequest):
+async def llm_account_login(
+    body: LlmAccountLoginRequest,
+    current_user: User = Depends(require_admin),
+):
     """
     Sign in with ChatGPT/Codex OAuth, local Ollama, Claude/Codex tokens, or Google OAuth.
 
@@ -210,7 +213,7 @@ async def llm_account_login(body: LlmAccountLoginRequest):
 
 
 @router.post("/llm/accounts/import")
-async def llm_account_import():
+async def llm_account_import(current_user: User = Depends(require_admin)):
     """Import credentials from local Claude Code / Codex / Cursor installs."""
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
@@ -222,7 +225,10 @@ async def llm_account_import():
 
 
 @router.delete("/llm/accounts/{provider}")
-async def llm_account_logout(provider: str):
+async def llm_account_logout(
+    provider: str,
+    current_user: User = Depends(require_admin),
+):
     """Remove a stored AI account login."""
     from nova_arsenal.llm.account_auth import get_account_store
     from nova_arsenal.llm.router import reset_llm_router
@@ -835,7 +841,7 @@ async def generate_code(
 # ââ MCP Server Routes ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.get("/mcp/tools")
-async def mcp_tools():
+async def mcp_tools(current_user: User = Depends(require_analyst)):
     """List MCP tools available from Nova."""
     from nova_arsenal.mcp import NovaMcpServer
     server = NovaMcpServer()
@@ -844,7 +850,7 @@ async def mcp_tools():
 
 
 @router.get("/mcp/resources")
-async def mcp_resources():
+async def mcp_resources(current_user: User = Depends(require_analyst)):
     """List MCP resources available from Nova."""
     from nova_arsenal.mcp import NovaMcpServer
     server = NovaMcpServer()
@@ -856,6 +862,7 @@ async def mcp_resources():
 async def mcp_call_tool(
     tool_name: str,
     arguments: dict = {},
+    current_user: User = Depends(require_analyst),
 ):
     """Call an MCP tool."""
     from nova_arsenal.mcp import NovaMcpServer

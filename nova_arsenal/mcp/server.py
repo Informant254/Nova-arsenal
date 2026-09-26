@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -242,18 +243,28 @@ class NovaMcpServer:
 
         try:
             if tool_name == "nmap_scan":
-                target = arguments["target"]
-                ports = arguments.get("ports", "")
-                flags = arguments.get("flags", "-sV -sC")
-                cmd = f"nmap {flags} {target}"
+                target = str(arguments["target"]).strip()
+                ports = str(arguments.get("ports", "")).strip()
+                flags = str(arguments.get("flags", "-sV -sC")).split()
+                allowed_flags = {"-sV", "-sC", "-sT", "-Pn", "-n", "-O", "--version-light"}
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}", target):
+                    return json.dumps({"error": "Invalid nmap target"})
+                if ports and not re.fullmatch(r"[0-9,-]+", ports):
+                    return json.dumps({"error": "Invalid nmap port specification"})
+                if any(flag not in allowed_flags for flag in flags):
+                    return json.dumps({"error": "Unsupported nmap flag"})
+
+                command = ["nmap", *flags, target]
                 if ports:
-                    cmd += f" -p {ports}"
-                proc = await asyncio.create_subprocess_shell(
-                    f"{cmd} 2>/dev/null || echo 'nmap failed'",
+                    command.extend(["-p", ports])
+                proc = await asyncio.create_subprocess_exec(
+                    *command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+                if getattr(proc, "returncode", 0) != 0:
+                    return json.dumps({"error": stderr.decode(errors="replace")[:1000] or "nmap failed"})
                 return stdout.decode(errors="replace")[:5000]
 
             elif tool_name == "osint_investigate":

@@ -69,6 +69,33 @@ class TestNovaMcpServer:
     def _run_async(self, coro):
         return asyncio.run(coro)
 
+    def test_nmap_uses_argument_vector_not_shell(self, monkeypatch):
+        server = NovaMcpServer()
+        calls = []
+
+        class Process:
+            async def communicate(self):
+                return b"safe output", b""
+
+        async def fake_exec(*args, **kwargs):
+            calls.append((args, kwargs))
+            return Process()
+
+        async def shell_must_not_run(*args, **kwargs):
+            raise AssertionError("nmap must not be launched through a shell")
+
+        monkeypatch.setattr("nova_arsenal.mcp.server.asyncio.create_subprocess_exec", fake_exec)
+        monkeypatch.setattr("nova_arsenal.mcp.server.asyncio.create_subprocess_shell", shell_must_not_run)
+
+        result = self._run_async(server.handle_tool_call("nmap_scan", {
+            "target": "lab.example.local",
+            "ports": "80,443",
+            "flags": "-sV -sC",
+        }))
+
+        assert result == "safe output"
+        assert calls[0][0] == ("nmap", "-sV", "-sC", "lab.example.local", "-p", "80,443")
+
     def test_handle_tool_call_unknown(self):
         server = NovaMcpServer()
         result = self._run_async(server.handle_tool_call("nonexistent", {}))

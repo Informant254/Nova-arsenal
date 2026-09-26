@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from nova_arsenal.auth.middleware import require_analyst
+from nova_arsenal.db.models import User
 
 from .models import DEFAULT_PARALLEL_ROLES, SubAgentRole
 from .runtime import get_session_manager
@@ -32,7 +35,7 @@ class StartSessionRequest(BaseModel):
 
 
 @router.get("/roles")
-async def list_roles():
+async def list_roles(current_user: User = Depends(require_analyst)):
     return {
         "roles": [r.value for r in SubAgentRole],
         "default": [r.value for r in DEFAULT_PARALLEL_ROLES],
@@ -49,7 +52,10 @@ async def list_roles():
 
 
 @router.post("")
-async def create_session(body: CreateSessionRequest):
+async def create_session(
+    body: CreateSessionRequest,
+    current_user: User = Depends(require_analyst),
+):
     mgr = get_session_manager()
     meta = {}
     if body.services:
@@ -70,7 +76,7 @@ async def create_session(body: CreateSessionRequest):
 
 
 @router.get("")
-async def list_sessions():
+async def list_sessions(current_user: User = Depends(require_analyst)):
     mgr = get_session_manager()
     return {
         "sessions": [
@@ -80,7 +86,7 @@ async def list_sessions():
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, current_user: User = Depends(require_analyst)):
     sess = get_session_manager().get(session_id)
     if not sess:
         raise HTTPException(404, f"Session {session_id} not found")
@@ -88,7 +94,7 @@ async def get_session(session_id: str):
 
 
 @router.post("/{session_id}/start")
-async def start_session(session_id: str):
+async def start_session(session_id: str, current_user: User = Depends(require_analyst)):
     mgr = get_session_manager()
     if not mgr.get(session_id):
         raise HTTPException(404, f"Session {session_id} not found")
@@ -97,7 +103,7 @@ async def start_session(session_id: str):
 
 
 @router.post("/{session_id}/cancel")
-async def cancel_session(session_id: str):
+async def cancel_session(session_id: str, current_user: User = Depends(require_analyst)):
     mgr = get_session_manager()
     if not mgr.get(session_id):
         raise HTTPException(404, f"Session {session_id} not found")
@@ -106,7 +112,11 @@ async def cancel_session(session_id: str):
 
 
 @router.get("/{session_id}/events")
-async def session_events(session_id: str, after: int = 0):
+async def session_events(
+    session_id: str,
+    after: int = 0,
+    current_user: User = Depends(require_analyst),
+):
     sess = get_session_manager().get(session_id)
     if not sess:
         raise HTTPException(404, f"Session {session_id} not found")
@@ -122,7 +132,7 @@ async def session_events(session_id: str, after: int = 0):
 
 
 @router.get("/{session_id}/agents")
-async def session_agents(session_id: str):
+async def session_agents(session_id: str, current_user: User = Depends(require_analyst)):
     sess = get_session_manager().get(session_id)
     if not sess:
         raise HTTPException(404, f"Session {session_id} not found")

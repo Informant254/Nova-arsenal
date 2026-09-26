@@ -10,7 +10,8 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:///workspace/nova.db
       - NOVA_LLM_URL=http://llm:11434
       - NOVA_WORKSPACE=/workspace
-      - JWT_SECRET=${JWT_SECRET:-changeme}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env before starting Nova}
+      - NOVA_CORS_ORIGINS=${NOVA_CORS_ORIGINS:-http://localhost:3000}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - workspace:/workspace
@@ -23,7 +24,7 @@ services:
       sandbox:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import nova_arsenal; print('ok')"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       start_period: 5s
@@ -92,7 +93,7 @@ services:
       dockerfile: containers/Dockerfile.web
     container_name: nova-web
     environment:
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-changeme}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in .env before starting Nova}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - AGENT_API_URL=http://agent:8080
       - DATABASE_URL=file:/app/data/nova.db
