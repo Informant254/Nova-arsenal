@@ -83,6 +83,8 @@ jobs:
                   if old not in text:
                       raise SystemExit(f"Expected text not found in {filename}: {old!r}")
                   text = text.replace(old, new, 1)
+              if filename == "nova_arsenal/prompt_builder.py":
+                  text = text.rstrip() + "\n"
               path.write_text(text)
           PY
 
