@@ -256,14 +256,15 @@ class TestJWTRegression:
 
         from nova_arsenal.auth.routes import create_access_token
 
+        jwt_secret = "test-secret-long-enough-for-hs256-signing-key"
         with patch("nova_arsenal.auth.routes.get_config") as mock_cfg:
-            mock_cfg.return_value.auth.jwt_secret = "test-secret"
+            mock_cfg.return_value.auth.jwt_secret = jwt_secret
             mock_cfg.return_value.auth.access_token_expire_minutes = 15
             token = create_access_token(
                 {"sub": "42", "email": "test@example.com", "role": "analyst"}
             )
 
-        payload = jwt.decode(token, "test-secret", algorithms=["HS256"])
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
         assert payload["sub"] == "42"
         assert isinstance(payload["sub"], str)
 
