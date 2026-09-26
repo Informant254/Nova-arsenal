@@ -6,7 +6,7 @@ Supports PCI DSS, SOC 2, ISO 27001, and NIST SP 800-53.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -18,7 +18,7 @@ class FrameworkControl:
     status: str = "unmapped"
     evidence: str = ""
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "framework": self.framework,
             "control_id": self.control_id,
@@ -34,10 +34,10 @@ class ComplianceResult:
     finding_title: str
     finding_severity: str
     finding_type: str
-    controls: List[FrameworkControl] = field(default_factory=list)
-    frameworks_affected: List[str] = field(default_factory=list)
+    controls: list[FrameworkControl] = field(default_factory=list)
+    frameworks_affected: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "finding_title": self.finding_title,
             "finding_severity": self.finding_severity,
@@ -48,7 +48,7 @@ class ComplianceResult:
         }
 
 
-FINDING_TYPE_MAP: Dict[str, List[FrameworkControl]] = {
+FINDING_TYPE_MAP: dict[str, list[FrameworkControl]] = {
     "sql_injection": [
         FrameworkControl("PCI DSS", "6.5.1", "Injection flaws",
                          "Ensure applications are not vulnerable to SQL injection"),
@@ -145,7 +145,7 @@ FINDING_TYPE_MAP: Dict[str, List[FrameworkControl]] = {
     ],
 }
 
-SEVERITY_THRESHOLDS: Dict[str, str] = {
+SEVERITY_THRESHOLDS: dict[str, str] = {
     "critical": "Requires immediate remediation. High risk of compromise.",
     "high": "Requires prompt remediation within 30 days.",
     "medium": "Should be remediated within 60-90 days.",
@@ -184,7 +184,7 @@ class ComplianceMapper:
             frameworks_affected=sorted(frameworks),
         )
 
-    def map_findings(self, findings: List[Dict[str, str]]) -> List[ComplianceResult]:
+    def map_findings(self, findings: list[dict[str, str]]) -> list[ComplianceResult]:
         return [self.map_finding(
             finding_type=f.get("finding_type", f.get("title", "unknown")),
             title=f.get("title", "Unknown finding"),
@@ -210,8 +210,8 @@ class ComplianceMapper:
         }
         return fuzzy_map.get(key, key)
 
-    def list_frameworks(self) -> Dict[str, List[str]]:
-        frameworks: Dict[str, set] = {}
+    def list_frameworks(self) -> dict[str, list[str]]:
+        frameworks: dict[str, set] = {}
         for finding_type, controls in FINDING_TYPE_MAP.items():
             for c in controls:
                 if c.framework not in frameworks:
@@ -223,9 +223,9 @@ class ComplianceMapper:
             for fw, controls in frameworks.items()
         }
 
-    def get_summary_stats(self, results: List[ComplianceResult]) -> Dict[str, Any]:
-        framework_hits: Dict[str, int] = {}
-        severity_counts: Dict[str, int] = {}
+    def get_summary_stats(self, results: list[ComplianceResult]) -> dict[str, Any]:
+        framework_hits: dict[str, int] = {}
+        severity_counts: dict[str, int] = {}
 
         for r in results:
             for fw in r.frameworks_affected:

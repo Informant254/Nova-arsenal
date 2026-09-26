@@ -1,7 +1,6 @@
 """Tests for CTF Solver module."""
 
-import pytest
-from nova_arsenal.ctf_solver import CtfSolver, ChallengeType, CtfFlag, CtfChallenge
+from nova_arsenal.ctf_solver import ChallengeType, CtfFlag, CtfSolver
 
 
 class TestCtfSolver:

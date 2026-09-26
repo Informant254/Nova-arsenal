@@ -6,6 +6,6 @@ high-confidence, multi-source vulnerabilities that
 individual tools might miss.
 """
 
-from .correlator import Correlator, CorrelatedFinding, CorrelationResult
+from .correlator import CorrelatedFinding, CorrelationResult, Correlator
 
 __all__ = ["Correlator", "CorrelatedFinding", "CorrelationResult"]

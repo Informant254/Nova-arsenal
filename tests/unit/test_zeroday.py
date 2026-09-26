@@ -5,7 +5,6 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
 
 from nova_arsenal.zeroday import (
     AttackSurfaceMapper,
@@ -165,8 +164,8 @@ class TestLiveFuzzWorker:
 
     def test_dry_run_splits_runnable(self):
         from nova_arsenal.zeroday import LiveFuzzWorker
-        from nova_arsenal.zeroday.surface import SurfaceEndpoint
         from nova_arsenal.zeroday.fuzz_orchestrator import FuzzOrchestrator
+        from nova_arsenal.zeroday.surface import SurfaceEndpoint
 
         orch = FuzzOrchestrator(max_jobs=5)
         campaign = orch.plan(
@@ -261,7 +260,7 @@ class TestZeroDayHunter:
         assert d["candidate_count"] == len(result.candidates)
 
     def test_exports(self):
-        from nova_arsenal.zeroday import ZeroDayHunter, ZeroDayHuntConfig
+        from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter
 
         assert ZeroDayHunter is not None
         assert ZeroDayHuntConfig is not None

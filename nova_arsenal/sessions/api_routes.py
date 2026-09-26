@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/work-sessions", tags=["work-sessions"])
 class CreateSessionRequest(BaseModel):
     goal: str = Field(..., min_length=1, description="What the multi-agent team should accomplish")
     target: str = Field(default="", description="Primary target host/domain/IP")
-    roles: Optional[List[str]] = Field(
+    roles: list[str] | None = Field(
         default=None,
         description="Sub-agent roles",
     )
@@ -27,7 +27,7 @@ class CreateSessionRequest(BaseModel):
     authorized: bool = False
     authorization_ref: str = ""
     auto_start: bool = False
-    services: Optional[Dict[str, Any]] = None
+    services: dict[str, Any] | None = None
 
 
 class StartSessionRequest(BaseModel):
@@ -49,7 +49,7 @@ def _owned_session(session_id: str, user: User):
     return session
 
 
-def _public_session(session, include_events: bool = True) -> Dict[str, Any]:
+def _public_session(session, include_events: bool = True) -> dict[str, Any]:
     """Serialize a session without internal ownership metadata."""
     data = session.to_dict(include_events=include_events)
     metadata = dict(data.get("metadata") or {})
@@ -94,7 +94,7 @@ async def create_session(
         )
 
     mgr = get_session_manager()
-    meta: Dict[str, Any] = {"owner_id": current_user.id}
+    meta: dict[str, Any] = {"owner_id": current_user.id}
     if body.services:
         meta["services"] = body.services
 

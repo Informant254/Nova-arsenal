@@ -5,7 +5,6 @@ Pydantic models for authentication requests and responses.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -77,7 +76,7 @@ class OAuthAccountResponse(BaseModel):
 
     id: int
     provider: str
-    provider_email: Optional[str] = None
+    provider_email: str | None = None
     created_at: datetime
 
 
@@ -101,7 +100,7 @@ class SubscriptionResponse(BaseModel):
     api_calls_remaining: int
     is_active: bool
     started_at: datetime
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 class SubscriptionUpgradeRequest(BaseModel):
@@ -124,9 +123,9 @@ class ApiKeyResponse(BaseModel):
     key_prefix: str
     name: str
     is_active: bool
-    full_key: Optional[str] = None
+    full_key: str | None = None
     created_at: datetime
-    last_used_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
 
 
 class ApiKeyListResponse(BaseModel):
@@ -138,4 +137,4 @@ class ApiKeyListResponse(BaseModel):
     name: str
     is_active: bool
     created_at: datetime
-    last_used_at: Optional[datetime] = None
+    last_used_at: datetime | None = None

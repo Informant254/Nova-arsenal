@@ -5,8 +5,6 @@ Unit tests for the new agentic components.
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -223,6 +221,7 @@ class TestSandboxExecutor:
 
     def test_execute_local_echo(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         result = asyncio.run(ex.execute("echo hello"))
@@ -231,6 +230,7 @@ class TestSandboxExecutor:
 
     def test_execute_local_fails(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         result = asyncio.run(ex.execute("exit 1"))
@@ -238,6 +238,7 @@ class TestSandboxExecutor:
 
     def test_execute_local_stderr(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         result = asyncio.run(ex.execute("echo error >&2"))
@@ -245,6 +246,7 @@ class TestSandboxExecutor:
 
     def test_file_exists(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         assert asyncio.run(ex.file_exists("/etc/hostname")) is True
@@ -252,6 +254,7 @@ class TestSandboxExecutor:
 
     def test_list_directory(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         listing = asyncio.run(ex.list_directory("/tmp"))
@@ -259,6 +262,7 @@ class TestSandboxExecutor:
 
     def test_history(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         asyncio.run(ex.execute("echo test1"))
@@ -270,6 +274,7 @@ class TestSandboxExecutor:
 
     def test_result_to_dict(self):
         import asyncio
+
         from nova_arsenal.sandbox_executor import SandboxExecutor
         ex = SandboxExecutor(mode="local")
         result = asyncio.run(ex.execute("echo hello"))
@@ -298,6 +303,7 @@ class TestAgentRunner:
 
     def test_runner_run_local(self):
         import asyncio
+
         from nova_arsenal.agent_runner import AgentRunner
         from nova_arsenal.sandbox_executor import SandboxExecutor
 
@@ -313,6 +319,7 @@ class TestAgentRunner:
 
     def test_runner_events(self):
         import asyncio
+
         from nova_arsenal.agent_runner import AgentRunner
         from nova_arsenal.sandbox_executor import SandboxExecutor
 
@@ -351,6 +358,7 @@ class TestNovaAgentAutonomous:
 
     def test_run_autonomous(self):
         import asyncio
+
         from nova_agent_core import NovaAgent
 
         agent = NovaAgent(target="example.com", max_steps=3)
@@ -360,6 +368,7 @@ class TestNovaAgentAutonomous:
 
     def test_step_once(self):
         import asyncio
+
         from nova_agent_core import NovaAgent
 
         agent = NovaAgent(target="example.com", max_steps=10)

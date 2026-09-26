@@ -2,14 +2,13 @@
 Nova Toolbox Module - Comprehensive collection of 100+ security tools.
 """
 
-from typing import Any, Dict, List
 
 
 class NovaToolbox:
     """Registry of 100+ security tools organized by category."""
 
     def __init__(self) -> None:
-        self.tools: Dict[str, List[str]] = {
+        self.tools: dict[str, list[str]] = {
             "recon": [
                 "nmap", "masscan", "zmap", "subfinder", "amass", "assetfinder",
                 "knockpy", "dnsrecon", "dnsenum", "fierce", " sublist3r",
@@ -94,7 +93,7 @@ class NovaToolbox:
             ],
         }
 
-        self.target_mapping: Dict[str, List[str]] = {
+        self.target_mapping: dict[str, list[str]] = {
             "linux": ["nmap", "enum4linux", "smbclient", "ssh-audit", "lynis"],
             "windows": ["nmap", "enum4linux", "smbclient", "bloodhound", "crackmapexec"],
             "web": ["nuclei", "nikto", "wpscan", "sqlmap", "ffuf"],
@@ -106,7 +105,7 @@ class NovaToolbox:
             "iot": ["nmap", "binwalk", "firmware-mod-kit", "binwalk"],
         }
 
-        self.attack_mapping: Dict[str, List[str]] = {
+        self.attack_mapping: dict[str, list[str]] = {
             "sql_injection": ["sqlmap", "bbqsql", "jsql"],
             "xss": ["xsstrike", "dalfox", "XSStrike"],
             "ssrf": ["ssrf-queen", "gopherus"],
@@ -132,11 +131,11 @@ class NovaToolbox:
             "post_exploitation": ["empire", "meterpreter", "bloodhound"],
         }
 
-    def get_tools_for_target(self, target_type: str) -> List[str]:
+    def get_tools_for_target(self, target_type: str) -> list[str]:
         """Get recommended tools for a target type."""
         return self.target_mapping.get(target_type, ["nmap", "nuclei"])
 
-    def get_tools_for_attack(self, attack_type: str) -> List[str]:
+    def get_tools_for_attack(self, attack_type: str) -> list[str]:
         """Get tools for a specific attack type."""
         return self.attack_mapping.get(attack_type, [])
 
@@ -147,11 +146,11 @@ class NovaToolbox:
             all_tools.update(tools)
         return len(all_tools)
 
-    def list_all_tools(self) -> Dict[str, List[str]]:
+    def list_all_tools(self) -> dict[str, list[str]]:
         """Return all tools grouped by category."""
         return dict(self.tools)
 
-    def get_top_tools(self, n: int = 10) -> List[str]:
+    def get_top_tools(self, n: int = 10) -> list[str]:
         """Get the top N most commonly used tools."""
         priority = [
             "nmap", "nuclei", "sqlmap", "ffuf", "subfinder",

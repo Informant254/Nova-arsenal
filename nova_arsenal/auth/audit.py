@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("nova_arsenal.auth.audit")
 
@@ -33,13 +33,13 @@ class AuditEventType(str, Enum):
 @dataclass
 class AuditEvent:
     event_type: AuditEventType
-    user_id: Optional[int] = None
-    email: Optional[str] = None
-    ip_address: Optional[str] = None
-    provider: Optional[str] = None
-    key_prefix: Optional[str] = None
-    tier: Optional[str] = None
-    detail: Optional[str] = None
+    user_id: int | None = None
+    email: str | None = None
+    ip_address: str | None = None
+    provider: str | None = None
+    key_prefix: str | None = None
+    tier: str | None = None
+    detail: str | None = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:

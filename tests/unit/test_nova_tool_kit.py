@@ -5,8 +5,6 @@ Unit tests for Nova Tool Kit module.
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -14,7 +12,6 @@ from nova_tool_kit import (
     NovaToolKit,
     PermissionProfile,
     ScopeGuard,
-    GovernedTool,
 )
 
 

@@ -9,10 +9,13 @@ environment API keys (OpenAI, Anthropic, Gemini, OpenRouter, …).
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from nova_arsenal.config import get_config
+from nova_arsenal.llm.anthropic import AnthropicProvider
 from nova_arsenal.llm.base import LLMProvider
+from nova_arsenal.llm.deepseek import DeepSeekProvider
+from nova_arsenal.llm.gemini import GeminiProvider
+from nova_arsenal.llm.huggingface import HuggingFaceProvider
 from nova_arsenal.llm.keys import (
     PROVIDER_SPECS,
     env_providers_with_keys,
@@ -22,16 +25,12 @@ from nova_arsenal.llm.keys import (
     resolve_model,
     resolve_url,
 )
+from nova_arsenal.llm.multi_router import MultiProviderRouter
 from nova_arsenal.llm.ollama import OllamaProvider
 from nova_arsenal.llm.openai import OpenAIProvider
-from nova_arsenal.llm.anthropic import AnthropicProvider
-from nova_arsenal.llm.gemini import GeminiProvider
-from nova_arsenal.llm.openrouter import OpenRouterProvider
-from nova_arsenal.llm.huggingface import HuggingFaceProvider
-from nova_arsenal.llm.qwen import QwenProvider
-from nova_arsenal.llm.deepseek import DeepSeekProvider
 from nova_arsenal.llm.opencode import OpencodeProvider
-from nova_arsenal.llm.multi_router import MultiProviderRouter
+from nova_arsenal.llm.openrouter import OpenRouterProvider
+from nova_arsenal.llm.qwen import QwenProvider
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ class LLMRouter:
 
     def __init__(self):
         self.providers: list[LLMProvider] = []
-        self._multi_router: Optional[MultiProviderRouter] = None
+        self._multi_router: MultiProviderRouter | None = None
         self._setup_providers()
 
     def _setup_providers(self):
@@ -164,7 +163,7 @@ class LLMRouter:
         api_key: str = "",
         url: str = "",
         timeout: int = 120,
-    ) -> Optional[LLMProvider]:
+    ) -> LLMProvider | None:
         """Create a provider instance, resolving keys from env when empty."""
         name = normalize_provider(provider)
         key = resolve_api_key(name, api_key)
@@ -233,18 +232,18 @@ class LLMRouter:
             return None
 
     @property
-    def multi_router(self) -> Optional[MultiProviderRouter]:
+    def multi_router(self) -> MultiProviderRouter | None:
         """Access the Fugu-style multi-provider router."""
         return self._multi_router
 
     async def complete(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         use_multi_router: bool = True,
-        preference: Optional[str] = None,
+        preference: str | None = None,
         **kwargs,
     ) -> str:
         """Generate a completion with automatic fallback."""
@@ -306,11 +305,11 @@ class LLMRouter:
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         use_multi_router: bool = True,
-        preference: Optional[str] = None,
+        preference: str | None = None,
         **kwargs,
     ):
         """Stream a completion with automatic fallback."""
@@ -457,7 +456,7 @@ class LLMRouter:
 
 
 # Global router singleton
-_router: Optional[LLMRouter] = None
+_router: LLMRouter | None = None
 
 
 def get_llm_router() -> LLMRouter:

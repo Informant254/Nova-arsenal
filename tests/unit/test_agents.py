@@ -1,11 +1,10 @@
 """Tests for multi-agent coordinator."""
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
 
 
 def _run(coro):
@@ -28,7 +27,7 @@ class TestAgentRole:
 
 class TestAgentTask:
     def test_import(self):
-        from nova_arsenal.agents.coordinator import AgentTask, AgentRole
+        from nova_arsenal.agents.coordinator import AgentRole, AgentTask
         t = AgentTask(
             task_id="t1", role=AgentRole.SCOUT, description="Recon",
             target="10.0.0.1", priority=5,
@@ -64,7 +63,9 @@ class TestMultiAgentCoordinator:
 
     def test_assign_task(self):
         from nova_arsenal.agents.coordinator import (
-            MultiAgentCoordinator, AgentTask, AgentRole,
+            AgentRole,
+            AgentTask,
+            MultiAgentCoordinator,
         )
         c = MultiAgentCoordinator()
         t = AgentTask(

@@ -3,9 +3,7 @@ Tests for Nova-Arsenal Authentication (OAuth, API Keys, Subscriptions, Audit).
 """
 
 import hashlib
-import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -77,9 +75,10 @@ class TestPKCE:
         assert extract_pkce_verifier(state) == pkce.code_verifier
 
     def test_pkce_challenge_deterministic(self):
-        from nova_arsenal.auth.oauth import PKCEChallenge
-        import hashlib
         import base64
+        import hashlib
+
+        from nova_arsenal.auth.oauth import PKCEChallenge
 
         pkce = PKCEChallenge.generate()
         expected = base64.urlsafe_b64encode(
@@ -254,6 +253,7 @@ class TestCleanup:
 class TestJWTRegression:
     def test_access_token_uses_string_subject(self):
         import jwt
+
         from nova_arsenal.auth.routes import create_access_token
 
         with patch("nova_arsenal.auth.routes.get_config") as mock_cfg:
@@ -271,6 +271,7 @@ class TestJWTRegression:
         import inspect
 
         from fastapi.params import Depends
+
         from nova_arsenal.auth.middleware import get_current_user
 
         parameter = inspect.signature(get_current_user).parameters["credentials"]

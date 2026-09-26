@@ -30,12 +30,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator, Optional
-
+from typing import Any
 
 DEFAULT_DB_PATH = Path("nova_memory.db")
 
@@ -100,7 +100,7 @@ def _now() -> str:
 class TaskEntry:
     id: int
     task_type: str
-    target: Optional[str]
+    target: str | None
     outcome: str
     summary: str
     detail: dict[str, Any]
@@ -111,10 +111,10 @@ class TaskEntry:
 class TargetEntry:
     target_id: str
     platform: str
-    name: Optional[str]
+    name: str | None
     status: str
-    last_score: Optional[float]
-    notes: Optional[str]
+    last_score: float | None
+    notes: str | None
     updated_at: str
 
 
@@ -155,8 +155,8 @@ class SessionMemory:
         task_type: str,
         outcome: str,
         summary: str,
-        target: Optional[str] = None,
-        detail: Optional[dict[str, Any]] = None,
+        target: str | None = None,
+        detail: dict[str, Any] | None = None,
     ) -> int:
         """Record a completed (or in-progress) task. Returns the row id."""
         valid_outcomes = {"success", "partial", "failed", "in_progress"}
@@ -199,9 +199,9 @@ class SessionMemory:
         target_id: str,
         platform: str,
         status: str,
-        name: Optional[str] = None,
-        last_score: Optional[float] = None,
-        notes: Optional[str] = None,
+        name: str | None = None,
+        last_score: float | None = None,
+        notes: str | None = None,
     ) -> None:
         """Upsert a target's tracking status — called whenever Nova reasons
         about, starts, or finishes work on a target from the skills
@@ -272,9 +272,9 @@ class SessionMemory:
         target_id: str,
         platform: str,
         title: str,
-        severity: Optional[str] = None,
+        severity: str | None = None,
         status: str = "draft",
-        detail: Optional[dict[str, Any]] = None,
+        detail: dict[str, Any] | None = None,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
@@ -311,7 +311,7 @@ class SessionMemory:
                 (self.user_id, key, value, _now()),
             )
 
-    def get_preference(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    def get_preference(self, key: str, default: str | None = None) -> str | None:
         with self._conn() as conn:
             row = conn.execute(
                 "SELECT value FROM preferences WHERE user_id = ? AND key = ?",

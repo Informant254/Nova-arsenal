@@ -30,11 +30,13 @@ router = APIRouter(prefix="/api")
 # Skills marketplace — platform connectors (HackerOne, HackTheBox, ...)
 # and Nova's target-recommendation reasoning endpoint.
 from nova_arsenal.skills.api_routes import router as skills_router  # noqa: E402
+
 router.include_router(skills_router)
 
 # Persistent per-user memory (recap, target history, preferences) and
 # the self-authoring skill review workflow (approve/reject).
 from nova_arsenal.skills.memory_api_routes import router as memory_router  # noqa: E402
+
 router.include_router(memory_router)
 
 

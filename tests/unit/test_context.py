@@ -2,7 +2,6 @@
 Tests for Nova-Arsenal Context Compression (DSA, HCA, CSA).
 """
 
-import pytest
 
 
 class TestDSAConfig:

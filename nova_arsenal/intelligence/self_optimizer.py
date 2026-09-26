@@ -10,7 +10,7 @@ Analyzes agent trajectories in real-time to detect:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class OptimizationSuggestion:
     reasoning: str
     action: str
     confidence: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 class SelfOptimizer:
     """
@@ -30,11 +30,11 @@ class SelfOptimizer:
     """
 
     def __init__(self):
-        self.history: List[Dict[str, Any]] = []
-        self.success_patterns: List[str] = []
-        self.failure_patterns: List[str] = []
+        self.history: list[dict[str, Any]] = []
+        self.success_patterns: list[str] = []
+        self.failure_patterns: list[str] = []
 
-    def analyze_trajectory(self, actions: List[Any]) -> List[OptimizationSuggestion]:
+    def analyze_trajectory(self, actions: list[Any]) -> list[OptimizationSuggestion]:
         """Analyze a list of AgentActions and suggest improvements."""
         suggestions = []
 
@@ -86,7 +86,7 @@ class SelfOptimizer:
 
         return suggestions
 
-    async def evolve_strategy(self, current_strategy: Dict[str, Any], suggestions: List[OptimizationSuggestion]) -> Dict[str, Any]:
+    async def evolve_strategy(self, current_strategy: dict[str, Any], suggestions: list[OptimizationSuggestion]) -> dict[str, Any]:
         """Update the agent's strategy based on optimization suggestions."""
         new_strategy = current_strategy.copy()
 

@@ -6,11 +6,10 @@ Supports: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, HuggingFace, Qwen, Deep
 """
 
 import logging
-import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Type
+from typing import Any
 
 from nova_arsenal.llm.base import LLMProvider
 
@@ -45,7 +44,7 @@ class ProviderProfile:
     """
 
     name: str
-    strengths: List[TaskCategory]
+    strengths: list[TaskCategory]
     supports_tools: bool = False
     local: bool = False
 
@@ -58,12 +57,12 @@ class RoutingDecision:
     category: TaskCategory
     confidence: float
     reason: str
-    fallback_chain: List[Dict[str, str]] = field(default_factory=list)
+    fallback_chain: list[dict[str, str]] = field(default_factory=list)
 
 
 # ── Provider Registry ──────────────────────────────────────────────────────
 
-PROVIDER_PROFILES: List[ProviderProfile] = [
+PROVIDER_PROFILES: list[ProviderProfile] = [
     ProviderProfile(
         name="anthropic",
         strengths=[
@@ -176,7 +175,7 @@ PROVIDER_PROFILES: List[ProviderProfile] = [
 
 # ── Task Classifier ────────────────────────────────────────────────────────
 
-TASK_KEYWORDS: Dict[TaskCategory, List[str]] = {
+TASK_KEYWORDS: dict[TaskCategory, list[str]] = {
     TaskCategory.CODE_GENERATION: [
         "write code", "implement", "function", "class", "script", "program",
         "create a", "build a", "generate code", "coding", "python", "javascript",
@@ -243,7 +242,7 @@ TASK_KEYWORDS: Dict[TaskCategory, List[str]] = {
 def classify_task(prompt: str) -> TaskCategory:
     """Classify a prompt into a task category."""
     prompt_lower = prompt.lower()
-    scores: Dict[TaskCategory, int] = {cat: 0 for cat in TaskCategory}
+    scores: dict[TaskCategory, int] = {cat: 0 for cat in TaskCategory}
 
     for category, keywords in TASK_KEYWORDS.items():
         for keyword in keywords:
@@ -273,27 +272,27 @@ class MultiProviderRouter:
 
     def __init__(
         self,
-        providers: Optional[Dict[str, LLMProvider]] = None,
+        providers: dict[str, LLMProvider] | None = None,
         preference: str = "balanced",
     ):
         self._providers = providers or {}
         self._preference = preference
-        self._provider_profiles: Dict[str, ProviderProfile] = {
+        self._provider_profiles: dict[str, ProviderProfile] = {
             p.name: p for p in PROVIDER_PROFILES
         }
-        self._routing_history: List[RoutingDecision] = []
-        self._provider_stats: Dict[str, Dict[str, float]] = {}
+        self._routing_history: list[RoutingDecision] = []
+        self._provider_stats: dict[str, dict[str, float]] = {}
 
     def register_provider(self, name: str, provider: LLMProvider) -> None:
         """Register a provider instance."""
         self._providers[name] = provider
         logger.info(f"Registered provider: {name}")
 
-    def get_provider(self, name: str) -> Optional[LLMProvider]:
+    def get_provider(self, name: str) -> LLMProvider | None:
         """Get a registered provider by name."""
         return self._providers.get(name)
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """List all registered providers."""
         return list(self._providers.keys())
 
@@ -304,8 +303,8 @@ class MultiProviderRouter:
     def route(
         self,
         prompt: str,
-        preference: Optional[str] = None,
-        exclude: Optional[List[str]] = None,
+        preference: str | None = None,
+        exclude: list[str] | None = None,
     ) -> RoutingDecision:
         """Route to a registered provider using capabilities plus runtime telemetry.
 
@@ -319,7 +318,7 @@ class MultiProviderRouter:
         excluded = set(exclude or [])
         category = classify_task(prompt)
 
-        candidates: List[Dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
         for name, provider in self._providers.items():
             if name in excluded:
                 continue
@@ -371,10 +370,10 @@ class MultiProviderRouter:
     async def complete(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        preference: Optional[str] = None,
+        preference: str | None = None,
         **kwargs,
     ) -> str:
         """
@@ -427,10 +426,10 @@ class MultiProviderRouter:
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        preference: Optional[str] = None,
+        preference: str | None = None,
         **kwargs,
     ):
         """Stream using the best provider with automatic fallback."""
@@ -469,7 +468,7 @@ class MultiProviderRouter:
 
         raise RuntimeError("All providers failed for streaming")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get routing statistics."""
         return {
             "total_routes": len(self._routing_history),
@@ -478,7 +477,7 @@ class MultiProviderRouter:
             "registered_providers": self.list_providers(),
         }
 
-    def get_routing_history(self) -> List[Dict[str, Any]]:
+    def get_routing_history(self) -> list[dict[str, Any]]:
         """Get the routing history."""
         return [
             {
@@ -563,7 +562,7 @@ class MultiProviderRouter:
         self._record_latency(stats, latency_ms)
 
     @staticmethod
-    def _record_latency(stats: Dict[str, float], latency_ms: float) -> None:
+    def _record_latency(stats: dict[str, float], latency_ms: float) -> None:
         if latency_ms <= 0:
             return
         stats["latency_ms_total"] += latency_ms
@@ -571,8 +570,8 @@ class MultiProviderRouter:
         if attempts > 0:
             stats["avg_latency_ms"] = stats["latency_ms_total"] / attempts
 
-    def _get_category_distribution(self) -> Dict[str, int]:
-        dist: Dict[str, int] = {}
+    def _get_category_distribution(self) -> dict[str, int]:
+        dist: dict[str, int] = {}
         for d in self._routing_history:
             cat = d.category.value
             dist[cat] = dist.get(cat, 0) + 1

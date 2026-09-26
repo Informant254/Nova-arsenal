@@ -8,9 +8,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 
-from nova_arsenal.db import get_db
 from nova_arsenal.db.models import ApiKey
 
 logger = logging.getLogger(__name__)

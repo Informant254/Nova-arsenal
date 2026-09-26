@@ -1,11 +1,10 @@
 """Tests for validation engine and safety controller."""
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
 
 
 def _run(coro):
@@ -55,7 +54,8 @@ class TestDeterministicValidationEngine:
 
     def test_validate_finding(self):
         from nova_arsenal.validation.engine import (
-            DeterministicValidationEngine, Finding, ValidationMethod,
+            DeterministicValidationEngine,
+            Finding,
         )
         e = DeterministicValidationEngine()
         f = Finding(
@@ -69,7 +69,9 @@ class TestDeterministicValidationEngine:
 
     def test_cross_validate(self):
         from nova_arsenal.validation.engine import (
-            DeterministicValidationEngine, Finding, ValidationMethod,
+            DeterministicValidationEngine,
+            Finding,
+            ValidationMethod,
         )
         e = DeterministicValidationEngine()
         f = Finding(
@@ -82,7 +84,8 @@ class TestDeterministicValidationEngine:
 
     def test_get_validated_findings(self):
         from nova_arsenal.validation.engine import (
-            DeterministicValidationEngine, Finding,
+            DeterministicValidationEngine,
+            Finding,
         )
         e = DeterministicValidationEngine()
         f = Finding(
@@ -122,7 +125,7 @@ class TestSafetyController:
         assert c is not None
 
     def test_check_operation(self):
-        from nova_arsenal.safety.controller import SafetyController, OperationRequest
+        from nova_arsenal.safety.controller import OperationRequest, SafetyController
         c = SafetyController()
         req = OperationRequest(
             operation_id="op1", operation_type="exploit",
@@ -132,7 +135,7 @@ class TestSafetyController:
         assert ok is True
 
     def test_blocked_target(self):
-        from nova_arsenal.safety.controller import SafetyController, SafetyRule, OperationRequest
+        from nova_arsenal.safety.controller import OperationRequest, SafetyController, SafetyRule
         rule = SafetyRule(rule_id="test", description="Test", blocked_targets={"192.168.1.1"})
         c = SafetyController(rule=rule)
         req = OperationRequest(

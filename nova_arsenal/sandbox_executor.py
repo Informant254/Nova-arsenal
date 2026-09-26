@@ -10,10 +10,9 @@ Supports:
 import asyncio
 import logging
 import os
-import subprocess
 import tempfile
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class ExecResult:
             parts.append(f"[STDERR]\n{self.stderr}")
         return "\n".join(parts)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "command": self.command,
             "stdout": self.stdout,
@@ -88,8 +87,8 @@ class SandboxExecutor:
         self,
         command: str,
         working_dir: str = "/tmp",
-        timeout: Optional[int] = None,
-        env: Optional[Dict[str, str]] = None,
+        timeout: int | None = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute a command in the sandbox."""
         timeout = timeout or self.timeout
@@ -141,7 +140,7 @@ class SandboxExecutor:
         script: str,
         filename: str = "script.sh",
         working_dir: str = "/tmp",
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> ExecResult:
         """Write a script to the sandbox and execute it."""
         # Write script to temp file and copy it in
@@ -249,7 +248,7 @@ class SandboxExecutor:
         command: str,
         working_dir: str,
         timeout: int,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute via docker exec."""
         cmd_args = ["docker", "exec", "-w", working_dir]
@@ -283,7 +282,7 @@ class SandboxExecutor:
         command: str,
         working_dir: str,
         timeout: int,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute via SSH."""
         ssh_args = [
@@ -322,7 +321,7 @@ class SandboxExecutor:
         command: str,
         working_dir: str,
         timeout: int,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute locally via subprocess."""
         full_env = dict(os.environ)
@@ -351,8 +350,8 @@ class SandboxExecutor:
 
 
 def create_executor(
-    mode: Optional[str] = None,
-    container_name: Optional[str] = None,
+    mode: str | None = None,
+    container_name: str | None = None,
 ) -> SandboxExecutor:
     """Factory to create a SandboxExecutor from environment."""
     mode = mode or os.getenv("NOVA_SANDBOX_MODE", "docker")

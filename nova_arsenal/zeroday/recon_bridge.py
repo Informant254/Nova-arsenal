@@ -5,7 +5,8 @@ Bridge recon/swarm findings into ZeroDayHunter service maps.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 _PORT_RE = re.compile(
     r"\b(?:port\s*)?(\d{1,5})/(tcp|udp)\b|\b(\d{1,5})\s*/\s*(tcp|udp)\b|"
@@ -49,13 +50,13 @@ _DEFAULT_PORTS = {
 def findings_to_services(
     findings: Sequence[Any],
     target: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convert swarm/agent findings into a ZeroDayHunter services map.
 
     Accepts SwarmFinding objects or plain dicts with title/description/evidence.
     """
-    services: Dict[str, Dict[str, Any]] = {}
+    services: dict[str, dict[str, Any]] = {}
 
     for f in findings:
         if hasattr(f, "to_dict"):
@@ -83,11 +84,11 @@ def findings_to_services(
     return services
 
 
-def _absorb_text(services: Dict[str, Dict[str, Any]], text: str) -> None:
+def _absorb_text(services: dict[str, dict[str, Any]], text: str) -> None:
     if not text:
         return
     found_services = {m.group(1).lower() for m in _SERVICE_RE.finditer(text)}
-    ports: List[Tuple[int, str]] = []
+    ports: list[tuple[int, str]] = []
     for m in _PORT_RE.finditer(text):
         if m.group(1):
             ports.append((int(m.group(1)), (m.group(2) or "tcp").lower()))

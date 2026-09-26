@@ -19,14 +19,11 @@ own to avoid a doubled /api/api/... path.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from .skill_manifest import SkillRegistry
 from .platform_connector import PlatformConnector, Target, TargetReasoner
-
+from .skill_manifest import SkillRegistry
 
 router = APIRouter(tags=["skills"])
 
@@ -66,8 +63,8 @@ class TargetOut(BaseModel):
     url: str
     scope_summary: str
     tags: list[str]
-    difficulty: Optional[str]
-    max_reward_usd: Optional[float]
+    difficulty: str | None
+    max_reward_usd: float | None
     asset_types: list[str]
 
 

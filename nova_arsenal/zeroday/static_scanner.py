@@ -11,8 +11,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,9 @@ class StaticFinding:
     snippet: str
     rationale: str
     cwe: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "finding_id": self.finding_id,
             "title": self.title,
@@ -48,7 +49,7 @@ class StaticFinding:
 
 
 # (name, bug_class, severity, confidence, cwe, pattern, rationale)
-_RULES: List[Tuple[str, str, str, float, str, re.Pattern[str], str]] = [
+_RULES: list[tuple[str, str, str, float, str, re.Pattern[str], str]] = [
     (
         "command_injection_sink",
         "rce",
@@ -212,7 +213,7 @@ _RULES: List[Tuple[str, str, str, float, str, re.Pattern[str], str]] = [
 class StaticBugScanner:
     """Heuristic static scanner for novel-bug candidates."""
 
-    def __init__(self, rules: Optional[Sequence[Any]] = None) -> None:
+    def __init__(self, rules: Sequence[Any] | None = None) -> None:
         self.rules = list(rules) if rules is not None else list(_RULES)
 
     def scan_text(
@@ -220,8 +221,8 @@ class StaticBugScanner:
         content: str,
         location: str = "<memory>",
         max_findings: int = 100,
-    ) -> List[StaticFinding]:
-        findings: List[StaticFinding] = []
+    ) -> list[StaticFinding]:
+        findings: list[StaticFinding] = []
         if not content:
             return findings
 
@@ -251,10 +252,10 @@ class StaticBugScanner:
 
     def scan_files(
         self,
-        files: Dict[str, str],
+        files: dict[str, str],
         max_findings: int = 200,
-    ) -> List[StaticFinding]:
-        out: List[StaticFinding] = []
+    ) -> list[StaticFinding]:
+        out: list[StaticFinding] = []
         for path, content in files.items():
             remaining = max_findings - len(out)
             if remaining <= 0:
@@ -263,5 +264,5 @@ class StaticBugScanner:
         logger.info("Static scan: %d findings across %d files", len(out), len(files))
         return out
 
-    async def scan_files_async(self, files: Dict[str, str], max_findings: int = 200) -> List[StaticFinding]:
+    async def scan_files_async(self, files: dict[str, str], max_findings: int = 200) -> list[StaticFinding]:
         return self.scan_files(files, max_findings=max_findings)

@@ -13,17 +13,17 @@ Key algorithm:
 
 import asyncio
 import logging
-import math
 import time
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
-from nova_arsenal.training.config import GRPOConfig, TrainingConfig
+from nova_arsenal.training.config import GRPOConfig
 from nova_arsenal.training.trajectory_pool import Trajectory, TrajectoryPool, TrajectoryStep
 
 logger = logging.getLogger(__name__)
 
 
-def compute_group_advantage(rewards: List[float]) -> List[float]:
+def compute_group_advantage(rewards: list[float]) -> list[float]:
     """Compute group-relative advantages via z-score normalization.
 
     Args:
@@ -63,8 +63,8 @@ class RolloutWorker:
     async def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
-    ) -> Optional[str]:
+        system_prompt: str | None = None,
+    ) -> str | None:
         """Generate a single response for GRPO training."""
         try:
             response = await self._llm_complete(
@@ -81,7 +81,7 @@ class RolloutWorker:
             return None
 
     @property
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         return dict(self._stats)
 
 
@@ -120,7 +120,7 @@ class RuleBasedReward:
         return 2 * precision * recall / (precision + recall)
 
     @staticmethod
-    def contains_all_keywords(response: str, keywords: List[str]) -> float:
+    def contains_all_keywords(response: str, keywords: list[str]) -> float:
         """Reward 1.0 if all keywords present in response."""
         resp_lower = response.lower()
         return 1.0 if all(k.lower() in resp_lower for k in keywords) else 0.0
@@ -171,8 +171,8 @@ class GRPOTrainer:
         self,
         config: GRPOConfig,
         llm_complete: Callable[..., Any],
-        reward_fn: Optional[Callable[[str, str], float]] = None,
-        data_loader: Optional[Callable[[], List[Dict[str, str]]]] = None,
+        reward_fn: Callable[[str, str], float] | None = None,
+        data_loader: Callable[[], list[dict[str, str]]] | None = None,
     ):
         self.config = config
         self._llm_complete = llm_complete
@@ -203,9 +203,9 @@ class GRPOTrainer:
 
     async def train_step(
         self,
-        prompts: List[Dict[str, str]],
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        prompts: list[dict[str, str]],
+        system_prompt: str | None = None,
+    ) -> dict[str, Any]:
         """Execute a single GRPO training step.
 
         Args:
@@ -218,7 +218,7 @@ class GRPOTrainer:
         step_start = time.time()
 
         # 1. Generate rollouts (rollout_repeat_n per prompt)
-        all_trajectories: List[Trajectory] = []
+        all_trajectories: list[Trajectory] = []
         rollout_tasks = []
 
         for prompt_data in prompts:
@@ -243,7 +243,7 @@ class GRPOTrainer:
         self._stats["rollouts_generated"] += len(all_trajectories)
 
         # 2. Group by prompt and compute advantages
-        groups: Dict[str, List[Trajectory]] = {}
+        groups: dict[str, list[Trajectory]] = {}
         for t in all_trajectories:
             gid = t.group_id
             if gid not in groups:
@@ -302,8 +302,8 @@ class GRPOTrainer:
         prompt: str,
         ground_truth: str,
         group_id: str,
-        system_prompt: Optional[str] = None,
-    ) -> Optional[Trajectory]:
+        system_prompt: str | None = None,
+    ) -> Trajectory | None:
         """Generate a single rollout trajectory."""
         response = await self._rollout_worker.generate(
             prompt=prompt,
@@ -330,9 +330,9 @@ class GRPOTrainer:
 
     async def train(
         self,
-        num_steps: Optional[int] = None,
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        num_steps: int | None = None,
+        system_prompt: str | None = None,
+    ) -> dict[str, Any]:
         """Run full GRPO training loop.
 
         Args:
@@ -362,7 +362,7 @@ class GRPOTrainer:
 
         return self.get_summary()
 
-    def _load_batch(self) -> List[Dict[str, str]]:
+    def _load_batch(self) -> list[dict[str, str]]:
         """Load a batch of prompts from the data loader."""
         all_data = self._data_loader()
         if not all_data:
@@ -372,7 +372,7 @@ class GRPOTrainer:
         batch = random.sample(all_data, min(self.config.batch_size, len(all_data)))
         return batch
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get training summary."""
         return dict(self._stats)
 

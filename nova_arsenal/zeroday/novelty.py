@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,10 @@ class NoveltyAssessment:
 
     score: float  # 0..1 (1 = highly novel / unknown)
     label: str
-    matched_known: List[str] = field(default_factory=list)
-    reasons: List[str] = field(default_factory=list)
+    matched_known: list[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "score": round(self.score, 3),
             "label": self.label,
@@ -59,7 +60,7 @@ class NoveltyScorer:
     match is weak and the item deserves deeper validation.
     """
 
-    def __init__(self, known_cve_ids: Optional[Set[str]] = None) -> None:
+    def __init__(self, known_cve_ids: set[str] | None = None) -> None:
         self.known_cve_ids = {c.upper() for c in (known_cve_ids or set())}
 
     def assess(
@@ -68,11 +69,11 @@ class NoveltyScorer:
         description: str = "",
         evidence: str = "",
         bug_class: str = "",
-        extra_cves: Optional[Sequence[str]] = None,
+        extra_cves: Sequence[str] | None = None,
     ) -> NoveltyAssessment:
         text = f"{title}\n{description}\n{evidence}\n{bug_class}".lower()
-        matched: List[str] = []
-        reasons: List[str] = []
+        matched: list[str] = []
+        reasons: list[str] = []
         score = 0.75  # start leaning novel until known markers found
 
         for marker, cve in _KNOWN_BUG_MARKERS.items():

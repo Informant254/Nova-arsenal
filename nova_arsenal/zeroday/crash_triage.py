@@ -10,8 +10,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +33,9 @@ class CrashReport:
     reproducer: str = ""
     stderr: str = ""
     target: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "crash_id": self.crash_id,
             "engine": self.engine,
@@ -57,13 +58,13 @@ class TriagedCrash:
     exploitability: float
     uniqueness: float
     signal: str
-    top_frames: List[str]
-    sample_crash_ids: List[str]
+    top_frames: list[str]
+    sample_crash_ids: list[str]
     count: int
     recommendation: str
-    sanitizer_hints: List[str] = field(default_factory=list)
+    sanitizer_hints: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "bucket_id": self.bucket_id,
             "title": self.title,
@@ -92,14 +93,14 @@ class CrashTriageEngine:
         norm = _ADDR_RE.sub("ADDR", norm)
         return hashlib.sha1(norm.encode()).hexdigest()[:16]
 
-    def triage(self, crashes: Sequence[CrashReport]) -> List[TriagedCrash]:
-        buckets: Dict[str, List[CrashReport]] = {}
+    def triage(self, crashes: Sequence[CrashReport]) -> list[TriagedCrash]:
+        buckets: dict[str, list[CrashReport]] = {}
         for c in crashes:
             text = "\n".join([c.stack_trace, c.stderr, c.signal])
             sig = self.stack_signature(text)
             buckets.setdefault(sig, []).append(c)
 
-        triaged: List[TriagedCrash] = []
+        triaged: list[TriagedCrash] = []
         for sig, group in buckets.items():
             sample = group[0]
             combined = "\n".join(
@@ -130,11 +131,11 @@ class CrashTriageEngine:
         logger.info("Triaged %d crashes into %d buckets", len(crashes), len(triaged))
         return triaged
 
-    async def triage_async(self, crashes: Sequence[CrashReport]) -> List[TriagedCrash]:
+    async def triage_async(self, crashes: Sequence[CrashReport]) -> list[TriagedCrash]:
         return self.triage(crashes)
 
-    def _extract_frames(self, text: str) -> List[str]:
-        frames: List[str] = []
+    def _extract_frames(self, text: str) -> list[str]:
+        frames: list[str] = []
         for m in _FRAME_RE.finditer(text or ""):
             fn = m.group(1) or m.group(2)
             if fn:
@@ -187,7 +188,7 @@ class CrashTriageEngine:
             return "medium"
         return "low"
 
-    def _sanitizer_hints(self, text: str) -> List[str]:
+    def _sanitizer_hints(self, text: str) -> list[str]:
         hints = []
         t = (text or "").lower()
         for key in ("heap-buffer-overflow", "stack-buffer-overflow", "use-after-free",
@@ -196,7 +197,7 @@ class CrashTriageEngine:
                 hints.append(key)
         return hints
 
-    def _recommendation(self, severity: str, signal: str, frames: List[str]) -> str:
+    def _recommendation(self, severity: str, signal: str, frames: list[str]) -> str:
         loc = frames[0] if frames else "the crashing function"
         if severity in {"critical", "high"}:
             return (

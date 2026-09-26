@@ -7,7 +7,6 @@ are insufficient for a task.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class CodeLanguage(Enum):
@@ -410,5 +409,5 @@ if __name__ == "__main__":
     def list_templates(self) -> list[str]:
         return list(self._templates.keys())
 
-    def get_template(self, name: str) -> Optional[str]:
+    def get_template(self, name: str) -> str | None:
         return self._templates.get(name)

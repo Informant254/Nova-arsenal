@@ -14,7 +14,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class NmapPort:
     def key(self) -> str:
         return f"{self.protocol}/{self.port}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "port": self.port,
             "protocol": self.protocol,
@@ -57,10 +57,10 @@ class NmapHost:
     os: str = ""
     os_accuracy: int = 0
     mac: str = ""
-    ports: List[NmapPort] = field(default_factory=list)
-    scripts: List[Dict[str, Any]] = field(default_factory=list)
+    ports: list[NmapPort] = field(default_factory=list)
+    scripts: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ip": self.ip,
             "hostname": self.hostname,
@@ -81,11 +81,11 @@ class NmapScanResult:
     cmdline: str = ""
     start_time: str = ""
     runtime: str = ""
-    hosts: List[NmapHost] = field(default_factory=list)
+    hosts: list[NmapHost] = field(default_factory=list)
     raw_xml: str = ""
 
     @property
-    def all_ports(self) -> List[NmapPort]:
+    def all_ports(self) -> list[NmapPort]:
         ports = []
         for host in self.hosts:
             ports.extend(host.ports)
@@ -96,8 +96,8 @@ class NmapScanResult:
         return sum(1 for p in self.all_ports if p.state == "open")
 
     @property
-    def services(self) -> Dict[str, List[int]]:
-        services: Dict[str, List[int]] = {}
+    def services(self) -> dict[str, list[int]]:
+        services: dict[str, list[int]] = {}
         for port in self.all_ports:
             if port.state == "open":
                 svc = port.service.lower()
@@ -106,7 +106,7 @@ class NmapScanResult:
                 services[svc].append(port.port)
         return services
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "cmdline": self.cmdline,
             "start_time": self.start_time,
@@ -168,7 +168,7 @@ class NmapParser:
     def parse_file(filepath: str) -> NmapScanResult:
         """Read and parse an nmap XML file."""
         try:
-            with open(filepath, "r", errors="replace") as f:
+            with open(filepath, errors="replace") as f:
                 content = f.read()
             return NmapParser.parse(content)
         except FileNotFoundError:
@@ -185,7 +185,7 @@ class NmapParser:
         return m.group(group) if m else ""
 
     @staticmethod
-    def _find_sections(text: str, tag: str) -> List[str]:
+    def _find_sections(text: str, tag: str) -> list[str]:
         """Find all top-level XML sections with given tag."""
         sections = []
         pattern = rf"<{tag}[^>]*>.*?</{tag}>"
@@ -194,7 +194,7 @@ class NmapParser:
         return sections
 
     @staticmethod
-    def _parse_host(host_xml: str) -> Optional[NmapHost]:
+    def _parse_host(host_xml: str) -> NmapHost | None:
         """Parse a single host section."""
         # Extract IP address
         ip = NmapParser._extract(
@@ -253,7 +253,7 @@ class NmapParser:
         return host
 
     @staticmethod
-    def _parse_port(port_xml: str) -> Optional[NmapPort]:
+    def _parse_port(port_xml: str) -> NmapPort | None:
         """Parse a single port section."""
         port_id = NmapParser._extract(port_xml, r'portid="(\d+)"')
         protocol = NmapParser._extract(port_xml, r'protocol="([^"]*)"')
@@ -288,7 +288,7 @@ class NmapParser:
         return port
 
     @staticmethod
-    def extract_findings(result: NmapScanResult) -> List[Dict[str, Any]]:
+    def extract_findings(result: NmapScanResult) -> list[dict[str, Any]]:
         """Extract security-relevant findings from parsed scan data."""
         findings = []
 

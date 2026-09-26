@@ -17,32 +17,37 @@ import asyncio
 import json
 import logging
 import traceback
-from datetime import datetime, timezone
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any
 
-from nova_arsenal.code_generator import CodeGenerator, CodeLanguage, GeneratedCode
-from nova_arsenal.kali_blueprint import KaliBlueprint
-from nova_arsenal.sandbox_executor import ExecResult, SandboxExecutor, create_executor
-from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy, ValidationResult
+from nova_arsenal.code_generator import CodeGenerator
+from nova_arsenal.correlation import Correlator
+from nova_arsenal.crypto import Cipher, KeyManager
+from nova_arsenal.ctf_solver import CtfSolver
 
 # API integrations (lazy-imported to avoid hard deps)
-from nova_arsenal.integrations import MetasploitRPC, BurpAPI, NmapParser, SQLmapAPI
-from nova_arsenal.intelligence import ToolSelector, CveResearch
+from nova_arsenal.integrations import BurpAPI, MetasploitRPC, NmapParser, SQLmapAPI
+from nova_arsenal.intelligence import CveResearch, ToolSelector
 from nova_arsenal.intelligence.self_optimizer import SelfOptimizer
-from nova_arsenal.correlation import Correlator
+from nova_arsenal.kali_blueprint import KaliBlueprint
+from nova_arsenal.payload_generator import PayloadGenerator
 from nova_arsenal.persona_manager import PersonaManager
-from nova_arsenal.payload_generator import PayloadGenerator, PayloadType, PayloadLanguage
-from nova_arsenal.scheduler import NovaScheduler, ScheduleEntry, CronExpression
-from nova_arsenal.ctf_solver import CtfSolver, ChallengeType
-from nova_arsenal.crypto import KeyManager, Cipher
 from nova_arsenal.prompt_builder import (
-    PromptBuilder, Scope, Text, system_message, user_message,
-    RenderResult, adaptive_thinking_block, ThinkingProfile,
+    PromptBuilder,
+    RenderResult,
+    Scope,
+    Text,
+    ThinkingProfile,
+    adaptive_thinking_block,
 )
+from nova_arsenal.sandbox_executor import ExecResult, SandboxExecutor, create_executor
+from nova_arsenal.scheduler import NovaScheduler, ScheduleEntry
+from nova_arsenal.secure_executor import SecureExecutor, SecurityPolicy
 from nova_arsenal.tool_definitions import (
-    ToolSchema, NOVA_SECURITY_TOOLS, tools_to_openai_format,
+    NOVA_SECURITY_TOOLS,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,12 +91,12 @@ class AgentAction:
     action_type: ActionType
     description: str
     command: str = ""
-    result: Optional[ExecResult] = None
+    result: ExecResult | None = None
     analysis: str = ""
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     duration_ms: float = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "step": self.step,
             "phase": self.phase.value,
@@ -120,7 +125,7 @@ class Finding:
     tool_used: str = ""
     raw_output: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "title": self.title,
             "severity": self.severity,
@@ -135,7 +140,7 @@ class Finding:
 
 
 # Type for event callbacks
-EventCallback = Callable[[str, Dict[str, Any]], Coroutine[Any, Any, None]]
+EventCallback = Callable[[str, dict[str, Any]], Coroutine[Any, Any, None]]
 
 
 class AgentRunner:
@@ -152,11 +157,11 @@ class AgentRunner:
         objective: str = "Find and exploit all critical vulnerabilities",
         max_steps: int = 40,
         reflect_every: int = 5,
-        scope: Optional[List[str]] = None,
-        executor: Optional[SandboxExecutor] = None,
-        llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
-        on_event: Optional[EventCallback] = None,
-        integrations: Optional[Dict[str, Dict[str, Any]]] = None,
+        scope: list[str] | None = None,
+        executor: SandboxExecutor | None = None,
+        llm_complete: Callable[..., Coroutine[Any, Any, str]] | None = None,
+        on_event: EventCallback | None = None,
+        integrations: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.target = target
         self.objective = objective
@@ -211,16 +216,16 @@ class AgentRunner:
         self._prompt_builder = PromptBuilder(token_limit=8000)
         self._read_first_enabled = True
         self._thinking_profile = ThinkingProfile.DEFAULT
-        self._thinking_enabled: Optional[bool] = None
+        self._thinking_enabled: bool | None = None
 
         # Scheduler (cron-based recurring scans)
         self.scheduler = NovaScheduler()
 
         # API-driven integrations (configured via integrations dict)
         integrations = integrations or {}
-        self.msf_rpc: Optional[MetasploitRPC] = None
-        self.burp_api: Optional[BurpAPI] = None
-        self.sqlmap_api: Optional[SQLmapAPI] = None
+        self.msf_rpc: MetasploitRPC | None = None
+        self.burp_api: BurpAPI | None = None
+        self.sqlmap_api: SQLmapAPI | None = None
         self.nmap_parser = NmapParser()
 
         msf_config = integrations.get("metasploit", {})
@@ -246,26 +251,26 @@ class AgentRunner:
         # State
         self._step = 0
         self._phase = AgentPhase.INIT
-        self._actions: List[AgentAction] = []
-        self._findings: List[Finding] = []
-        self._context: List[Dict[str, str]] = []
+        self._actions: list[AgentAction] = []
+        self._findings: list[Finding] = []
+        self._context: list[dict[str, str]] = []
         self._running = False
-        self._error: Optional[str] = None
+        self._error: str | None = None
 
         # Detected services (populated during scanning)
-        self._detected_services: Dict[str, List[int]] = {}
+        self._detected_services: dict[str, list[int]] = {}
 
         # Integration artifacts
-        self._burp_issues: List[Dict[str, Any]] = []
-        self._msf_results: List[Dict[str, Any]] = []
-        self._sqlmap_results: List[Dict[str, Any]] = []
+        self._burp_issues: list[dict[str, Any]] = []
+        self._msf_results: list[dict[str, Any]] = []
+        self._sqlmap_results: list[dict[str, Any]] = []
 
         # Correlation result
-        self._correlation_result: Optional[Any] = None
+        self._correlation_result: Any | None = None
 
     # ── Public API ──────────────────────────────────────────────────────────
 
-    async def run(self) -> Dict[str, Any]:
+    async def run(self) -> dict[str, Any]:
         """Execute the full autonomous agent loop."""
         self._running = True
         start_time = datetime.now(timezone.utc)
@@ -427,7 +432,7 @@ class AgentRunner:
         """Stop the agent."""
         self._running = False
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "phase": self._phase.value,
@@ -531,10 +536,10 @@ class AgentRunner:
         # Start with DNS/subdomain enumeration
         recon_commands = [
             f"subfinder -d {self.target} -silent -o /workspace/subs.txt 2>/dev/null || echo 'subfinder not available'",
-            f"cat /workspace/subs.txt 2>/dev/null | head -50 || echo 'No subdomains found yet'",
+            "cat /workspace/subs.txt 2>/dev/null | head -50 || echo 'No subdomains found yet'",
             f"nmap -sn {self.target} -oN /workspace/ping_scan.txt 2>/dev/null || echo 'nmap ping scan done'",
             f"nmap -sV -sC --top-ports 1000 {self.target} -oN /workspace/nmap_quick.txt 2>/dev/null || echo 'quick scan done'",
-            f"httpx -l /workspace/subs.txt -silent -sc -title 2>/dev/null | head -30 || echo 'httpx probe done'",
+            "httpx -l /workspace/subs.txt -silent -sc -title 2>/dev/null | head -30 || echo 'httpx probe done'",
         ]
 
         # Add theHarvester for passive recon
@@ -719,9 +724,9 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
     async def _execute_post_exploitation(self) -> None:
         """Post-exploitation: gather more info, pivot, extract data."""
         post_commands = [
-            f"cat /workspace/nmap_full.txt 2>/dev/null | head -100 || echo 'reading scan results'",
-            f"ls -la /workspace/ 2>/dev/null || echo 'listing workspace'",
-            f"id && uname -a && whoami 2>/dev/null || echo 'system info'",
+            "cat /workspace/nmap_full.txt 2>/dev/null | head -100 || echo 'reading scan results'",
+            "ls -la /workspace/ 2>/dev/null || echo 'listing workspace'",
+            "id && uname -a && whoami 2>/dev/null || echo 'system info'",
         ]
 
         for cmd in post_commands:
@@ -731,7 +736,7 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
     # ── Core Execution ──────────────────────────────────────────────────────
 
-    async def _execute_and_analyze(self, command: str, phase: AgentPhase) -> Optional[AgentAction]:
+    async def _execute_and_analyze(self, command: str, phase: AgentPhase) -> AgentAction | None:
         """Execute a command and analyze the result."""
         self._step += 1
         await self._set_phase(phase)
@@ -835,7 +840,7 @@ Provide 3-5 specific commands to try. Return ONLY the commands, one per line:"""
 
         tree = [
             Scope(absolute_priority=0, name="identity", children=[
-                Text(f"You are Nova, an elite autonomous security researcher operating in Kali Linux.\n\n"),
+                Text("You are Nova, an elite autonomous security researcher operating in Kali Linux.\n\n"),
             ]),
             Scope(absolute_priority=0, name="adaptive_thinking", children=[
                 thinking_block,
@@ -1319,7 +1324,7 @@ Analysis:"""
 
     # ── Tool Selection Intelligence ────────────────────────────────────────
 
-    async def _generate_strategy(self) -> Dict[str, Any]:
+    async def _generate_strategy(self) -> dict[str, Any]:
         """Generate exploitation strategy using tool-selection intelligence."""
         if not self._detected_services:
             self._detect_services()
@@ -1572,7 +1577,7 @@ Cross-Tool Correlation:
 - Confidence score: {cr.to_dict().get('confidence_score', 0)}
 
 Top Correlated Findings:
-{chr(10).join(f'  [{f.severity.upper()}] {f.title} (sources: {", ".join(f.source_tools)})' for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}
+{chr(10).join('  [{}] {} (sources: {})'.format(f.severity.upper(), f.title, ", ".join(f.source_tools)) for f in cr.correlated_findings[:5]) if cr.correlated_findings else '  None'}
 
 Insights:
 {chr(10).join(f'  - {i}' for i in cr.cross_tool_insights) if cr.cross_tool_insights else '  No insights generated'}
@@ -1628,7 +1633,7 @@ Report:"""
                 lines.append("")
         return "\n".join(lines[-50:]) if lines else "No scan results yet"
 
-    def _extract_commands(self, text: str) -> List[str]:
+    def _extract_commands(self, text: str) -> list[str]:
         """Extract commands from LLM text response."""
         import re
         commands = []
@@ -1675,7 +1680,7 @@ Report:"""
             await self._emit("phase_changed", {"from": old.value, "to": phase.value,
                                                 "thinking_profile": self._thinking_profile.value})
 
-    async def _emit(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def _emit(self, event_type: str, data: dict[str, Any]) -> None:
         """Emit an event to the callback."""
         if self._on_event:
             try:
@@ -1688,10 +1693,10 @@ def create_runner(
     target: str,
     objective: str = "Find and exploit all critical vulnerabilities",
     max_steps: int = 40,
-    scope: Optional[List[str]] = None,
-    llm_complete: Optional[Callable[..., Coroutine[Any, Any, str]]] = None,
-    on_event: Optional[EventCallback] = None,
-    sandbox_mode: Optional[str] = None,
+    scope: list[str] | None = None,
+    llm_complete: Callable[..., Coroutine[Any, Any, str]] | None = None,
+    on_event: EventCallback | None = None,
+    sandbox_mode: str | None = None,
 ) -> AgentRunner:
     """Factory to create a fully configured AgentRunner."""
     executor = create_executor(mode=sandbox_mode)

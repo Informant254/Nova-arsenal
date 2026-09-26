@@ -7,10 +7,10 @@ circuit breakers, and retry budgets.
 
 import asyncio
 import logging
-from typing import Any, Callable, Optional, TypeVar, Coroutine, Dict
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from enum import Enum
-
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +35,12 @@ class CircuitBreakerConfig:
 class CircuitBreaker:
     """Circuit breaker for preventing cascading failures."""
 
-    def __init__(self, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None):
         self.config = config or CircuitBreakerConfig()
         self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.success_count = 0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
 
     async def call(
         self,
@@ -63,7 +63,7 @@ class CircuitBreaker:
             result = await func(*args, **kwargs)
             self._on_success()
             return result
-        except Exception as e:
+        except Exception:
             self._on_failure()
             raise
 
@@ -136,7 +136,7 @@ class RetryConfig:
 
 async def async_retry(
     func: Callable[..., Coroutine[Any, Any, T]],
-    config: Optional[RetryConfig] = None,
+    config: RetryConfig | None = None,
     operation_name: str = "operation",
     *args: Any,
     **kwargs: Any,
@@ -192,11 +192,11 @@ class ResourceLimits:
 class ResourceTracker:
     """Track resource usage during agent execution."""
 
-    def __init__(self, limits: Optional[ResourceLimits] = None):
+    def __init__(self, limits: ResourceLimits | None = None):
         self.limits = limits or ResourceLimits()
         self.active_tasks = 0
         self.total_tool_calls = 0
-        self.start_time: Optional[float] = None
+        self.start_time: float | None = None
 
     def start_execution(self) -> None:
         """Mark execution start."""
@@ -216,7 +216,7 @@ class ResourceTracker:
             return False, f"Max concurrent tasks ({self.limits.max_concurrent_tasks}) exceeded"
 
         if self.total_tool_calls > self.limits.max_tool_calls_per_step:
-            return False, f"Tool call budget exceeded"
+            return False, "Tool call budget exceeded"
 
         if self.start_time:
             import time

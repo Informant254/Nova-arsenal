@@ -6,15 +6,14 @@ existence, not just detection. Separates exploration from verification.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import time
-import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

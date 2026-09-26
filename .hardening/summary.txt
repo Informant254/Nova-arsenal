@@ -1,52 +1,44 @@
 # Nova-Arsenal hardening summary
 
 ## Ruff
-Diagnostics: 1896
+Diagnostics: 96
 
 Top rules:
-- UP006: 949
-- UP045: 362
-- UP035: 176
-- F401: 138
-- W293: 132
-- I001: 88
-- F841: 17
-- F541: 13
-- UP007: 5
+- W293: 67
+- F841: 15
 - E712: 4
-- UP037: 3
+- F401: 4
 - E402: 2
-- W291: 2
 - E741: 2
-- UP015: 2
-- W292: 1
+- W291: 1
+- UP007: 1
 
 Top files:
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/training/glm_agentic_rl.py: 105
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py: 68
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/correlation/correlator.py: 68
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py: 68
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/zeroday/pipeline.py: 68
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/context/compression.py: 46
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/kali_blueprint.py: 45
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/data_generation/core.py: 44
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/llm/multi_router.py: 39
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/swarm.py: 37
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/training/cross_stage_distillation.py: 37
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/zeroday/fuzz_worker.py: 36
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_agent_core.py: 35
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/resilient_agent_core.py: 32
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/integrations/burp_api.py: 31
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/code_generator.py: 30
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/training/grpo_trainer.py: 30
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/integrations/msf_rpc.py: 29
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/zeroday/surface.py: 28
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/data_generation/dedup.py: 27
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/llm/account_auth.py: 27
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/ctf_solver.py: 26
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/intelligence/tool_selector.py: 25
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sessions/runtime.py: 25
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_swarm.py: 25
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/code_generator.py: 29
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/prompt_builder.py: 14
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/async_utils.py: 7
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/llm/base.py: 7
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py: 6
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/resilient_agent_core.py: 5
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py: 3
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_agent_core.py: 2
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/routes.py: 2
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/mcp/server.py: 2
+- /home/runner/work/Nova-arsenal/Nova-arsenal/alembic/env.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/alembic/versions/82cbcd264eab_initial_models.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/websocket/events.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/cleanup.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/cli.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/context/compression.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/data_generation/core.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/attack_chaining.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/exploitation/safe_engine.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/intelligence/osint_chain.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/llm/multi_router.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/ransomware/emulator.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sandbox_executor.py: 1
+- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/streaming/realtime.py: 1
 
 ## Ruff format
 unformatted: File would be reformatted
@@ -82,18 +74,14 @@ unformatted: File would be reformatted
     |
 
 unformatted: File would be reformatted
-  --> alembic/env.py:14:1
+  --> alembic/env.py:38:27
    |
-13 | from nova_arsenal.db.models import Base
-14 +
-15 | target_metadata = Base.metadata
---------------------------------------------------------------------------------
-38 |     with connectable.connect() as connection:
+37 |     with connectable.connect() as connection:
    -         context.configure(
    -             connection=connection, target_metadata=target_metadata
    -         )
-39 +         context.configure(connection=connection, target_metadata=target_metadata)
-40 |
+38 +         context.configure(connection=connection, target_metadata=target_metadata)
+39 |
    |
 
 unformatted: File would be reformatted
@@ -106,12 +94,12 @@ unformatted: File would be reformatted
 6   |
 7   | """
 8   +
-9   | from typing import Sequence, Union
+9   | from collections.abc import Sequence
 --------------------------------------------------------------------------------
 15  | # revision identifiers, used by Alembic.
     - revision: str = '82cbcd264eab'
 16  + revision: str = "82cbcd264eab"
-17  | down_revision: Union[str, Sequence[str], None] = None
+17  | down_revision: str | Sequence[str] | None = None
 --------------------------------------------------------------------------------
 24  |     # ### commands auto generated by Alembic - please adjust! ###
     -     op.create_table('schedule_entries',
@@ -123,36 +111,7 @@ unformatted: File would be reformatted
     -     sa.Column('objective', sa.Text(), nullable=True),
     -     sa.Column('max_steps', sa.Integer(), nullable=True),
     -     sa.Column('status', sa.String(length=20), nullable=True),
-    -     sa.Column('run_count', sa.Integer(), nullable=True),
-    -     sa.Column('last_run', sa.DateTime(), nullable=True),
-    -     sa.Column('last_result', sa.Text(), nullable=True),
-    -     sa.Column('next_run', sa.DateTime(), nullable=True),
-    -     sa.Column('created_at', sa.DateTime(), nullable=True),
-    -     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    -     sa.PrimaryKeyConstraint('id')
-25  +     op.create_table(
-26  +         "schedule_entries",
-27  +         sa.Column("id", sa.Integer(), nullable=False),
-28  +         sa.Column("name", sa.String(length=255), nullable=False),
-29  +         sa.Column("cron", sa.String(length=100), nullable=False),
-30  +         sa.Column("target", sa.String(length=500), nullable=False),
-31  +         sa.Column("task_type", sa.String(length=100), nullable=True),
-32  +         sa.Column("objective", sa.Text(), nullable=True),
-33  +         sa.Column("max_steps", sa.Integer(), nullable=True),
-34  +         sa.Column("status", sa.String(length=20), nullable=True),
-35  +         sa.Column("run_count", sa.Integer(), nullable=True),
-36  +         sa.Column("last_run", sa.DateTime(), nullable=True),
-37  +         sa.Column("last_result", sa.Text(), nullable=True),
-38  +         sa.Column("next_run", sa.DateTime(), nullable=True),
-39  +         sa.Column("created_at", sa.DateTime(), nullable=True),
-40  +         sa.Column("updated_at", sa.DateTime(), nullable=True),
-41  +         sa.PrimaryKeyConstraint("id"),
-42  |     )
-    -     op.create_index(op.f('ix_schedule_entries_id'), 'schedule_entries', ['id'], unique=False)
-    -     op.create_index(op.f('ix_schedule_entries_name'), 'schedule_entries', ['name'], unique=True)
-    -     op.create_table('users',
-    -     sa.Column('id', sa.Integer(), nullable=False),
-    -     sa.Column('email', sa.String(length=255), nullable=
+    -     sa.Column('run_cou
 
 ## BasedPyright
 Errors: 186
@@ -198,65 +157,3 @@ Top files:
 - /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/safety/controller.py: 1
 - /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sandbox_executor.py: 1
 - /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/sessions/runtime.py: 1
-
-First diagnostics:
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1253 [reportAttributeAccessIssue] Cannot assign to attribute "_burp_issues" for class "AgentRunner*" "List[BurpIssue]" is not assignable to "List[Dict[str, Any]]" Type parameter "_T@list" is invariant, but "BurpIssue" is not the same as "Dict[str, Any]" Consider switching from "list" to "Sequence" which is covari
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1260 [reportAttributeAccessIssue] Cannot access attribute "name" for class "Dict[str, Any]" Attribute "name" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1261 [reportAttributeAccessIssue] Cannot access attribute "severity" for class "Dict[str, Any]" Attribute "severity" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1262 [reportAttributeAccessIssue] Cannot access attribute "description" for class "Dict[str, Any]" Attribute "description" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1263 [reportAttributeAccessIssue] Cannot access attribute "evidence" for class "Dict[str, Any]" Attribute "evidence" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1264 [reportAttributeAccessIssue] Cannot access attribute "url" for class "Dict[str, Any]" Attribute "url" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1265 [reportAttributeAccessIssue] Cannot access attribute "remediation" for class "Dict[str, Any]" Attribute "remediation" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1413 [reportCallIssue] Argument missing for parameter "severity"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1420 [reportCallIssue] Argument missing for parameter "results"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/agent_runner.py:1425 [reportPossiblyUnboundVariable] "stats" is possibly unbound
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:81 [reportAttributeAccessIssue] Cannot access attribute "health_check" for class "MultiProviderRouter" Attribute "health_check" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:88 [reportAttributeAccessIssue] Cannot access attribute "byok_status" for class "MultiProviderRouter" Attribute "byok_status" is unknown
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:322 [reportGeneralTypeIssues] Invalid conditional operand of type "Any | ColumnElement[bool]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:337 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:338 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:394 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "int" "None" is not assignable to "int"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:395 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "str" "None" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:462 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:489 [reportAttributeAccessIssue] Cannot assign to attribute "verified" for class "Finding" Expression of type "Literal[True]" cannot be assigned to attribute "verified" of class "Finding" "Literal[True]" is not assignable to "Column[bool]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:490 [reportAttributeAccessIssue] Cannot assign to attribute "verified_at" for class "Finding" Expression of type "datetime" cannot be assigned to attribute "verified_at" of class "Finding" "datetime" is not assignable to "Column[datetime]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:526 [reportArgumentType] Expression of type "None" cannot be assigned to parameter of type "str" "None" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:567 [reportAttributeAccessIssue] Cannot assign to attribute "is_active" for class "Scope" Expression of type "Literal[False]" cannot be assigned to attribute "is_active" of class "Scope" "Literal[False]" is not assignable to "Column[bool]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:589 [reportGeneralTypeIssues] Invalid conditional operand of type "Any | ColumnElement[bool]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:607 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "Agent" Expression of type "Literal[AgentStatus.RUNNING]" cannot be assigned to attribute "status" of class "Agent" "Literal[AgentStatus.RUNNING]" is not assignable to "Column[str]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:608 [reportAttributeAccessIssue] Cannot assign to attribute "started_at" for class "Agent" Expression of type "datetime" cannot be assigned to attribute "started_at" of class "Agent" "datetime" is not assignable to "Column[datetime]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:619 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "Agent" Expression of type "Literal[AgentStatus.COMPLETED, AgentStatus.FAILED]" cannot be assigned to attribute "status" of class "Agent" Type "Literal[AgentStatus.COMPLETED, AgentStatus.FAILED]" is not assignable to type "Column[str]
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:620 [reportAttributeAccessIssue] Cannot assign to attribute "completed_at" for class "Agent" Expression of type "datetime" cannot be assigned to attribute "completed_at" of class "Agent" "datetime" is not assignable to "Column[datetime]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:631 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "run_id" of type "int" in function "complete_agent_run" "Column[int]" is not assignable to "int"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:640 [reportAttributeAccessIssue] Cannot assign to attribute "status" for class "Agent" Expression of type "Literal[AgentStatus.FAILED]" cannot be assigned to attribute "status" of class "Agent" "Literal[AgentStatus.FAILED]" is not assignable to "Column[str]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:643 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "run_id" of type "int" in function "complete_agent_run" "Column[int]" is not assignable to "int"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:694 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "target" of type "str" in function "create_runner" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:695 [reportArgumentType] Argument of type "Column[str] | Literal['Find vulnerabilities']" cannot be assigned to parameter "objective" of type "str" in function "create_runner" Type "Column[str] | Literal['Find vulnerabilities']" is not assignable to type "str" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:696 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "max_steps" of type "int" in function "create_runner" "Column[int]" is not assignable to "int"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:737 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:738 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "s" of type "str | bytes | bytearray" in function "loads" Type "Column[str]" is not assignable to type "str | bytes | bytearray" "Column[str]" is not assignable to "str" "Column[str]" is not assignable to "bytes" "Col
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:738 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[str]" Method __bool__ for type "Column[str]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:748 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:749 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes.py:809 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:90 [reportGeneralTypeIssues] Invalid conditional operand of type "ColumnElement[bool] | Literal[True]" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:443 [reportAssignmentType] Type "Column[str]" is not assignable to declared type "str" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:502 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "get_or_create_chat_session" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assignable to "None"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:508 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "add_chat_message" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:516 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "get_chat_messages" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:526 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "add_chat_message" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:531 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "__init__" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:549 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "get_or_create_chat_session" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assignable to "None"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:558 [reportArgumentType] Argument of type "Column[str]" cannot be assigned to parameter "session_id" of type "str" in function "_stream_response" "Column[str]" is not assignable to "str"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:559 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "_stream_response" "Column[int]" is not assignable to "int"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:577 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int" in function "_require_owned_chat_session" "Column[int]" is not assignable to "int"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:597 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "list_chat_sessions" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assignable to "None"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/api/routes_chat.py:610 [reportArgumentType] Argument of type "Column[int]" cannot be assigned to parameter "user_id" of type "int | None" in function "delete_chat_session" Type "Column[int]" is not assignable to type "int | None" "Column[int]" is not assignable to "int" "Column[int]" is not assignable to "None"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:16 [reportMissingImports] Import "torch" could not be resolved
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:17 [reportMissingImports] Import "torch.nn" could not be resolved
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/arch/mhc.py:18 [reportMissingImports] Import "torch.nn.functional" could not be resolved
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/async_utils.py:180 [reportGeneralTypeIssues] Invalid exception class or object "None" does not derive from BaseException
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/cleanup.py:22 [reportAttributeAccessIssue] "async_session" is unknown import symbol
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py:94 [reportGeneralTypeIssues] Invalid conditional operand of type "Column[datetime] | ColumnElement[bool]" Method __bool__ for type "Column[datetime]" returns type "NoReturn" rather than "bool" Method __bool__ for type "ColumnElement[bool]" returns type "NoReturn" rather than "bool"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py:102 [reportAttributeAccessIssue] Cannot assign to attribute "last_used_at" for class "ApiKey" Expression of type "datetime" cannot be assigned to attribute "last_used_at" of class "ApiKey" "datetime" is not assignable to "Column[datetime]"
-- /home/runner/work/Nova-arsenal/Nova-arsenal/nova_arsenal/auth/middleware.py:110 [reportCallIssue] No overloads for "get" match the provided arguments

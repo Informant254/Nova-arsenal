@@ -5,7 +5,7 @@ Abstract base class for all LLM providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Dict, Optional
+from collections.abc import AsyncGenerator
 
 
 class LLMProvider(ABC):
@@ -30,7 +30,7 @@ class LLMProvider(ABC):
     async def complete(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs,
@@ -53,7 +53,7 @@ class LLMProvider(ABC):
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs,

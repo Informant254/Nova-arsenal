@@ -6,14 +6,13 @@ Every command goes through this before reaching the sandbox.
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 
 @dataclass
 class SecurityPolicy:
     """Security policy for command execution."""
-    blocked_commands: List[str] = field(default_factory=lambda: [
+    blocked_commands: list[str] = field(default_factory=lambda: [
         "rm -rf /",
         "rm -rf /*",
         "mkfs",
@@ -27,7 +26,7 @@ class SecurityPolicy:
         "init 6",
     ])
 
-    blocked_patterns: List[str] = field(default_factory=lambda: [
+    blocked_patterns: list[str] = field(default_factory=lambda: [
         r"rm\s+-rf\s+/",
         r"curl\s+.*\|\s*(ba)?sh",
         r"wget\s+.*\|\s*(ba)?sh",
@@ -42,7 +41,7 @@ class SecurityPolicy:
         r"halt\s+-p",
     ])
 
-    blocked_hosts: List[str] = field(default_factory=lambda: [
+    blocked_hosts: list[str] = field(default_factory=lambda: [
         "google.com",
         "facebook.com",
         "twitter.com",
@@ -55,7 +54,7 @@ class SecurityPolicy:
         "cloudflare.com",
     ])
 
-    sensitive_paths: List[str] = field(default_factory=lambda: [
+    sensitive_paths: list[str] = field(default_factory=lambda: [
         "/etc/shadow",
         "/etc/sudoers",
         "/root/.ssh",
@@ -73,17 +72,17 @@ class ValidationResult:
     allowed: bool
     reason: str = ""
     sanitized_command: str = ""
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 class SecureExecutor:
     """Validates and sanitizes commands before execution."""
 
-    def __init__(self, policy: Optional[SecurityPolicy] = None) -> None:
+    def __init__(self, policy: SecurityPolicy | None = None) -> None:
         self._policy = policy or SecurityPolicy()
         self._active_commands = 0
 
-    def validate_command(self, command: str, scope: Optional[List[str]] = None) -> ValidationResult:
+    def validate_command(self, command: str, scope: list[str] | None = None) -> ValidationResult:
         """Validate a command against security policy."""
         if len(command) > self._policy.max_command_length:
             return ValidationResult(
@@ -162,7 +161,7 @@ class SecureExecutor:
             warnings=warnings,
         )
 
-    def validate_script(self, script: str, scope: Optional[List[str]] = None) -> ValidationResult:
+    def validate_script(self, script: str, scope: list[str] | None = None) -> ValidationResult:
         """Validate a complete script."""
         # Split into individual commands and validate each
         commands = [c.strip() for c in script.split("\n") if c.strip() and not c.strip().startswith("#")]
@@ -177,7 +176,7 @@ class SecureExecutor:
             sanitized_command=script,
         )
 
-    def _check_scope(self, command: str, scope: List[str]) -> Tuple[bool, str]:
+    def _check_scope(self, command: str, scope: list[str]) -> tuple[bool, str]:
         """Check if command targets are within scope."""
         # Extract hosts/domains from command
         hosts = set()

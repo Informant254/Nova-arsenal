@@ -13,7 +13,7 @@ import os
 import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -87,7 +87,7 @@ class LLMProviderConfig:
     api_key: str = ""
     timeout: int = 120
 
-    def resolved(self) -> "LLMProviderConfig":
+    def resolved(self) -> LLMProviderConfig:
         """Return a copy with env-resolved key/model/url."""
         prov = normalize_provider(self.provider)
         return LLMProviderConfig(
@@ -102,7 +102,7 @@ class LLMProviderConfig:
 @dataclass
 class LLMConfig:
     primary: LLMProviderConfig = field(default_factory=LLMProviderConfig)
-    fallbacks: List[LLMProviderConfig] = field(default_factory=list)
+    fallbacks: list[LLMProviderConfig] = field(default_factory=list)
     routing_strategy: str = "balanced"
     fallback_threshold: int = 3
     max_retries: int = 3
@@ -111,9 +111,9 @@ class LLMConfig:
 @dataclass
 class SecurityConfig:
     permission_profile: str = "scoped"
-    blocked_patterns: List[str] = field(default_factory=list)
-    allowed_tools: List[str] = field(default_factory=list)
-    blocked_hosts: List[str] = field(default_factory=list)
+    blocked_patterns: list[str] = field(default_factory=list)
+    allowed_tools: list[str] = field(default_factory=list)
+    blocked_hosts: list[str] = field(default_factory=list)
     strict_mode: bool = False
 
 
@@ -163,7 +163,7 @@ class NovaConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
-    scope: List[str] = field(default_factory=list)
+    scope: list[str] = field(default_factory=list)
 
 
 def _resolve_env_vars(value: str) -> str:
@@ -189,7 +189,7 @@ def _process_config(data: Any) -> Any:
     return data
 
 
-def _provider_from_dict(raw: Dict[str, Any]) -> LLMProviderConfig:
+def _provider_from_dict(raw: dict[str, Any]) -> LLMProviderConfig:
     # Filter unknown keys so older/newer YAML stays compatible
     allowed = {"provider", "model", "url", "api_key", "timeout"}
     cleaned = {k: v for k, v in (raw or {}).items() if k in allowed}
@@ -197,7 +197,7 @@ def _provider_from_dict(raw: Dict[str, Any]) -> LLMProviderConfig:
     return cfg.resolved()
 
 
-def _account_preferred_primary() -> Optional[LLMProviderConfig]:
+def _account_preferred_primary() -> LLMProviderConfig | None:
     """If user registered local LLM or OAuth account as preferred, use it."""
     try:
         from nova_arsenal.llm.account_auth import get_account_store
@@ -246,7 +246,7 @@ def _account_preferred_primary() -> Optional[LLMProviderConfig]:
     return None
 
 
-def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
+def _auto_llm_from_env(existing: LLMConfig | None = None) -> LLMConfig:
     """
     Build / enrich LLM config from environment + account store.
 
@@ -316,7 +316,7 @@ def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
                     ).resolved()
 
     # Build fallbacks: keep YAML fallbacks (resolved) + any env keys not already listed
-    fallbacks: List[LLMProviderConfig] = []
+    fallbacks: list[LLMProviderConfig] = []
     seen = {primary.provider}
 
     for fb in base.fallbacks or []:
@@ -360,7 +360,7 @@ def _auto_llm_from_env(existing: Optional[LLMConfig] = None) -> LLMConfig:
     )
 
 
-def load_config(config_path: Optional[str] = None) -> NovaConfig:
+def load_config(config_path: str | None = None) -> NovaConfig:
     """
     Load configuration from a YAML file + environment.
 
@@ -372,7 +372,7 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
     if loaded_env:
         logger.info("Loaded env files: %s", ", ".join(loaded_env))
 
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
     path = config_path
     if path is None:
         # Search common locations
@@ -467,7 +467,7 @@ def load_config(config_path: Optional[str] = None) -> NovaConfig:
 
 
 # Global config singleton
-_config: Optional[NovaConfig] = None
+_config: NovaConfig | None = None
 
 
 def get_config() -> NovaConfig:
@@ -478,7 +478,7 @@ def get_config() -> NovaConfig:
     return _config
 
 
-def reload_config(config_path: Optional[str] = None) -> NovaConfig:
+def reload_config(config_path: str | None = None) -> NovaConfig:
     """Reload configuration from file + env (also resets LLM router if imported)."""
     global _config
     _config = load_config(config_path)

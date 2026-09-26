@@ -1,6 +1,5 @@
 """Tests for account-style AI login (Codex / Claude Code)."""
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -60,10 +59,9 @@ class TestAccountAuth:
         store.login_with_token("openai", "session-token-codex-abcdef012345")
         # Ensure no env key shadows
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        from nova_arsenal.llm.keys import resolve_api_key
-
         # account_token_for uses singleton — point singleton at our store
         import nova_arsenal.llm.account_auth as aa
+        from nova_arsenal.llm.keys import resolve_api_key
 
         aa._store = store
         assert resolve_api_key("openai") == "session-token-codex-abcdef012345"

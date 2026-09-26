@@ -6,10 +6,8 @@ knowledge, tactics, and focus areas. This transforms Nova from a
 general security agent into a team of specialists.
 """
 
-from typing import Dict
 
-
-PERSONA_MAP: Dict[str, Dict[str, str]] = {
+PERSONA_MAP: dict[str, dict[str, str]] = {
     "init": {
         "role": "Strategic Security Planner",
         "personality": "Methodical, big-picture thinker who designs comprehensive assessment strategies",
@@ -80,7 +78,7 @@ DEFAULT_PERSONA = {
     "focus": "Complete security assessment",
 }
 
-SUMMARY_MAP: Dict[str, str] = {
+SUMMARY_MAP: dict[str, str] = {
     "init": "I am a Strategic Security Planner. I design comprehensive assessment strategies and map out attack surfaces before the operation begins.",
     "planning": "I am a Strategic Security Planner. I select the optimal methodology, tool chain, and approach for this specific target.",
     "reconnaissance": "I am an OSINT & Reconnaissance Specialist. I cast the widest possible net to discover every subdomain, certificate, and entry point before the target knows I am here.",
@@ -103,7 +101,7 @@ class PersonaManager:
     transforming the agent's behavior, focus, and tactical approach.
     """
 
-    def get_persona(self, phase: str) -> Dict[str, str]:
+    def get_persona(self, phase: str) -> dict[str, str]:
         return PERSONA_MAP.get(phase, DEFAULT_PERSONA)
 
     def get_summary(self, phase: str) -> str:
@@ -129,7 +127,7 @@ class PersonaManager:
 
         return "\n".join(lines)
 
-    def list_personas(self) -> Dict[str, str]:
+    def list_personas(self) -> dict[str, str]:
         return {
             phase: info["role"]
             for phase, info in PERSONA_MAP.items()

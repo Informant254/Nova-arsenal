@@ -4,14 +4,14 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.backends import default_backend
 
-from .key_manager import KeyManager, KeySize
+from .key_manager import KeyManager
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class SecureEnvelope:
     sender_id: str = ""
     recipient_id: str = ""
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "ciphertext": self.ciphertext,
             "iv": self.iv,
@@ -53,7 +53,7 @@ class Cipher:
 
     def encrypt(self, plaintext: str, recipient_public_key_pem: str,
                 sender_id: str = "", recipient_id: str = "",
-                aad: Optional[bytes] = None) -> SecureEnvelope:
+                aad: bytes | None = None) -> SecureEnvelope:
         aes_key = AESGCM.generate_key(bit_length=256)
         aesgcm = AESGCM(aes_key)
         iv = os.urandom(12)
@@ -92,7 +92,7 @@ class Cipher:
 
     def decrypt(self, envelope: SecureEnvelope,
                 private_key_pem: str,
-                aad: Optional[bytes] = None) -> str:
+                aad: bytes | None = None) -> str:
         private_key = serialization.load_pem_private_key(
             private_key_pem.encode(), password=None, backend=default_backend()
         )
@@ -117,7 +117,7 @@ class Cipher:
         plaintext = aesgcm.decrypt(iv, ciphertext, aad_bytes)
         return plaintext.decode("utf-8")
 
-    def encrypt_message(self, message: Dict[str, Any],
+    def encrypt_message(self, message: dict[str, Any],
                         recipient_public_key_pem: str,
                         sender_id: str = "nova") -> SecureEnvelope:
         return self.encrypt(
@@ -127,6 +127,6 @@ class Cipher:
         )
 
     def decrypt_message(self, envelope: SecureEnvelope,
-                        private_key_pem: str) -> Dict[str, Any]:
+                        private_key_pem: str) -> dict[str, Any]:
         plaintext = self.decrypt(envelope, private_key_pem)
         return json.loads(plaintext)

@@ -13,12 +13,12 @@ import asyncio
 import json
 import logging
 import random
-import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class DifficultyScale(Enum):
     POLYMATH = 10
 
 
-DIFFICULTY_LABELS: Dict[DifficultyScale, str] = {
+DIFFICULTY_LABELS: dict[DifficultyScale, str] = {
     DifficultyScale.VERY_EASY: "Very Easy (child-level)",
     DifficultyScale.EASY: "Easy (elementary)",
     DifficultyScale.BASIC: "Basic (middle school)",
@@ -119,10 +119,10 @@ Each block must be present and substantive. Empty blocks will be rejected."""
 class SecurityDomainTaxonomy:
     category: str
     name: str
-    subdomains: List[str]
+    subdomains: list[str]
 
 
-SECURITY_DOMAIN_TAXONOMY: List[SecurityDomainTaxonomy] = [
+SECURITY_DOMAIN_TAXONOMY: list[SecurityDomainTaxonomy] = [
     # Reconnaissance
     SecurityDomainTaxonomy("recon", "Passive Reconnaissance", [
         "dns_enumeration", "subdomain_discovery", "certificate_transparency",
@@ -220,13 +220,13 @@ SECURITY_DOMAIN_TAXONOMY: List[SecurityDomainTaxonomy] = [
 ]
 
 # Category → domains mapping for weighted sampling
-CATEGORY_MAP: Dict[str, List[SecurityDomainTaxonomy]] = {}
+CATEGORY_MAP: dict[str, list[SecurityDomainTaxonomy]] = {}
 for d in SECURITY_DOMAIN_TAXONOMY:
     CATEGORY_MAP.setdefault(d.category, []).append(d)
 
 CATEGORIES = list(CATEGORY_MAP.keys())
 
-DEFAULT_CATEGORY_DISTRIBUTION: Dict[str, float] = {
+DEFAULT_CATEGORY_DISTRIBUTION: dict[str, float] = {
     "recon": 0.15,
     "exploit": 0.25,
     "osint": 0.10,
@@ -238,7 +238,7 @@ DEFAULT_CATEGORY_DISTRIBUTION: Dict[str, float] = {
     "social": 0.05,
 }
 
-DEFAULT_DIFFICULTY_DISTRIBUTION: Dict[int, float] = {
+DEFAULT_DIFFICULTY_DISTRIBUTION: dict[int, float] = {
     1: 0.05,
     2: 0.05,
     3: 0.10,
@@ -340,22 +340,22 @@ class GenerationConfig:
     workers: int = 5
     temperature: float = 0.9
     model: str = "gpt-4o-mini"
-    system_prompt: Optional[str] = None
-    category_distribution: Optional[Dict[str, float]] = None
-    difficulty_distribution: Optional[Dict[int, float]] = None
-    output_path: Optional[Path] = None
+    system_prompt: str | None = None
+    category_distribution: dict[str, float] | None = None
+    difficulty_distribution: dict[int, float] | None = None
+    output_path: Path | None = None
     dedup: bool = True
     dedup_threshold: float = 0.6
     cot_ratio: float = 0.3
     append: bool = False
-    budget: Optional[float] = None
-    input_price: Optional[float] = None
-    output_price: Optional[float] = None
+    budget: float | None = None
+    input_price: float | None = None
+    output_price: float | None = None
 
 
 # ── Sampling Logic (ported from taskgen) ────────────────────────────────────
 
-def build_domain_pool(dist: Dict[str, float]) -> List[Tuple[str, str, str, float]]:
+def build_domain_pool(dist: dict[str, float]) -> list[tuple[str, str, str, float]]:
     pool = []
     for cat, weight in dist.items():
         domains = CATEGORY_MAP.get(cat, [])
@@ -370,8 +370,8 @@ def build_domain_pool(dist: Dict[str, float]) -> List[Tuple[str, str, str, float
 
 
 def weighted_sample(
-    items: List[Tuple[Any, ...]],
-    weights: List[float],
+    items: list[tuple[Any, ...]],
+    weights: list[float],
     rng: random.Random,
 ) -> Any:
     total = sum(weights)
@@ -386,15 +386,15 @@ def weighted_sample(
 
 def sample_domain(
     rng: random.Random,
-    pool: List[Tuple[str, str, str, float]],
-) -> Tuple[str, str, str]:
+    pool: list[tuple[str, str, str, float]],
+) -> tuple[str, str, str]:
     weights = [w for _, _, _, w in pool]
     return weighted_sample(pool, weights, rng)
 
 
 def sample_difficulty(
     rng: random.Random,
-    dist: Dict[int, float],
+    dist: dict[int, float],
 ) -> int:
     levels = list(dist.keys())
     weights = [dist[l] for l in levels]
@@ -427,7 +427,7 @@ def build_generation_messages(
     subdomain: str,
     difficulty: int,
     include_cot: bool,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     user_msg = SECURITY_TASK_INSTRUCTION.format(
         domain=domain, name=name, subdomain=subdomain,
         difficulty=difficulty, label=DIFFICULTY_LABELS.get(DifficultyScale(difficulty), ""),
@@ -459,7 +459,7 @@ class NovaDataGenerator:
         config: GenerationConfig,
         api_key: str,
         api_base: str = "https://api.openai.com/v1",
-        llm_call: Optional[Callable] = None,
+        llm_call: Callable | None = None,
     ):
         self.config = config
         self.api_key = api_key
@@ -470,10 +470,10 @@ class NovaDataGenerator:
 
     async def _default_llm_call(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int = 2048,
-    ) -> Tuple[str, int, int]:
+    ) -> tuple[str, int, int]:
         import httpx
         async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(
@@ -505,7 +505,7 @@ class NovaDataGenerator:
         subdomain: str,
         difficulty: int,
         include_cot: bool,
-    ) -> Optional[TaskEntry]:
+    ) -> TaskEntry | None:
         system_prompt = self.config.system_prompt or DIFFICULTY_SYSTEM_PROMPT
         messages = build_generation_messages(
             system_prompt, domain, name, subdomain, difficulty, include_cot,
@@ -533,7 +533,7 @@ class NovaDataGenerator:
             logger.warning(f"Generation failed for {domain}/{subdomain} d{difficulty}: {e}")
             return None
 
-    async def generate(self) -> List[TaskEntry]:
+    async def generate(self) -> list[TaskEntry]:
         pool = build_domain_pool(
             self.config.category_distribution or DEFAULT_CATEGORY_DISTRIBUTION
         )
@@ -571,7 +571,7 @@ class NovaDataGenerator:
         )
         return entries
 
-    def _write_output(self, entries: List[TaskEntry]) -> None:
+    def _write_output(self, entries: list[TaskEntry]) -> None:
         path = self.config.output_path
         mode = "a" if self.config.append else "w"
 
@@ -583,7 +583,7 @@ class NovaDataGenerator:
                     f.write(entry.to_jsonl() + "\n")
         logger.info(f"Wrote {len(entries)} tasks to {path}")
 
-    def _write_parquet(self, entries: List[TaskEntry], path: Path) -> None:
+    def _write_parquet(self, entries: list[TaskEntry], path: Path) -> None:
         """Write entries in Nex-N2 style parquet format (prompt/ground_truth columns)."""
         try:
             import pandas as pd
@@ -596,5 +596,5 @@ class NovaDataGenerator:
                 for entry in entries:
                     f.write(entry.to_jsonl() + "\n")
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         return dict(self._stats)

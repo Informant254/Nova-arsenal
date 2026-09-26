@@ -1,15 +1,28 @@
 """Tests for Cursor-inspired Priority Prompt Builder and Tool Definitions."""
 
-import pytest
 from nova_arsenal.prompt_builder import (
-    Scope, First, Empty, Isolate, Text, ChatMessage, ToolDefinition,
-    BASE_PRIORITY, render, PromptBuilder, RenderResult,
-    compute_priority_levels, _render_with_level,
-    system_message, user_message, assistant_message,
+    BASE_PRIORITY,
+    Empty,
+    First,
+    Isolate,
+    PromptBuilder,
+    Scope,
+    Text,
+    _render_with_level,
+    assistant_message,
+    compute_priority_levels,
+    render,
+    system_message,
+    user_message,
 )
 from nova_arsenal.tool_definitions import (
-    ToolSchema, CURSOR_BUILTIN_TOOLS, NOVA_SECURITY_TOOLS,
-    ALL_TOOLS, get_tool_by_name, tools_to_openai_format, tools_to_anthropic_format,
+    ALL_TOOLS,
+    CURSOR_BUILTIN_TOOLS,
+    NOVA_SECURITY_TOOLS,
+    ToolSchema,
+    get_tool_by_name,
+    tools_to_anthropic_format,
+    tools_to_openai_format,
 )
 
 
@@ -233,13 +246,13 @@ class TestToolDefinitions:
 
     def test_cursor_tool_has_schema(self):
         for tool in CURSOR_BUILTIN_TOOLS:
-            assert tool.name, f"Tool missing name"
+            assert tool.name, "Tool missing name"
             assert tool.description, f"Tool {tool.name} missing description"
             assert "type" in tool.parameters
 
     def test_nova_tool_has_schema(self):
         for tool in NOVA_SECURITY_TOOLS:
-            assert tool.name, f"Tool missing name"
+            assert tool.name, "Tool missing name"
             assert tool.description, f"Tool {tool.name} missing description"
             assert "type" in tool.parameters
 

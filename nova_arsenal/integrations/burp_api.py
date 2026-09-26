@@ -10,12 +10,10 @@ Allows Nova to:
 - Generate reports
 """
 
-import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +32,7 @@ class BurpIssue:
     evidence: str = ""
     tool_used: str = "burp"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "severity": self.severity,
@@ -55,11 +53,11 @@ class BurpScanJob:
     scan_id: str
     url: str
     status: str
-    issues: List[BurpIssue] = field(default_factory=list)
+    issues: list[BurpIssue] = field(default_factory=list)
     progress: int = 0
     started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "scan_id": self.scan_id,
             "url": self.url,
@@ -87,7 +85,7 @@ class BurpAPI:
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:1337",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         api_version: str = "v0.1",
         timeout: int = 300,
     ) -> None:
@@ -103,9 +101,9 @@ class BurpAPI:
         self,
         method: str,
         path: str,
-        data: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> Optional[Dict[str, Any]]:
+        data: dict[str, Any] | None = None,
+        timeout: int | None = None,
+    ) -> dict[str, Any] | None:
         """Make an HTTP request to Burp's REST API."""
         try:
             import aiohttp
@@ -141,8 +139,8 @@ class BurpAPI:
     async def start_scan(
         self,
         url: str,
-        scope: Optional[Dict[str, Any]] = None,
-        scan_configurations: Optional[List[str]] = None,
+        scope: dict[str, Any] | None = None,
+        scan_configurations: list[str] | None = None,
     ) -> BurpScanJob:
         """Start an active scan against a URL."""
         payload = {
@@ -167,7 +165,7 @@ class BurpAPI:
     async def _start_scan_graphql(
         self,
         url: str,
-        scope: Optional[Dict[str, Any]] = None,
+        scope: dict[str, Any] | None = None,
     ) -> BurpScanJob:
         """Start a scan using Burp's GraphQL endpoint."""
         mutation = """
@@ -195,14 +193,14 @@ class BurpAPI:
 
         return BurpScanJob(scan_id="error", url=url, status="failed")
 
-    async def get_scan_status(self, scan_id: str) -> Optional[str]:
+    async def get_scan_status(self, scan_id: str) -> str | None:
         """Get the status of a scan."""
         result = await self._request("GET", f"scan/{scan_id}")
         if result:
             return result.get("status", result.get("data", {}).get("status", "unknown"))
         return None
 
-    async def get_issues(self, scan_id: Optional[str] = None) -> List[BurpIssue]:
+    async def get_issues(self, scan_id: str | None = None) -> list[BurpIssue]:
         """Get all issues/findings from scans."""
         path = f"scan/{scan_id}/issues" if scan_id else "issues"
         result = await self._request("GET", path)
@@ -222,7 +220,7 @@ class BurpAPI:
         logger.info(f"Retrieved {len(issues)} Burp issues")
         return issues
 
-    def _parse_issue(self, item: Dict[str, Any]) -> Optional[BurpIssue]:
+    def _parse_issue(self, item: dict[str, Any]) -> BurpIssue | None:
         """Parse a raw Burp issue into a structured BurpIssue."""
         try:
             return BurpIssue(
@@ -240,7 +238,7 @@ class BurpAPI:
             logger.warning(f"Failed to parse Burp issue: {e}")
             return None
 
-    async def configure_scope(self, include: List[str], exclude: Optional[List[str]] = None) -> bool:
+    async def configure_scope(self, include: list[str], exclude: list[str] | None = None) -> bool:
         """Configure Burp's target scope."""
         payload = {
             "include": [{"rule": f".*{url}.*", "type": "SimpleScope"} for url in include],
@@ -252,7 +250,7 @@ class BurpAPI:
             logger.info(f"Burp scope configured: {include}")
         return success
 
-    async def get_scan_queue(self) -> List[Dict[str, Any]]:
+    async def get_scan_queue(self) -> list[dict[str, Any]]:
         """List all scans in the queue."""
         result = await self._request("GET", "scan")
         if result:
@@ -263,9 +261,9 @@ class BurpAPI:
 
     async def generate_report(
         self,
-        scan_id: Optional[str] = None,
+        scan_id: str | None = None,
         format: str = "html",
-    ) -> Optional[str]:
+    ) -> str | None:
         """Generate a report and return the file path."""
         payload = {"format": format}
         if scan_id:

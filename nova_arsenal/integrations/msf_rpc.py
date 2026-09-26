@@ -13,8 +13,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +25,12 @@ class MsfModuleResult:
     module_type: str
     status: str
     output: str = ""
-    session_id: Optional[int] = None
-    findings: List[Dict[str, Any]] = field(default_factory=list)
+    session_id: int | None = None
+    findings: list[dict[str, Any]] = field(default_factory=list)
     duration_ms: float = 0
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "module": self.module,
             "module_type": self.module_type,
@@ -64,16 +63,16 @@ class MetasploitRPC:
         self,
         host: str = "https://127.0.0.1:55553",
         password: str = "",
-        token: Optional[str] = None,
+        token: str | None = None,
         ssl_verify: bool = False,
     ) -> None:
         self.host = host.rstrip("/")
         self.password = password
         self._token = token
         self.ssl_verify = ssl_verify
-        self._session_id: Optional[str] = None
+        self._session_id: str | None = None
         self._authenticated = False
-        self._modules_cache: Dict[str, List[str]] = {}
+        self._modules_cache: dict[str, list[str]] = {}
 
     async def login(self) -> bool:
         """Authenticate with msfrpcd."""
@@ -121,7 +120,7 @@ class MetasploitRPC:
             logger.error(f"MSF RPC login error: {e}")
             return False
 
-    async def _rpc_call(self, method: str, params: Optional[List[Any]] = None) -> Dict[str, Any]:
+    async def _rpc_call(self, method: str, params: list[Any] | None = None) -> dict[str, Any]:
         """Make a JSON-RPC call to msfrpcd."""
         import aiohttp
 
@@ -150,7 +149,7 @@ class MetasploitRPC:
                     return {"error": f"HTTP {resp.status}"}
                 return await resp.json()
 
-    async def get_modules(self, module_type: str = "auxiliary") -> List[str]:
+    async def get_modules(self, module_type: str = "auxiliary") -> list[str]:
         """List available modules of a given type."""
         if module_type in self._modules_cache:
             return self._modules_cache[module_type]
@@ -170,7 +169,7 @@ class MetasploitRPC:
         self,
         module: str,
         module_type: str = "auxiliary",
-        options: Optional[Dict[str, Any]] = None,
+        options: dict[str, Any] | None = None,
         timeout: int = 120,
     ) -> MsfModuleResult:
         """Execute a Metasploit module and return structured results."""
@@ -240,8 +239,8 @@ class MetasploitRPC:
         return result
 
     def _extract_findings(
-        self, raw: Dict[str, Any], module: str
-    ) -> List[Dict[str, Any]]:
+        self, raw: dict[str, Any], module: str
+    ) -> list[dict[str, Any]]:
         """Extract security findings from module output."""
         findings = []
         output_text = json.dumps(raw).lower()
@@ -266,14 +265,14 @@ class MetasploitRPC:
 
         return findings
 
-    async def create_session(self, module: str, options: Dict[str, Any]) -> Optional[int]:
+    async def create_session(self, module: str, options: dict[str, Any]) -> int | None:
         """Execute an exploit module and return the session ID if successful."""
         result = await self.execute_module(module, "exploit", options)
         return result.session_id
 
     async def run_module_group(
-        self, modules: List[str], shared_options: Optional[Dict[str, Any]] = None
-    ) -> List[MsfModuleResult]:
+        self, modules: list[str], shared_options: dict[str, Any] | None = None
+    ) -> list[MsfModuleResult]:
         """Run multiple modules and collect all results."""
         results = []
         shared_options = shared_options or {}
@@ -287,7 +286,7 @@ class MetasploitRPC:
             results.append(result)
         return results
 
-    async def get_sessions(self) -> Dict[int, Dict[str, Any]]:
+    async def get_sessions(self) -> dict[int, dict[str, Any]]:
         """List active Meterpreter sessions."""
         try:
             data = await self._rpc_call("session.list")
@@ -299,7 +298,7 @@ class MetasploitRPC:
             logger.error(f"Error listing MSF sessions: {e}")
         return {}
 
-    async def write_report(self, data: Dict[str, Any]) -> str:
+    async def write_report(self, data: dict[str, Any]) -> str:
         """Write output to msfrpcd for report generation."""
         try:
             result = await self._rpc_call("core.report", [data])

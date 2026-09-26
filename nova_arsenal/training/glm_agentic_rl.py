@@ -16,13 +16,14 @@ import logging
 import math
 import random
 import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from nova_arsenal.training.config import GRPOConfig
-from nova_arsenal.training.grpo_trainer import GRPOTrainer, RolloutWorker, compute_group_advantage
-from nova_arsenal.training.trajectory_pool import Trajectory, TrajectoryPool, TrajectoryStep
+from nova_arsenal.training.grpo_trainer import RolloutWorker, compute_group_advantage
+from nova_arsenal.training.trajectory_pool import Trajectory
 
 logger = logging.getLogger(__name__)
 
@@ -103,16 +104,16 @@ class TITOGateway:
     avoiding re-tokenization mismatches during RL training.
     """
 
-    def __init__(self, config: Optional[TITOConfig] = None):
+    def __init__(self, config: TITOConfig | None = None):
         self.config = config or TITOConfig()
-        self._fragments: Dict[str, List[Dict[str, Any]]] = {}
+        self._fragments: dict[str, list[dict[str, Any]]] = {}
 
     def record_fragment(
         self,
         rollout_id: str,
-        token_ids: List[int],
-        log_probs: List[float],
-        metadata: Optional[Dict[str, Any]] = None,
+        token_ids: list[int],
+        log_probs: list[float],
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         if not self.config.enabled:
             return
@@ -127,16 +128,16 @@ class TITOGateway:
 
     def get_trajectory_tokens(
         self, rollout_id: str
-    ) -> Tuple[List[int], List[float]]:
+    ) -> tuple[list[int], list[float]]:
         fragments = self._fragments.pop(rollout_id, [])
-        all_tokens: List[int] = []
-        all_log_probs: List[float] = []
+        all_tokens: list[int] = []
+        all_log_probs: list[float] = []
         for frag in fragments:
             all_tokens.extend(frag["token_ids"])
             all_log_probs.extend(frag["log_probs"])
         return all_tokens, all_log_probs
 
-    def clear(self, rollout_id: Optional[str] = None) -> None:
+    def clear(self, rollout_id: str | None = None) -> None:
         if rollout_id:
             self._fragments.pop(rollout_id, None)
         else:
@@ -157,14 +158,14 @@ class DoubledSidedImportanceSampling:
     - Tokens outside interval are fully masked (gradient = 0)
     """
 
-    def __init__(self, config: Optional[DoubledSidedISConfig] = None):
+    def __init__(self, config: DoubledSidedISConfig | None = None):
         self.config = config or DoubledSidedISConfig()
 
     def compute_clipped_ratio(
         self,
-        current_log_probs: List[float],
-        rollout_log_probs: List[float],
-    ) -> List[float]:
+        current_log_probs: list[float],
+        rollout_log_probs: list[float],
+    ) -> list[float]:
         """Compute importance sampling ratio r_t(θ) with double-sided clipping.
 
         Args:
@@ -198,9 +199,9 @@ class DoubledSidedImportanceSampling:
 
     def compute_loss_scale(
         self,
-        current_log_probs: List[float],
-        rollout_log_probs: List[float],
-        advantages: List[float],
+        current_log_probs: list[float],
+        rollout_log_probs: list[float],
+        advantages: list[float],
     ) -> float:
         """Compute the token-level clipped surrogate loss.
 
@@ -223,7 +224,7 @@ class OffPolicySampleDropper:
     - Handles incomplete GRPO groups via padding/dropping
     """
 
-    def __init__(self, config: Optional[OffPolicyDropConfig] = None):
+    def __init__(self, config: OffPolicyDropConfig | None = None):
         self.config = config or OffPolicyDropConfig()
         self._current_version: int = 0
 
@@ -236,14 +237,14 @@ class OffPolicySampleDropper:
         return self._current_version
 
     def should_drop_by_version(
-        self, rollout_versions: List[int]
+        self, rollout_versions: list[int]
     ) -> bool:
         if not rollout_versions:
             return False
         w_0 = min(rollout_versions)
         return (self._current_version - w_0) > self.config.version_staleness_threshold
 
-    def should_drop_by_env_failure(self, failure_reason: Optional[str]) -> bool:
+    def should_drop_by_env_failure(self, failure_reason: str | None) -> bool:
         if not self.config.drop_env_failures or not failure_reason:
             return False
         env_failure_keywords = [
@@ -255,8 +256,8 @@ class OffPolicySampleDropper:
 
     def filter_group(
         self,
-        trajectories: List[Tuple[Trajectory, Optional[str], List[int]]],
-    ) -> List[Trajectory]:
+        trajectories: list[tuple[Trajectory, str | None, list[int]]],
+    ) -> list[Trajectory]:
         """Filter a group of trajectories, handling incomplete groups.
 
         Args:
@@ -265,7 +266,7 @@ class OffPolicySampleDropper:
         Returns:
             Filtered list of trajectories (may be padded)
         """
-        valid: List[Trajectory] = []
+        valid: list[Trajectory] = []
         for traj, failure_reason, rollout_versions in trajectories:
             if self.should_drop_by_env_failure(failure_reason):
                 continue
@@ -298,10 +299,10 @@ class DPAwareRouter:
     - Prefill cost proportional to incremental tokens, not total context
     """
 
-    def __init__(self, config: Optional[DPAwareRoutingConfig] = None):
+    def __init__(self, config: DPAwareRoutingConfig | None = None):
         self.config = config or DPAwareRoutingConfig()
-        self._routing_table: Dict[str, int] = {}
-        self._load_counts: Dict[int, int] = {
+        self._routing_table: dict[str, int] = {}
+        self._load_counts: dict[int, int] = {
             i: 0 for i in range(self.config.num_dp_ranks)
         }
         self._step_counter = 0
@@ -388,8 +389,8 @@ class TaskService:
         self._stats = {"rollouts": 0, "rewards": 0, "errors": 0}
 
     async def execute_rollout(
-        self, prompt: str, context: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, prompt: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         async with self._semaphore:
             try:
                 result = await self.rollout_fn(prompt, context)
@@ -403,7 +404,7 @@ class TaskService:
                 return None
 
     def compute_reward(
-        self, response: str, ground_truth: str, metadata: Optional[Dict[str, Any]] = None
+        self, response: str, ground_truth: str, metadata: dict[str, Any] | None = None
     ) -> float:
         try:
             reward = self.reward_fn(response, ground_truth, metadata)
@@ -415,7 +416,7 @@ class TaskService:
             return 0.0
 
     @property
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         return dict(self._stats)
 
 
@@ -431,9 +432,9 @@ class MultiTaskRolloutOrchestrator:
     """
 
     def __init__(self):
-        self._services: Dict[AgenticTaskType, TaskService] = {}
-        self._task_ratios: Dict[AgenticTaskType, float] = {}
-        self._unified_trajectories: List[Dict[str, Any]] = []
+        self._services: dict[AgenticTaskType, TaskService] = {}
+        self._task_ratios: dict[AgenticTaskType, float] = {}
+        self._unified_trajectories: list[dict[str, Any]] = []
         self._stats = {
             "total_rollouts": 0,
             "completed_trajectories": 0,
@@ -462,7 +463,7 @@ class MultiTaskRolloutOrchestrator:
         )
         return service
 
-    def set_sampling_ratios(self, ratios: Dict[AgenticTaskType, float]) -> None:
+    def set_sampling_ratios(self, ratios: dict[AgenticTaskType, float]) -> None:
         total = sum(ratios.values())
         if total > 0:
             self._task_ratios = {k: v / total for k, v in ratios.items()}
@@ -477,9 +478,9 @@ class MultiTaskRolloutOrchestrator:
     async def dispatch_rollout(
         self,
         prompt: str,
-        task_type: Optional[AgenticTaskType] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        task_type: AgenticTaskType | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         if task_type is None:
             task_type = self._sample_task_type()
 
@@ -506,10 +507,10 @@ class MultiTaskRolloutOrchestrator:
         prompt: str,
         response: str,
         reward: float,
-        token_ids: Optional[List[int]] = None,
-        log_probs: Optional[List[float]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        token_ids: list[int] | None = None,
+        log_probs: list[float] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Convert task-specific trajectory into unified message-list format.
 
         Ported from GLM-5: all agentic tasks share a unified message-list
@@ -530,14 +531,14 @@ class MultiTaskRolloutOrchestrator:
             "timestamp": time.time(),
         }
 
-    def collect_ready_trajectories(self) -> List[Dict[str, Any]]:
+    def collect_ready_trajectories(self) -> list[dict[str, Any]]:
         ready = self._unified_trajectories.copy()
         self._unified_trajectories.clear()
         self._stats["completed_trajectories"] += len(ready)
         return ready
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         s = dict(self._stats)
         s["registered_tasks"] = list(self._services.keys())
         s["service_stats"] = {
@@ -566,14 +567,14 @@ class AgenticEnvironment:
     async def teardown(self) -> None:
         ...
 
-    async def execute(self, action: str) -> Dict[str, Any]:
+    async def execute(self, action: str) -> dict[str, Any]:
         ...
 
     def verify(self, response: str, ground_truth: str) -> float:
         return 0.0
 
     @property
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         return dict(self._stats)
 
 
@@ -599,10 +600,10 @@ class SWEEnvironment(AgenticEnvironment):
         self.issue_text = issue_text
         self.test_command = test_command
         self.language = language
-        self._f2p_tests: List[str] = []
-        self._p2p_tests: List[str] = []
+        self._f2p_tests: list[str] = []
+        self._p2p_tests: list[str] = []
 
-    def set_tests(self, f2p: List[str], p2p: List[str]) -> None:
+    def set_tests(self, f2p: list[str], p2p: list[str]) -> None:
         self._f2p_tests = f2p
         self._p2p_tests = p2p
 
@@ -678,7 +679,7 @@ class SearchEnvironment(AgenticEnvironment):
     def __init__(
         self,
         question: str = "",
-        expected_sources: Optional[List[str]] = None,
+        expected_sources: list[str] | None = None,
         num_hops: int = 2,
     ):
         super().__init__(AgenticTaskType.SEARCH, "search-env")
@@ -725,10 +726,10 @@ class AsyncAgenticRLTrainer:
         config: GRPOConfig,
         orchestrator: MultiTaskRolloutOrchestrator,
         llm_complete: Callable[..., Any],
-        tito_config: Optional[TITOConfig] = None,
-        double_sided_is_config: Optional[DoubledSidedISConfig] = None,
-        off_policy_drop_config: Optional[OffPolicyDropConfig] = None,
-        dp_routing_config: Optional[DPAwareRoutingConfig] = None,
+        tito_config: TITOConfig | None = None,
+        double_sided_is_config: DoubledSidedISConfig | None = None,
+        off_policy_drop_config: OffPolicyDropConfig | None = None,
+        dp_routing_config: DPAwareRoutingConfig | None = None,
         weight_sync_interval: int = 10,
         trajectory_threshold: int = 64,
     ):
@@ -744,7 +745,7 @@ class AsyncAgenticRLTrainer:
         self.weight_sync_interval = weight_sync_interval
         self.trajectory_threshold = trajectory_threshold
         self._weight_version = 0
-        self._pending_trajectories: List[Dict[str, Any]] = []
+        self._pending_trajectories: list[dict[str, Any]] = []
 
         self._rollout_worker = RolloutWorker(
             llm_complete=llm_complete,
@@ -762,7 +763,7 @@ class AsyncAgenticRLTrainer:
             "avg_reward": 0.0,
         }
 
-    async def continuous_rollout(self, prompts: List[Dict[str, Any]]) -> None:
+    async def continuous_rollout(self, prompts: list[dict[str, Any]]) -> None:
         """Continuously generate rollouts via orchestrator.
 
         Inference engine runs independently; generated trajectories
@@ -806,7 +807,7 @@ class AsyncAgenticRLTrainer:
         ground_truth: str,
         task_type: AgenticTaskType,
         dp_rank: int,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         response = await self._rollout_worker.generate(prompt=prompt)
         if not response:
             return None
@@ -828,7 +829,7 @@ class AsyncAgenticRLTrainer:
             "dp_rank": dp_rank,
         }
 
-    def consume_ready_trajectories(self) -> List[Dict[str, Any]]:
+    def consume_ready_trajectories(self) -> list[dict[str, Any]]:
         """Consume trajectories once threshold is reached.
 
         Ported from GLM-5: batch is sent to training engine when
@@ -846,13 +847,13 @@ class AsyncAgenticRLTrainer:
         return filtered
 
     def _filter_batch(
-        self, batch: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, batch: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Apply off-policy filtering to batch.
 
         Drops stale trajectories and env failures, handles incomplete groups.
         """
-        filtered: List[Dict[str, Any]] = []
+        filtered: list[dict[str, Any]] = []
         for traj in batch:
             failure_reason = traj.get("failure_reason")
             rollout_versions = traj.get("rollout_versions", [])
@@ -883,7 +884,7 @@ class AsyncAgenticRLTrainer:
             f"version={self._weight_version}"
         )
 
-    async def train_step(self, batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def train_step(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
         """Execute one training step on consumed trajectories.
 
         Uses GLM-5 GRPO variant (Section 4.1):
@@ -894,7 +895,7 @@ class AsyncAgenticRLTrainer:
         if not batch:
             return {"step": self._stats["train_steps"], "trajectories": 0}
 
-        groups: Dict[str, List[Dict[str, Any]]] = {}
+        groups: dict[str, list[dict[str, Any]]] = {}
         for traj in batch:
             gid = traj.get("prompt", "")
             if gid not in groups:
@@ -926,9 +927,9 @@ class AsyncAgenticRLTrainer:
 
     async def train_loop(
         self,
-        data_loader: Callable[[], List[Dict[str, Any]]],
+        data_loader: Callable[[], list[dict[str, Any]]],
         num_rollout_steps: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run the full asynchronous training loop.
 
         Flow:
@@ -955,7 +956,7 @@ class AsyncAgenticRLTrainer:
 
         return dict(self._stats)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         return dict(self._stats)
 
     def reset(self) -> None:

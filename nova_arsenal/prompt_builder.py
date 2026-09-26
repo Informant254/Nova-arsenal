@@ -20,7 +20,7 @@ Qwythos enhancements:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +40,11 @@ class Scope:
     relative_priority. relative_priority is relative to the parent's priority
     (should be negative to make content lower priority than parent).
     """
-    children: List[Any] = field(default_factory=list)
-    absolute_priority: Optional[int] = None
-    relative_priority: Optional[int] = None
-    name: Optional[str] = None
-    priority: Optional[int] = None  # alias for absolute_priority
+    children: list[Any] = field(default_factory=list)
+    absolute_priority: int | None = None
+    relative_priority: int | None = None
+    name: str | None = None
+    priority: int | None = None  # alias for absolute_priority
 
     def __post_init__(self) -> None:
         if self.priority is not None and self.absolute_priority is None:
@@ -58,7 +58,7 @@ class First:
     Children must be Scope nodes. The first child with absolute_priority >= cutoff
     is rendered; others are skipped.
     """
-    children: List[Scope] = field(default_factory=list)
+    children: list[Scope] = field(default_factory=list)
 
 
 @dataclass
@@ -71,8 +71,8 @@ class Empty:
 class Isolate:
     """Independently bounded subtree with its own token limit."""
     token_limit: int
-    children: List[Any] = field(default_factory=list)
-    _cached_output: Optional[Any] = None
+    children: list[Any] = field(default_factory=list)
+    _cached_output: Any | None = None
 
 
 @dataclass
@@ -86,8 +86,8 @@ class ChatMessage:
     """A chat message with a role and content."""
     role: str  # system, user, assistant, tool, function
     content: str
-    name: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    name: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -95,7 +95,7 @@ class ToolDefinition:
     """A tool/function definition with JSON schema."""
     name: str
     description: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
 
 class ThinkingProfile(Enum):
@@ -122,7 +122,7 @@ class AdaptiveThinking:
     - SWE: dense reasoning during bug-localization and fix-verification
     - LONG_HORIZON: progressively deepening reasoning over many steps
     """
-    enable_thinking: Optional[bool] = None
+    enable_thinking: bool | None = None
     profile: ThinkingProfile = ThinkingProfile.DEFAULT
     content: str = ""
 
@@ -248,7 +248,7 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // TOKEN_CHAR_ESTIMATE)
 
 
-def count_text_tokens(text: str, tokenizer: Optional[Any] = None) -> int:
+def count_text_tokens(text: str, tokenizer: Any | None = None) -> int:
     """Count tokens using tiktoken if available, else character estimate."""
     if tokenizer is not None:
         try:
@@ -260,7 +260,7 @@ def count_text_tokens(text: str, tokenizer: Optional[Any] = None) -> int:
     return _estimate_tokens(text)
 
 
-def count_tool_tokens(tool: ToolDefinition, tokenizer: Optional[Any] = None) -> int:
+def count_tool_tokens(tool: ToolDefinition, tokenizer: Any | None = None) -> int:
     """Estimate tokens for a tool definition."""
     text = f"{tool.name}: {tool.description} {json.dumps(tool.parameters)}"
     return count_text_tokens(text, tokenizer)
@@ -270,7 +270,7 @@ def count_tool_tokens(tool: ToolDefinition, tokenizer: Optional[Any] = None) -> 
 
 
 def _compute_priority(
-    node: Union[Scope, Any],
+    node: Scope | Any,
     parent_priority: int,
 ) -> int:
     """Compute effective priority for a node."""
@@ -338,7 +338,7 @@ def compute_priority_levels(
 # ── Hydration (isolates and empty token counts) ────────────────────────────
 
 
-def _hydrate_isolates(nodes: Any, tokenizer: Optional[Any]) -> None:
+def _hydrate_isolates(nodes: Any, tokenizer: Any | None) -> None:
     """Pre-render isolated subtrees."""
     if isinstance(nodes, (list, tuple)):
         for child in nodes:
@@ -376,16 +376,16 @@ def _hydrate_isolates(nodes: Any, tokenizer: Optional[Any]) -> None:
 def _render_with_level(
     nodes: Any,
     level: int,
-    tokenizer: Optional[Any],
-) -> Tuple[Optional[str], int, Optional[List[ChatMessage]], Optional[List[ToolDefinition]]]:
+    tokenizer: Any | None,
+) -> tuple[str | None, int, list[ChatMessage] | None, list[ToolDefinition] | None]:
     """Render prompt content including all scopes with priority >= level.
     
     Returns (text, empty_tokens, chat_messages, tool_definitions).
     """
-    text_parts: List[str] = []
+    text_parts: list[str] = []
     empty_token_count = 0
-    chat_messages: Optional[List[ChatMessage]] = None
-    tool_definitions: Optional[List[ToolDefinition]] = None
+    chat_messages: list[ChatMessage] | None = None
+    tool_definitions: list[ToolDefinition] | None = None
 
     def _render_inner(nodes_inner: Any) -> None:
         nonlocal text_parts, empty_token_count, chat_messages, tool_definitions
@@ -510,7 +510,7 @@ def _render_with_level(
     return text, empty_token_count, chat_messages, tool_definitions
 
 
-def _count_tokens_approx(text: Optional[str], tokenizer: Optional[Any]) -> int:
+def _count_tokens_approx(text: str | None, tokenizer: Any | None) -> int:
     """Count tokens in text, using tokenizer if available."""
     if not text:
         return 0
@@ -520,8 +520,8 @@ def _count_tokens_approx(text: Optional[str], tokenizer: Optional[Any]) -> int:
 def render(
     nodes: Any,
     token_limit: int = 4096,
-    tokenizer: Optional[Any] = None,
-) -> Tuple[Optional[str], int, Optional[List[ChatMessage]], Optional[List[ToolDefinition]]]:
+    tokenizer: Any | None = None,
+) -> tuple[str | None, int, list[ChatMessage] | None, list[ToolDefinition] | None]:
     """Render prompt with priority-based token budget fitting.
     
     Uses binary search (like Priompt's renderBinarySearch) to find the
@@ -571,7 +571,7 @@ def render(
         nodes, sorted_levels[inclusive_upper], tokenizer
     )
 
-    # If even the highest priority (most restrictive) doesn't fit, 
+    # If even the highest priority (most restrictive) doesn't fit,
     # render at the highest level anyway
     if final_text is None:
         final_text, final_empty, final_chats, final_tools = _render_with_level(
@@ -591,8 +591,8 @@ class RenderResult:
     tokens_reserved: int = 0
     token_count: int = 0
     token_limit: int = 4096
-    chat_messages: Optional[List[ChatMessage]] = None
-    tool_definitions: Optional[List[ToolDefinition]] = None
+    chat_messages: list[ChatMessage] | None = None
+    tool_definitions: list[ToolDefinition] | None = None
     priority_cutoff: int = BASE_PRIORITY
 
     @property
@@ -627,7 +627,7 @@ class PromptBuilder:
     def render(
         self,
         tree: Any,
-        tokenizer: Optional[Any] = None,
+        tokenizer: Any | None = None,
     ) -> RenderResult:
         """Render a prompt tree with priority-based token fitting."""
         text, empty, chats, tools = render(
@@ -650,15 +650,15 @@ class PromptBuilder:
 # ── Convenience Constructors ────────────────────────────────────────────────
 
 
-def system_message(content: str, name: Optional[str] = None) -> ChatMessage:
+def system_message(content: str, name: str | None = None) -> ChatMessage:
     return ChatMessage(role="system", content=content, name=name)
 
 
-def user_message(content: str, name: Optional[str] = None) -> ChatMessage:
+def user_message(content: str, name: str | None = None) -> ChatMessage:
     return ChatMessage(role="user", content=content, name=name)
 
 
-def assistant_message(content: str, tool_calls: Optional[List[Dict]] = None) -> ChatMessage:
+def assistant_message(content: str, tool_calls: list[dict] | None = None) -> ChatMessage:
     return ChatMessage(role="assistant", content=content, tool_calls=tool_calls)
 
 
@@ -667,7 +667,7 @@ def tool_result(content: str, name: str) -> ChatMessage:
 
 
 def adaptive_thinking_block(
-    enable_thinking: Optional[bool] = None,
+    enable_thinking: bool | None = None,
     profile: ThinkingProfile = ThinkingProfile.DEFAULT,
     content: str = "",
 ) -> AdaptiveThinking:

@@ -34,7 +34,7 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
     print("\n" + "="*60)
     print("NOVA-ARSENAL TEST RUN")
     print("="*60 + "\n")
-    
+
     # Initialize blueprint (loads all 230 tools)
     print("📂 Loading Kali Linux knowledge base...")
     blueprint = KaliBlueprint()
@@ -42,7 +42,7 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
     print(f"   ✓ {len(blueprint.attack_chains)} attack chains")
     print(f"   ✓ {len(blueprint.nse_scripts)} NSE scripts")
     print()
-    
+
     # Create agent runner
     print("🤖 Initializing Nova agent runner...")
     executor = SandboxExecutor(mode="local")
@@ -54,13 +54,13 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
     )
     print("   ✓ Agent runner initialized")
     print()
-    
+
     # Run agent
     print("🚀 Starting autonomous testing...")
     print("-"*60)
-    
+
     result = await runner.run()
-    
+
     print("-"*60)
     print("\n" + "="*60)
     print("TEST RESULTS")
@@ -70,7 +70,7 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
     print(f"Findings: {len(result.get('findings', []))}")
     print(f"Duration: {result.get('elapsed_seconds', 0):.2f}s")
     print()
-    
+
     if result.get("findings"):
         print("📊 Findings Summary:")
         for finding in result["findings"][:10]:  # Show first 10
@@ -80,11 +80,11 @@ async def test_nova(target: str, objective: str, max_steps: int = 20):
         if len(result["findings"]) > 10:
             print(f"   ... and {len(result['findings']) - 10} more")
     print()
-    
+
     if result.get("report"):
         print("📝 Final Report:")
         print(result["report"][:1000] + "..." if len(result["report"]) > 1000 else result["report"])
-    
+
     return result
 
 
@@ -97,11 +97,11 @@ async def main():
         print("  python test_nova.py 192.168.1.100 'Full audit'")
         print("  python test_nova.py example.com 'Web app test'")
         sys.exit(1)
-    
+
     target = sys.argv[1]
     objective = sys.argv[2]
     max_steps = int(sys.argv[3]) if len(sys.argv) > 3 else 20
-    
+
     await test_nova(target, objective, max_steps)
 
 

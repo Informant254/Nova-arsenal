@@ -8,8 +8,8 @@ Tools can be rendered into prompt_builder Scope nodes for
 priority-based prompt assembly.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -17,13 +17,13 @@ class ToolSchema:
     """A tool definition with JSON Schema parameters."""
     name: str
     description: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
 
 # ── Cursor Builtin Tools (from aiserver.proto BuiltinTool enum) ────────────
 
 
-CURSOR_BUILTIN_TOOLS: List[ToolSchema] = [
+CURSOR_BUILTIN_TOOLS: list[ToolSchema] = [
     ToolSchema(
         name="search",
         description="Semantic code search across the codebase. Returns relevant file paths and code snippets matching the query.",
@@ -385,7 +385,7 @@ CURSOR_BUILTIN_TOOLS: List[ToolSchema] = [
 # ── Nova-Arsenal Security Tools ─────────────────────────────────────────────
 
 
-NOVA_SECURITY_TOOLS: List[ToolSchema] = [
+NOVA_SECURITY_TOOLS: list[ToolSchema] = [
     ToolSchema(
         name="nmap_scan",
         description="Run an Nmap scan against a target. Supports full port scans, service detection, and NSE scripts.",
@@ -695,10 +695,10 @@ NOVA_SECURITY_TOOLS: List[ToolSchema] = [
 # ── Combined Tool Registry ──────────────────────────────────────────────────
 
 
-ALL_TOOLS: List[ToolSchema] = CURSOR_BUILTIN_TOOLS + NOVA_SECURITY_TOOLS
+ALL_TOOLS: list[ToolSchema] = CURSOR_BUILTIN_TOOLS + NOVA_SECURITY_TOOLS
 
 
-def get_tool_by_name(name: str) -> Optional[ToolSchema]:
+def get_tool_by_name(name: str) -> ToolSchema | None:
     """Look up a tool by name across all registries."""
     for tool in ALL_TOOLS:
         if tool.name == name:
@@ -706,7 +706,7 @@ def get_tool_by_name(name: str) -> Optional[ToolSchema]:
     return None
 
 
-def tools_to_openai_format(tools: List[ToolSchema]) -> List[Dict[str, Any]]:
+def tools_to_openai_format(tools: list[ToolSchema]) -> list[dict[str, Any]]:
     """Convert tool schemas to OpenAI-compatible tool definitions."""
     result = []
     for tool in tools:
@@ -721,7 +721,7 @@ def tools_to_openai_format(tools: List[ToolSchema]) -> List[Dict[str, Any]]:
     return result
 
 
-def tools_to_anthropic_format(tools: List[ToolSchema]) -> List[Dict[str, Any]]:
+def tools_to_anthropic_format(tools: list[ToolSchema]) -> list[dict[str, Any]]:
     """Convert tool schemas to Anthropic-compatible tool definitions."""
     result = []
     for tool in tools:
@@ -733,7 +733,7 @@ def tools_to_anthropic_format(tools: List[ToolSchema]) -> List[Dict[str, Any]]:
     return result
 
 
-def tools_to_nexn2_xml_format(tools: List[ToolSchema]) -> str:
+def tools_to_nexn2_xml_format(tools: list[ToolSchema]) -> str:
     """Convert tool schemas to Nex-N2 XML tool call format.
 
     Generates the <tools> block for Nex-N2 style chat templates:
@@ -780,7 +780,7 @@ value
     return "\n".join(lines) + instruction
 
 
-def tools_to_deepseek_xml_format(tools: List[ToolSchema]) -> str:
+def tools_to_deepseek_xml_format(tools: list[ToolSchema]) -> str:
     """Convert tool schemas to DeepSeek V4 Pro DSML tool format.
 
     Uses <|DSML|tool_calls> markers and XML format.

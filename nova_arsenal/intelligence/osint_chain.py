@@ -6,13 +6,12 @@ discovery steps to build a complete intelligence picture.
 """
 
 import asyncio
-import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +43,9 @@ class OsintArtifact:
     type: str
     value: str
     source: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "phase": self.phase.value,
             "type": self.type,
@@ -59,16 +58,16 @@ class OsintArtifact:
 @dataclass
 class OsintChainResult:
     target: str
-    completed_phases: List[str] = field(default_factory=list)
-    artifacts: List[OsintArtifact] = field(default_factory=list)
-    subdomains: List[str] = field(default_factory=list)
-    emails: List[str] = field(default_factory=list)
-    technologies: Dict[str, List[str]] = field(default_factory=dict)
-    social_accounts: List[str] = field(default_factory=list)
-    breached_accounts: List[str] = field(default_factory=list)
+    completed_phases: list[str] = field(default_factory=list)
+    artifacts: list[OsintArtifact] = field(default_factory=list)
+    subdomains: list[str] = field(default_factory=list)
+    emails: list[str] = field(default_factory=list)
+    technologies: dict[str, list[str]] = field(default_factory=dict)
+    social_accounts: list[str] = field(default_factory=list)
+    breached_accounts: list[str] = field(default_factory=list)
     summary: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "completed_phases": self.completed_phases,
@@ -98,7 +97,7 @@ class OsintChain:
     Phase 7: Correlation            — cross-phase analysis
     """
 
-    def __init__(self, executor: Optional[CommandExecutor] = None) -> None:
+    def __init__(self, executor: CommandExecutor | None = None) -> None:
         self._executor = executor or self._default_executor
 
     async def investigate(self, target: str) -> OsintChainResult:

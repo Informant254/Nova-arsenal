@@ -1,12 +1,12 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 try:
-    from mcp import MCPServer, Tool, Resource, Prompt, TextContent
+    from mcp import MCPServer, Prompt, Resource, TextContent, Tool
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
@@ -16,9 +16,9 @@ class NovaMcpServer:
     def __init__(self, host: str = "127.0.0.1", port: int = 8765) -> None:
         self.host = host
         self.port = port
-        self._mcp_server: Optional[Any] = None
-        self._tools: Dict[str, Any] = {}
-        self._resources: Dict[str, Any] = {}
+        self._mcp_server: Any | None = None
+        self._tools: dict[str, Any] = {}
+        self._resources: dict[str, Any] = {}
 
     def register_all_tools(self) -> None:
         self._register_tool(
@@ -188,7 +188,7 @@ class NovaMcpServer:
         )
 
     def _register_tool(self, name: str, description: str,
-                       input_schema: Dict[str, Any]) -> None:
+                       input_schema: dict[str, Any]) -> None:
         self._tools[name] = {
             "name": name,
             "description": description,
@@ -225,20 +225,19 @@ class NovaMcpServer:
             "mimeType": mime_type,
         }
 
-    def get_tool_list(self) -> List[Dict[str, Any]]:
+    def get_tool_list(self) -> list[dict[str, Any]]:
         return list(self._tools.values())
 
-    def get_resource_list(self) -> List[Dict[str, Any]]:
+    def get_resource_list(self) -> list[dict[str, Any]]:
         return list(self._resources.values())
 
     async def handle_tool_call(self, tool_name: str,
-                               arguments: Dict[str, Any]) -> str:
+                               arguments: dict[str, Any]) -> str:
+        from nova_arsenal.compliance import ComplianceMapper
+        from nova_arsenal.ctf_solver import ChallengeType, CtfSolver
         from nova_arsenal.intelligence import CveResearch, OsintChain
         from nova_arsenal.payload_generator import PayloadGenerator
-        from nova_arsenal.compliance import ComplianceMapper
         from nova_arsenal.swarm import SwarmOrchestrator
-        from nova_arsenal.ctf_solver import CtfSolver, ChallengeType
-        from nova_arsenal.integrations import NmapParser
 
         try:
             if tool_name == "nmap_scan":
@@ -279,7 +278,7 @@ class NovaMcpServer:
                 }, indent=2)
 
             elif tool_name == "payload_generate":
-                from nova_arsenal.payload_generator import PayloadType, PayloadLanguage
+                from nova_arsenal.payload_generator import PayloadLanguage, PayloadType
                 generator = PayloadGenerator()
                 ptype_str = arguments["payload_type"]
                 lhost = arguments["lhost"]
@@ -379,7 +378,7 @@ class NovaMcpServer:
                 }, indent=2)
 
             elif tool_name == "zeroday_hunt":
-                from nova_arsenal.zeroday import ZeroDayHunter, ZeroDayHuntConfig
+                from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter
 
                 if not arguments.get("authorized"):
                     return json.dumps({

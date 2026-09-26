@@ -1,11 +1,10 @@
 """Tests for MITRE mapper, credentials, ransomware, fix verification, incremental, streaming."""
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
 
 
 def _run(coro):
@@ -80,7 +79,10 @@ class TestCredentialHarvester:
 
     def test_validate_credential(self):
         from nova_arsenal.credentials.harvester import (
-            CredentialHarvester, HarvestedCredential, CredentialType, HarvestMethod,
+            CredentialHarvester,
+            CredentialType,
+            HarvestedCredential,
+            HarvestMethod,
         )
         h = CredentialHarvester()
         c = HarvestedCredential(
@@ -93,7 +95,10 @@ class TestCredentialHarvester:
 
     def test_analyze_with_llm(self):
         from nova_arsenal.credentials.harvester import (
-            CredentialHarvester, HarvestedCredential, CredentialType, HarvestMethod,
+            CredentialHarvester,
+            CredentialType,
+            HarvestedCredential,
+            HarvestMethod,
         )
         h = CredentialHarvester()
         c = HarvestedCredential(
@@ -152,7 +157,9 @@ class TestFixVerifier:
 
     def test_register_and_verify(self):
         from nova_arsenal.fix_verification.verifier import (
-            FixVerifier, OriginalFinding, VerificationStatus,
+            FixVerifier,
+            OriginalFinding,
+            VerificationStatus,
         )
         v = FixVerifier()
         f = OriginalFinding(
@@ -180,7 +187,7 @@ class TestIncrementalTester:
         assert t is not None
 
     def test_detect_deltas(self):
-        from nova_arsenal.incremental.engine import IncrementalTester, ChangeType
+        from nova_arsenal.incremental.engine import IncrementalTester
         t = IncrementalTester()
         baseline = {"file1.py": "content1", "file2.py": "content2"}
         target = {"file1.py": "modified", "file3.py": "new"}

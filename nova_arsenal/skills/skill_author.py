@@ -29,8 +29,6 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
-
 
 DEFAULT_PENDING_DIR = Path("pending_skills")
 DEFAULT_APPROVED_DIR = Path("skills")
@@ -95,9 +93,9 @@ class SkillAuthor:
         entry_class: str,
         skill_type: str = "tool",
         author: str = "nova-self-authored",
-        requires_credentials: Optional[list[str]] = None,
-        python_requires: Optional[list[str]] = None,
-        tags: Optional[list[str]] = None,
+        requires_credentials: list[str] | None = None,
+        python_requires: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> DraftedSkill:
         """
         Write a new candidate skill to pending_skills/<name>/.

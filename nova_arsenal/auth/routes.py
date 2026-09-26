@@ -5,16 +5,14 @@ FastAPI routes for user authentication, OAuth, subscription, and API keys.
 """
 
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
 import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import secrets
 
 from nova_arsenal.auth.audit import (
     audit_api_key_created,
@@ -22,16 +20,15 @@ from nova_arsenal.auth.audit import (
     audit_login_failure,
     audit_login_success,
     audit_oauth_login,
-    audit_subscription_upgraded,
 )
-from nova_arsenal.auth.middleware import get_current_user as require_current_user, require_admin
+from nova_arsenal.auth.middleware import get_current_user as require_current_user
+from nova_arsenal.auth.middleware import require_admin
 from nova_arsenal.auth.models import (
     ApiKeyCreateRequest,
     ApiKeyListResponse,
     ApiKeyResponse,
     OAuthAccountResponse,
     OAuthLoginResponse,
-    PasswordChange,
     RefreshTokenRequest,
     SubscriptionResponse,
     SubscriptionUpgradeRequest,
@@ -42,12 +39,17 @@ from nova_arsenal.auth.models import (
     UserRoleUpdate,
 )
 from nova_arsenal.auth.oauth import (
+    PKCEChallenge,
     extract_pkce_verifier,
-    extract_redirect,
     generate_oauth_state,
     get_oauth_provider,
-    PKCEChallenge,
     verify_oauth_state,
+)
+from nova_arsenal.auth.passwords import (
+    DUMMY_PASSWORD_HASH,
+    get_password_hash,
+    verify_and_upgrade_password,
+    verify_password,
 )
 from nova_arsenal.config import get_config
 from nova_arsenal.db import get_db
@@ -61,16 +63,9 @@ from nova_arsenal.db.models import (
     UserRole,
 )
 
-from nova_arsenal.auth.passwords import (
-    DUMMY_PASSWORD_HASH,
-    get_password_hash,
-    verify_and_upgrade_password,
-    verify_password,
-)
-
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create an access token."""
     config = get_config()
     to_encode = data.copy()

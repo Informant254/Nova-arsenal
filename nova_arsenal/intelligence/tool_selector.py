@@ -11,7 +11,7 @@ security tool for the job. Nova uses this to decide:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,9 @@ class ToolSuggestion:
     reasoning: str
     priority: int  # 1-10, higher = more relevant
     phase: str = "exploitation"
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tool_name": self.tool_name,
             "tool_type": self.tool_type,
@@ -66,7 +66,7 @@ class ToolSelector:
         # Correlation rules (cross-service)
         self._correlation_rules = self._build_correlation_rules()
 
-    def _build_service_rules(self) -> List[Dict[str, Any]]:
+    def _build_service_rules(self) -> list[dict[str, Any]]:
         """Build rules mapping services to recommended tools."""
         return [
             # ── Web Services ──
@@ -357,7 +357,7 @@ class ToolSelector:
             },
         ]
 
-    def _build_finding_rules(self) -> List[Dict[str, Any]]:
+    def _build_finding_rules(self) -> list[dict[str, Any]]:
         """Build rules matching finding types to recommended tools."""
         return [
             {
@@ -472,7 +472,7 @@ class ToolSelector:
             },
         ]
 
-    def _build_correlation_rules(self) -> List[Dict[str, Any]]:
+    def _build_correlation_rules(self) -> list[dict[str, Any]]:
         """Build cross-service correlation rules."""
         return [
             {
@@ -532,11 +532,11 @@ class ToolSelector:
 
     def suggest(
         self,
-        services: Dict[str, List[int]],
-        findings: Optional[List[Dict[str, Any]]] = None,
+        services: dict[str, list[int]],
+        findings: list[dict[str, Any]] | None = None,
         target: str = "",
         domain: str = "",
-    ) -> List[ToolSuggestion]:
+    ) -> list[ToolSuggestion]:
         """
         Get tool suggestions based on detected services and findings.
 
@@ -549,7 +549,7 @@ class ToolSelector:
         Returns:
             Ranked list of ToolSuggestion objects
         """
-        suggestions: Dict[str, ToolSuggestion] = {}
+        suggestions: dict[str, ToolSuggestion] = {}
         findings = findings or []
 
         # Phase 1: Service-based suggestions
@@ -608,9 +608,9 @@ class ToolSelector:
 
     def decide_exploit_strategy(
         self,
-        services: Dict[str, List[int]],
-        findings: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        services: dict[str, list[int]],
+        findings: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """
         High-level strategy decision based on full context.
 
@@ -631,7 +631,7 @@ class ToolSelector:
             }
 
         # Group tools by type
-        by_type: Dict[str, List[ToolSuggestion]] = {}
+        by_type: dict[str, list[ToolSuggestion]] = {}
         for s in suggestions:
             by_type.setdefault(s.tool_type, []).append(s)
 

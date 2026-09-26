@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import pytest
 
 from nova_arsenal.mcp import NovaMcpServer
 

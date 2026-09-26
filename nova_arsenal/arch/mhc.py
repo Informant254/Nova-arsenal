@@ -11,7 +11,6 @@ for future Nova model architecture experiments.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -120,7 +119,7 @@ class MultimodalProjection(nn.Module):
 
     def __init__(
         self,
-        modal_dims: Dict[str, int],
+        modal_dims: dict[str, int],
         hidden_dim: int,
         num_heads: int = 8,
     ):
@@ -141,7 +140,7 @@ class MultimodalProjection(nn.Module):
 
     def forward(
         self,
-        inputs: Dict[str, torch.Tensor],
+        inputs: dict[str, torch.Tensor],
     ) -> torch.Tensor:
         projected = []
         for name, x in inputs.items():
@@ -198,8 +197,8 @@ class AnticipatoryRouter(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        expert_counts: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        expert_counts: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         B, L, D = x.shape
         x_flat = x.view(-1, D)
 
@@ -229,7 +228,7 @@ class AnticipatoryRouter(nn.Module):
 
         return indices, weights
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         return {
             "conflict_rate": self._stats["conflict_rate"],
             "total_tokens": self._stats["total_tokens"],

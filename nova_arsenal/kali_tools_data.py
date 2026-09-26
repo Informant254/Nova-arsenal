@@ -3,7 +3,7 @@ Kali tool data - all tool definitions organized by category.
 Imported by KaliBlueprint to populate the knowledge base.
 """
 
-from nova_arsenal.kali_blueprint import ToolInfo, NSEScript, MetasploitModule, Wordlist
+from nova_arsenal.kali_blueprint import MetasploitModule, NSEScript, ToolInfo, Wordlist
 
 # ═══════════════════════════════════════════════════════════════════════════
 # RECONNAISSANCE TOOLS

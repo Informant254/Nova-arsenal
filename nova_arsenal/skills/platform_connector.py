@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class PlatformKind(str, Enum):
@@ -36,10 +36,10 @@ class Target:
     url: str
     scope_summary: str = ""
     tags: list[str] = field(default_factory=list)
-    difficulty: Optional[str] = None          # easy/medium/hard/insane (labs/ctf)
-    max_reward_usd: Optional[float] = None    # bug bounty only
+    difficulty: str | None = None          # easy/medium/hard/insane (labs/ctf)
+    max_reward_usd: float | None = None    # bug bounty only
     asset_types: list[str] = field(default_factory=list)  # web, api, mobile, network...
-    last_updated: Optional[datetime] = None
+    last_updated: datetime | None = None
     raw: dict[str, Any] = field(default_factory=dict)  # original platform payload
 
 

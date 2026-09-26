@@ -7,8 +7,8 @@ DeepSeek Sparse Attention (DSA) patterns adapted for Nova:
 - Deterministic indexer for consistent training-inference
 """
 from nova_arsenal.context.compression import (
-    CompressionStrategy,
     CompressedLatent,
+    CompressionStrategy,
     ContentCompressor,
     DSAConfig,
     DSAIndexer,

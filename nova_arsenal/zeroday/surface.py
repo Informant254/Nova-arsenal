@@ -11,8 +11,9 @@ import hashlib
 import logging
 import re
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +77,10 @@ class SurfaceEndpoint:
     path: str = ""
     version: str = ""
     banner: str = ""
-    technologies: List[str] = field(default_factory=list)
-    params: List[str] = field(default_factory=list)
-    methods: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    technologies: list[str] = field(default_factory=list)
+    params: list[str] = field(default_factory=list)
+    methods: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     priority: float = 0.0
     blast_radius: float = 0.0
     fuzz_affinity: float = 0.0
@@ -91,7 +92,7 @@ class SurfaceEndpoint:
         raw = f"{self.target}|{self.service}|{self.port}|{self.path}|{self.version}"
         return hashlib.sha1(raw.encode()).hexdigest()[:12]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "surface_id": self.surface_id,
             "target": self.target,
@@ -118,15 +119,15 @@ class SurfaceMap:
     """Ranked attack surface for a target."""
 
     target: str
-    endpoints: List[SurfaceEndpoint] = field(default_factory=list)
+    endpoints: list[SurfaceEndpoint] = field(default_factory=list)
     elapsed_ms: float = 0.0
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
     @property
-    def top(self) -> List[SurfaceEndpoint]:
+    def top(self) -> list[SurfaceEndpoint]:
         return sorted(self.endpoints, key=lambda e: e.priority, reverse=True)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "endpoint_count": len(self.endpoints),
@@ -155,14 +156,14 @@ class AttackSurfaceMapper:
     def map(
         self,
         target: str,
-        services: Optional[Dict[str, Any]] = None,
-        endpoints: Optional[Sequence[Dict[str, Any]]] = None,
-        technologies: Optional[Sequence[str]] = None,
-        findings: Optional[Sequence[Dict[str, Any]]] = None,
+        services: dict[str, Any] | None = None,
+        endpoints: Sequence[dict[str, Any]] | None = None,
+        technologies: Sequence[str] | None = None,
+        findings: Sequence[dict[str, Any]] | None = None,
     ) -> SurfaceMap:
         t0 = time.perf_counter()
-        mapped: List[SurfaceEndpoint] = []
-        notes: List[str] = []
+        mapped: list[SurfaceEndpoint] = []
+        notes: list[str] = []
 
         services = services or {}
         technologies = list(technologies or [])
@@ -200,7 +201,7 @@ class AttackSurfaceMapper:
             self._score(ep)
 
         # Dedup by surface_id, keep highest priority
-        by_id: Dict[str, SurfaceEndpoint] = {}
+        by_id: dict[str, SurfaceEndpoint] = {}
         for ep in mapped:
             prev = by_id.get(ep.surface_id)
             if prev is None or ep.priority > prev.priority:
@@ -235,8 +236,8 @@ class AttackSurfaceMapper:
         svc_name: str,
         meta: Any,
         technologies: Sequence[str],
-    ) -> List[SurfaceEndpoint]:
-        results: List[SurfaceEndpoint] = []
+    ) -> list[SurfaceEndpoint]:
+        results: list[SurfaceEndpoint] = []
         name = str(svc_name).lower().strip()
 
         if isinstance(meta, list):
@@ -298,7 +299,7 @@ class AttackSurfaceMapper:
     def _from_endpoint_dict(
         self,
         target: str,
-        ep: Dict[str, Any],
+        ep: dict[str, Any],
         technologies: Sequence[str],
     ) -> SurfaceEndpoint:
         return SurfaceEndpoint(
@@ -319,8 +320,8 @@ class AttackSurfaceMapper:
 
     def _boost_from_finding(
         self,
-        endpoints: List[SurfaceEndpoint],
-        finding: Dict[str, Any],
+        endpoints: list[SurfaceEndpoint],
+        finding: dict[str, Any],
     ) -> None:
         text = " ".join(
             str(finding.get(k, ""))

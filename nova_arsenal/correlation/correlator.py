@@ -14,7 +14,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +35,18 @@ class CorrelatedFinding:
     remediation: str = ""
 
     # Correlation metadata
-    source_tools: List[str] = field(default_factory=list)
+    source_tools: list[str] = field(default_factory=list)
     source_count: int = 0
     confidence: float = 0.0
-    correlation_tags: List[str] = field(default_factory=list)
-    raw_sources: List[Dict[str, Any]] = field(default_factory=list)
+    correlation_tags: list[str] = field(default_factory=list)
+    raw_sources: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.source_count = len(self.source_tools)
         if self.confidence == 0.0 and self.source_count > 0:
             self.confidence = min(1.0, self.source_count * 0.3)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "title": self.title,
             "severity": self.severity,
@@ -64,25 +64,25 @@ class CorrelatedFinding:
 @dataclass
 class CorrelationResult:
     """Complete correlation output."""
-    correlated_findings: List[CorrelatedFinding] = field(default_factory=list)
-    uncorrelated_findings: List[Dict[str, Any]] = field(default_factory=list)
-    tool_coverage: Dict[str, int] = field(default_factory=dict)
-    cross_tool_insights: List[str] = field(default_factory=list)
+    correlated_findings: list[CorrelatedFinding] = field(default_factory=list)
+    uncorrelated_findings: list[dict[str, Any]] = field(default_factory=list)
+    tool_coverage: dict[str, int] = field(default_factory=dict)
+    cross_tool_insights: list[str] = field(default_factory=list)
     correlation_time: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     @property
-    def critical_findings(self) -> List[CorrelatedFinding]:
+    def critical_findings(self) -> list[CorrelatedFinding]:
         return [f for f in self.correlated_findings if f.severity == "critical"]
 
     @property
-    def high_findings(self) -> List[CorrelatedFinding]:
+    def high_findings(self) -> list[CorrelatedFinding]:
         return [f for f in self.correlated_findings if f.severity == "high"]
 
     @property
     def total_correlated(self) -> int:
         return len(self.correlated_findings)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "correlated_findings": [f.to_dict() for f in self.correlated_findings],
             "uncorrelated_count": len(self.uncorrelated_findings),
@@ -128,7 +128,7 @@ class Correlator:
     def __init__(self) -> None:
         self._correlation_rules = self._build_rules()
 
-    def _build_rules(self) -> List[Dict[str, Any]]:
+    def _build_rules(self) -> list[dict[str, Any]]:
         """Build correlation rules for cross-tool finding matching."""
         return [
             # ── Web Vulnerability Chains ──
@@ -212,11 +212,11 @@ class Correlator:
 
     async def correlate(
         self,
-        nmap_data: Optional[Dict[str, Any]] = None,
-        burp_issues: Optional[List[Dict[str, Any]]] = None,
-        msf_results: Optional[List[Dict[str, Any]]] = None,
-        sqlmap_tasks: Optional[List[Dict[str, Any]]] = None,
-        findings: Optional[List[Dict[str, Any]]] = None,
+        nmap_data: dict[str, Any] | None = None,
+        burp_issues: list[dict[str, Any]] | None = None,
+        msf_results: list[dict[str, Any]] | None = None,
+        sqlmap_tasks: list[dict[str, Any]] | None = None,
+        findings: list[dict[str, Any]] | None = None,
     ) -> CorrelationResult:
         """
         Correlate findings from all tool sources.
@@ -231,7 +231,7 @@ class Correlator:
             CorrelationResult with correlated + uncorrelated findings
         """
         # Normalize all sources
-        all_sources: Dict[str, List[Dict[str, Any]]] = {}
+        all_sources: dict[str, list[dict[str, Any]]] = {}
 
         if nmap_data:
             all_sources["nmap"] = self._normalize_nmap(nmap_data)
@@ -260,7 +260,7 @@ class Correlator:
             return CorrelationResult(tool_coverage=tool_coverage)
 
         # Run correlation
-        correlated: List[Dict[str, Any]] = []
+        correlated: list[dict[str, Any]] = []
         used_indices: set = set()
 
         for rule in self._correlation_rules:
@@ -316,10 +316,10 @@ class Correlator:
 
     def _find_matching(
         self,
-        all_flat: List[Dict[str, Any]],
-        rule: Dict[str, Any],
+        all_flat: list[dict[str, Any]],
+        rule: dict[str, Any],
         used_indices: set,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find findings matching a correlation rule."""
         matching = []
 
@@ -341,7 +341,7 @@ class Correlator:
         return matching
 
     def _build_title(
-        self, matching: List[Dict[str, Any]], rule: Dict[str, Any]
+        self, matching: list[dict[str, Any]], rule: dict[str, Any]
     ) -> str:
         """Build a descriptive title for a correlated finding."""
         sources = [m["_source_tool"] for m in matching]
@@ -352,7 +352,7 @@ class Correlator:
         return f"Correlated: {base} ({', '.join(set(sources))})"
 
     def _build_description(
-        self, matching: List[Dict[str, Any]], rule: Dict[str, Any]
+        self, matching: list[dict[str, Any]], rule: dict[str, Any]
     ) -> str:
         """Build description from matching sources."""
         parts = [rule["description"]]
@@ -363,7 +363,7 @@ class Correlator:
                 parts.append(f"  [{source}] {title}")
         return "\n".join(parts)
 
-    def _build_evidence(self, matching: List[Dict[str, Any]]) -> str:
+    def _build_evidence(self, matching: list[dict[str, Any]]) -> str:
         """Collect evidence from all sources."""
         evidence = []
         for m in matching[:3]:
@@ -372,7 +372,7 @@ class Correlator:
                 evidence.append(f"[{m.get('_source_tool', '?')}]\n{ev[:300]}")
         return "\n---\n".join(evidence[:3])
 
-    def _build_remediation(self, matching: List[Dict[str, Any]]) -> str:
+    def _build_remediation(self, matching: list[dict[str, Any]]) -> str:
         """Build composite remediation from sources."""
         remediations = []
         for m in matching:
@@ -383,10 +383,10 @@ class Correlator:
 
     def _generate_insights(
         self,
-        correlated: List[CorrelatedFinding],
-        all_sources: Dict[str, List[Dict[str, Any]]],
-        tool_coverage: Dict[str, int],
-    ) -> List[str]:
+        correlated: list[CorrelatedFinding],
+        all_sources: dict[str, list[dict[str, Any]]],
+        tool_coverage: dict[str, int],
+    ) -> list[str]:
         """Generate high-level cross-tool insights."""
         insights = []
 
@@ -431,7 +431,7 @@ class Correlator:
 
     # ── Normalizers ──
 
-    def _normalize_nmap(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _normalize_nmap(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         """Normalize nmap parser output to common format."""
         items = []
         for host in data.get("hosts", []):
@@ -453,7 +453,7 @@ class Correlator:
                 })
         return items
 
-    def _normalize_msf(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _normalize_msf(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize Metasploit results to common format."""
         items = []
         for result in results:
@@ -471,7 +471,7 @@ class Correlator:
             })
         return items
 
-    def _normalize_sqlmap(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _normalize_sqlmap(self, tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize SQLmap results to common format."""
         items = []
         for task in tasks:

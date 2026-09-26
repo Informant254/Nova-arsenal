@@ -239,7 +239,7 @@ Examples:
                     sandbox_mode=args.sandbox,
                 )
                 if args.verbose:
-                    print(f"\nFull result:")
+                    print("\nFull result:")
                     print(f"  Status: {result.get('status')}")
                     print(f"  Steps: {result.get('steps_taken', 0)}")
                     for f in result.get("findings", []):

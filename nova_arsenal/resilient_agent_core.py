@@ -10,18 +10,16 @@ Enhances nova_agent_core.py with:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+from typing import Any
 
-from nova_agent_core import NovaAgent, AgentState
+from nova_agent_core import NovaAgent
 from nova_arsenal.async_utils import (
     CircuitBreaker,
     CircuitBreakerConfig,
-    async_timeout,
-    async_retry,
-    RetryConfig,
-    ResourceTracker,
     ResourceLimits,
+    ResourceTracker,
+    async_timeout,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,8 +52,8 @@ class ResilientNovaAgent(NovaAgent):
         objective: str = "Find and exploit all critical vulnerabilities",
         max_steps: int = 40,
         model: str = "deepseek-r1",
-        workspace: Optional[str] = None,
-        config: Optional[ResilientAgentConfig] = None,
+        workspace: str | None = None,
+        config: ResilientAgentConfig | None = None,
     ) -> None:
         """Initialize resilient agent.
         
@@ -69,7 +67,7 @@ class ResilientNovaAgent(NovaAgent):
         """
         super().__init__(target, objective, max_steps, model, workspace)
         self.config = config or ResilientAgentConfig()
-        
+
         # Resilience components
         self.circuit_breaker = CircuitBreaker(
             CircuitBreakerConfig(
@@ -83,15 +81,15 @@ class ResilientNovaAgent(NovaAgent):
                 max_execution_time_seconds=self.config.total_timeout,
             )
         )
-        self._execution_errors: List[Dict[str, Any]] = []
+        self._execution_errors: list[dict[str, Any]] = []
 
-    def add_execution_error(self, error: Dict[str, Any]) -> None:
+    def add_execution_error(self, error: dict[str, Any]) -> None:
         """Record an execution error."""
         self._execution_errors.append(error)
         if len(self._execution_errors) > 100:  # Keep last 100 errors
             self._execution_errors.pop(0)
 
-    def get_execution_errors(self) -> List[Dict[str, Any]]:
+    def get_execution_errors(self) -> list[dict[str, Any]]:
         """Get all recorded execution errors."""
         return list(self._execution_errors)
 
@@ -99,7 +97,7 @@ class ResilientNovaAgent(NovaAgent):
         self,
         action: str,
         result: str,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         """Record a step with optional error.
         
@@ -119,11 +117,11 @@ class ResilientNovaAgent(NovaAgent):
 
     async def run_autonomous_with_resilience(
         self,
-        scope: Optional[List[str]] = None,
-        llm_complete: Optional[Any] = None,
-        on_event: Optional[Any] = None,
-        sandbox_mode: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        scope: list[str] | None = None,
+        llm_complete: Any | None = None,
+        on_event: Any | None = None,
+        sandbox_mode: str | None = None,
+    ) -> dict[str, Any]:
         """Run agent with timeout and error handling.
         
         Args:
@@ -136,10 +134,10 @@ class ResilientNovaAgent(NovaAgent):
             Execution result
         """
         self.resource_tracker.start_execution()
-        
+
         try:
             logger.info(f"Starting resilient agent for {self.target}")
-            
+
             # Wrap the autonomous run with timeout
             result = await async_timeout(
                 self.run_autonomous(
@@ -151,10 +149,10 @@ class ResilientNovaAgent(NovaAgent):
                 timeout_seconds=self.config.total_timeout,
                 operation_name=f"Agent autonomy ({self.target})",
             )
-            
+
             logger.info(f"Agent completed for {self.target}")
             return result
-            
+
         except Exception as e:
             logger.error(f"Agent execution failed: {e}", exc_info=True)
             self.add_execution_error({
@@ -162,7 +160,7 @@ class ResilientNovaAgent(NovaAgent):
                 "message": str(e),
                 "error_class": e.__class__.__name__,
             })
-            
+
             # Return partial results
             return {
                 "status": "error",
@@ -173,7 +171,7 @@ class ResilientNovaAgent(NovaAgent):
                 "error_message": str(e),
             }
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Return extended summary including errors and resource usage."""
         base = super().summary()
         return {

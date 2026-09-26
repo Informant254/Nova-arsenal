@@ -31,7 +31,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ CODEX_SCOPES = "openid profile email offline_access"
 CODEX_CALLBACK_PORT = int(os.getenv("NOVA_CODEX_CALLBACK_PORT", "1455"))
 
 # Paths we try when importing existing tool logins
-IMPORT_CANDIDATES: Dict[str, List[Path]] = {
+IMPORT_CANDIDATES: dict[str, list[Path]] = {
     "anthropic": [
         Path.home() / ".claude" / ".credentials.json",
         Path.home() / ".claude.json",
@@ -74,7 +74,7 @@ IMPORT_CANDIDATES: Dict[str, List[Path]] = {
 }
 
 # Env vars that hold *session* tokens (not classic sk- API keys)
-SESSION_ENV: Dict[str, Tuple[str, ...]] = {
+SESSION_ENV: dict[str, tuple[str, ...]] = {
     "anthropic": ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_SESSION_TOKEN"),
     "openai": ("CODEX_API_KEY", "OPENAI_SESSION_TOKEN", "CHATGPT_SESSION_TOKEN"),
     "gemini": ("GOOGLE_OAUTH_TOKEN", "GEMINI_OAUTH_TOKEN"),
@@ -93,7 +93,7 @@ class AccountCredential:
     label: str = ""
     source: str = "manual"
     # Optional routing metadata (local URL, preferred model, account id, …)
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)
     updated_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -107,7 +107,7 @@ class AccountCredential:
         except ValueError:
             return False
 
-    def to_public_dict(self) -> Dict[str, Any]:
+    def to_public_dict(self) -> dict[str, Any]:
         """Safe for UI — never includes full token."""
         tok = self.access_token or ""
         hint = (tok[:6] + "…" + tok[-4:]) if len(tok) > 12 else ("set" if tok else "")
@@ -137,7 +137,7 @@ class AccountAuthStore:
     def __init__(self, path: Path = STORE_PATH) -> None:
         self.path = path
         self._lock = threading.Lock()
-        self._accounts: Dict[str, AccountCredential] = {}
+        self._accounts: dict[str, AccountCredential] = {}
         self._load()
 
     def _load(self) -> None:
@@ -190,7 +190,7 @@ class AccountAuthStore:
             cred.auth_type,
         )
 
-    def get(self, provider: str) -> Optional[AccountCredential]:
+    def get(self, provider: str) -> AccountCredential | None:
         return self._accounts.get(provider)
 
     def remove(self, provider: str) -> bool:
@@ -201,7 +201,7 @@ class AccountAuthStore:
             self._save()
             return True
 
-    def list_accounts(self) -> List[AccountCredential]:
+    def list_accounts(self) -> list[AccountCredential]:
         return list(self._accounts.values())
 
     def get_token(self, provider: str) -> str:
@@ -261,8 +261,8 @@ class AccountAuthStore:
         self.set_account(cred)
         return cred
 
-    def import_from_environment(self) -> List[AccountCredential]:
-        imported: List[AccountCredential] = []
+    def import_from_environment(self) -> list[AccountCredential]:
+        imported: list[AccountCredential] = []
         for provider, envs in SESSION_ENV.items():
             for env_name in envs:
                 val = os.getenv(env_name, "").strip()
@@ -278,13 +278,13 @@ class AccountAuthStore:
                     break
         return imported
 
-    def import_from_tools(self) -> List[Dict[str, Any]]:
+    def import_from_tools(self) -> list[dict[str, Any]]:
         """
         Import credentials from Claude Code / Codex / Cursor local files.
 
         Returns list of {provider, status, detail} results.
         """
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         # Env first
         for cred in self.import_from_environment():
@@ -377,7 +377,7 @@ class AccountAuthStore:
             )
 
         # Local callback server
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         state = secrets.token_urlsafe(16)
         port = _free_port()
 
@@ -527,7 +527,7 @@ class AccountAuthStore:
             port = _free_port()
             logger.warning("Codex callback port 1455 busy; using %s", port)
 
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         done = threading.Event()
 
         class Handler(BaseHTTPRequestHandler):
@@ -759,7 +759,7 @@ class AccountAuthStore:
 
     def _store_openai_tokens(
         self,
-        tok: Dict[str, Any],
+        tok: dict[str, Any],
         source: str,
         client_id: str = "",
         email: str = "",
@@ -922,7 +922,7 @@ def _assert_port_free(port: int) -> None:
         s.bind(("127.0.0.1", port))
 
 
-def _extract_token_from_paths(paths: List[Path]) -> Tuple[str, str]:
+def _extract_token_from_paths(paths: list[Path]) -> tuple[str, str]:
     """Best-effort extract access/session tokens from known JSON shapes."""
     keys_priority = (
         "claudeAiOauth",
@@ -961,7 +961,7 @@ def _extract_token_from_paths(paths: List[Path]) -> Tuple[str, str]:
     return "", ""
 
 
-def _deep_find_token(obj: Any, keys: Tuple[str, ...], depth: int = 0) -> str:
+def _deep_find_token(obj: Any, keys: tuple[str, ...], depth: int = 0) -> str:
     if depth > 6:
         return ""
     if isinstance(obj, dict):
@@ -994,7 +994,7 @@ def _free_port() -> int:
 
 
 # Module-level singleton
-_store: Optional[AccountAuthStore] = None
+_store: AccountAuthStore | None = None
 
 
 def get_account_store() -> AccountAuthStore:
@@ -1017,9 +1017,9 @@ def account_token_for(provider: str) -> str:
         return ""
 
 
-def account_status() -> Dict[str, Any]:
+def account_status() -> dict[str, Any]:
     store = get_account_store()
-    local_status: Dict[str, Any] = {}
+    local_status: dict[str, Any] = {}
     try:
         from nova_arsenal.llm.local_llm import local_llm_status
 

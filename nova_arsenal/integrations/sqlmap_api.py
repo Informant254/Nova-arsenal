@@ -10,11 +10,10 @@ Allows Nova to:
 """
 
 import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ class SqlmapFinding:
     severity: str = "high"
     vector: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "url": self.url,
             "parameter": self.parameter,
@@ -51,10 +50,10 @@ class SqlmapTask:
     url: str
     status: str = "not_running"
     progress: int = 0
-    findings: List[SqlmapFinding] = field(default_factory=list)
+    findings: list[SqlmapFinding] = field(default_factory=list)
     dbms: str = ""
     os: str = ""
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     @property
@@ -65,7 +64,7 @@ class SqlmapTask:
     def has_findings(self) -> bool:
         return len(self.findings) > 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "url": self.url,
@@ -100,9 +99,9 @@ class SQLmapAPI:
     ) -> None:
         self.server_url = server_url.rstrip("/")
         self.timeout = timeout
-        self._admin_token: Optional[str] = None
+        self._admin_token: str | None = None
 
-    async def _get_admin_token(self) -> Optional[str]:
+    async def _get_admin_token(self) -> str | None:
         """Get admin token from sqlmap API server."""
         try:
             import aiohttp
@@ -128,9 +127,9 @@ class SQLmapAPI:
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> Optional[Dict[str, Any]]:
+        data: dict[str, Any] | None = None,
+        timeout: int | None = None,
+    ) -> dict[str, Any] | None:
         """Make HTTP request to sqlmap API."""
         try:
             import aiohttp
@@ -155,7 +154,7 @@ class SQLmapAPI:
             logger.error(f"SQLmap API error ({method} {endpoint}): {e}")
             return {"error": str(e)}
 
-    async def new_task(self, url: str, options: Optional[Dict[str, Any]] = None) -> SqlmapTask:
+    async def new_task(self, url: str, options: dict[str, Any] | None = None) -> SqlmapTask:
         """Create a new sqlmap scan task."""
         # Create task
         result = await self._request("POST", "task/new")
@@ -193,7 +192,7 @@ class SQLmapAPI:
         logger.error(f"Failed to start sqlmap scan: {start_result}")
         return SqlmapTask(task_id=task_id, url=url, status="failed")
 
-    def _build_options(self, options: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_options(self, options: dict[str, Any]) -> dict[str, Any]:
         """Build sqlmap API options dict from user params."""
         built = {}
 
@@ -223,7 +222,7 @@ class SQLmapAPI:
 
         return built
 
-    async def poll_task(self, task_id: str) -> Optional[SqlmapTask]:
+    async def poll_task(self, task_id: str) -> SqlmapTask | None:
         """Poll the status of a running task."""
         status_result = await self._request("GET", f"scan/{task_id}/status")
 
@@ -261,8 +260,8 @@ class SQLmapAPI:
         return task
 
     def _parse_findings(
-        self, items: List[Dict[str, Any]], url: str
-    ) -> List[SqlmapFinding]:
+        self, items: list[dict[str, Any]], url: str
+    ) -> list[SqlmapFinding]:
         """Parse raw sqlmap data items into structured findings."""
         findings = []
 
@@ -305,7 +304,7 @@ class SQLmapAPI:
     ) -> SqlmapTask:
         """Poll task until complete with progress tracking."""
         start = datetime.now(timezone.utc)
-        last_task: Optional[SqlmapTask] = None
+        last_task: SqlmapTask | None = None
 
         while (datetime.now(timezone.utc) - start).total_seconds() < max_time:
             task = await self.poll_task(task_id)
@@ -340,7 +339,7 @@ class SQLmapAPI:
         result = await self._request("GET", f"scan/{task_id}/kill")
         return bool(result and result.get("success"))
 
-    async def list_tasks(self) -> List[str]:
+    async def list_tasks(self) -> list[str]:
         """List all tasks."""
         result = await self._request("GET", "admin/list")
         if result:

@@ -8,7 +8,7 @@ The agent uses this to know exactly what's available and how to use it.
 
 import subprocess
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
@@ -20,13 +20,13 @@ class ToolInfo:
     install_path: str
     binary: str
     usage: str
-    examples: List[str]
-    flags: Dict[str, str]
-    depends_on: List[str] = field(default_factory=list)
+    examples: list[str]
+    flags: dict[str, str]
+    depends_on: list[str] = field(default_factory=list)
     man_page: str = ""
-    config_files: List[str] = field(default_factory=list)
-    output_formats: List[str] = field(default_factory=list)
-    tool_combos: List[str] = field(default_factory=list)
+    config_files: list[str] = field(default_factory=list)
+    output_formats: list[str] = field(default_factory=list)
+    tool_combos: list[str] = field(default_factory=list)
     notes: str = ""
 
 
@@ -42,8 +42,8 @@ class ServiceInfo:
     stop_cmd: str
     status_cmd: str
     description: str
-    default_creds: List[str] = field(default_factory=list)
-    common_vulns: List[str] = field(default_factory=list)
+    default_creds: list[str] = field(default_factory=list)
+    common_vulns: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -53,7 +53,7 @@ class PathInfo:
     description: str
     permissions: str
     owner: str
-    contents: List[str] = field(default_factory=list)
+    contents: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -73,7 +73,7 @@ class MetasploitModule:
     path: str
     description: str
     platform: str
-    options: Dict[str, str] = field(default_factory=dict)
+    options: dict[str, str] = field(default_factory=dict)
     payload: str = ""
 
 
@@ -84,7 +84,7 @@ class Wordlist:
     path: str
     description: str
     size: str
-    use_cases: List[str] = field(default_factory=list)
+    use_cases: list[str] = field(default_factory=list)
 
 
 class KaliBlueprint:
@@ -104,15 +104,15 @@ class KaliBlueprint:
     """
 
     def __init__(self) -> None:
-        self.tools: Dict[str, ToolInfo] = {}
-        self.services: Dict[str, ServiceInfo] = {}
-        self.paths: Dict[str, PathInfo] = {}
-        self.tool_categories: Dict[str, List[str]] = {}
-        self.attack_chains: Dict[str, List[str]] = {}
-        self.nse_scripts: Dict[str, NSEScript] = {}
-        self.metasploit_modules: Dict[str, MetasploitModule] = {}
-        self.wordlists: Dict[str, Wordlist] = {}
-        self._installed_cache: Optional[Set[str]] = None
+        self.tools: dict[str, ToolInfo] = {}
+        self.services: dict[str, ServiceInfo] = {}
+        self.paths: dict[str, PathInfo] = {}
+        self.tool_categories: dict[str, list[str]] = {}
+        self.attack_chains: dict[str, list[str]] = {}
+        self.nse_scripts: dict[str, NSEScript] = {}
+        self.metasploit_modules: dict[str, MetasploitModule] = {}
+        self.wordlists: dict[str, Wordlist] = {}
+        self._installed_cache: set[str] | None = None
         self._build_blueprint()
 
     def _build_blueprint(self) -> None:
@@ -130,17 +130,38 @@ class KaliBlueprint:
     def _register_tools_from_data(self) -> None:
         """Import and register all tools from kali_tools_data and kali_tools_extended."""
         from nova_arsenal.kali_tools_data import (
-            RECON_TOOLS, WEB_TOOLS, NETWORK_TOOLS, EXPLOITATION_TOOLS,
-            PASSWORD_TOOLS, FORENSICS_TOOLS, WIRELESS_TOOLS,
-            REVERSE_ENGINEERING_TOOLS, SNIFFING_SPOOFING_TOOLS,
-            POST_EXPLOIT_TOOLS, STEGANOGRAPHY_TOOLS, TOOL_COMBINATIONS,
+            EXPLOITATION_TOOLS,
+            FORENSICS_TOOLS,
+            NETWORK_TOOLS,
+            PASSWORD_TOOLS,
+            POST_EXPLOIT_TOOLS,
+            RECON_TOOLS,
+            REVERSE_ENGINEERING_TOOLS,
+            SNIFFING_SPOOFING_TOOLS,
+            STEGANOGRAPHY_TOOLS,
+            TOOL_COMBINATIONS,
+            WEB_TOOLS,
+            WIRELESS_TOOLS,
         )
         from nova_arsenal.kali_tools_extended import (
-            MOBILE_TOOLS, CLOUD_TOOLS, AD_TOOLS, C2_TOOLS, API_FUZZING_TOOLS,
-            CODE_ANALYSIS_TOOLS, CONTAINER_TOOLS, SOCIAL_ENGINEERING_TOOLS,
-            FUZZING_TOOLS, IOT_SCADA_TOOLS, BLUETOOTH_TOOLS,
-            REVERSE_ENGINEERING_EXTRA, LOG_FORENSICS_TOOLS, ANONYMITY_TOOLS,
-            EXPLOIT_DEV_TOOLS, AI_SECURITY_TOOLS, HARDWARE_TOOLS, VEHICLE_TOOLS,
+            AD_TOOLS,
+            AI_SECURITY_TOOLS,
+            ANONYMITY_TOOLS,
+            API_FUZZING_TOOLS,
+            BLUETOOTH_TOOLS,
+            C2_TOOLS,
+            CLOUD_TOOLS,
+            CODE_ANALYSIS_TOOLS,
+            CONTAINER_TOOLS,
+            EXPLOIT_DEV_TOOLS,
+            FUZZING_TOOLS,
+            HARDWARE_TOOLS,
+            IOT_SCADA_TOOLS,
+            LOG_FORENSICS_TOOLS,
+            MOBILE_TOOLS,
+            REVERSE_ENGINEERING_EXTRA,
+            SOCIAL_ENGINEERING_TOOLS,
+            VEHICLE_TOOLS,
         )
         all_tools = (
             RECON_TOOLS + WEB_TOOLS + NETWORK_TOOLS + EXPLOITATION_TOOLS +
@@ -224,51 +245,51 @@ class KaliBlueprint:
     # HELPERS
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _add_tools(self, tools: List[ToolInfo]) -> None:
+    def _add_tools(self, tools: list[ToolInfo]) -> None:
         for tool in tools:
             self.tools[tool.name] = tool
             if tool.category not in self.tool_categories:
                 self.tool_categories[tool.category] = []
             self.tool_categories[tool.category].append(tool.name)
 
-    def get_tool(self, name: str) -> Optional[ToolInfo]:
+    def get_tool(self, name: str) -> ToolInfo | None:
         return self.tools.get(name)
 
-    def get_tools_by_category(self, category: str) -> List[ToolInfo]:
+    def get_tools_by_category(self, category: str) -> list[ToolInfo]:
         names = self.tool_categories.get(category, [])
         return [self.tools[n] for n in names if n in self.tools]
 
-    def get_attack_chain(self, chain_name: str) -> List[str]:
+    def get_attack_chain(self, chain_name: str) -> list[str]:
         return self.attack_chains.get(chain_name, [])
 
-    def get_all_categories(self) -> List[str]:
+    def get_all_categories(self) -> list[str]:
         return sorted(self.tool_categories.keys())
 
-    def get_service(self, name: str) -> Optional[ServiceInfo]:
+    def get_service(self, name: str) -> ServiceInfo | None:
         return self.services.get(name)
 
-    def get_path_info(self, path: str) -> Optional[PathInfo]:
+    def get_path_info(self, path: str) -> PathInfo | None:
         return self.paths.get(path)
 
-    def get_nse_scripts(self, category: Optional[str] = None) -> List[NSEScript]:
+    def get_nse_scripts(self, category: str | None = None) -> list[NSEScript]:
         scripts = list(self.nse_scripts.values())
         if category:
             scripts = [s for s in scripts if s.category == category]
         return scripts
 
-    def get_metasploit_modules(self, platform: Optional[str] = None) -> List[MetasploitModule]:
+    def get_metasploit_modules(self, platform: str | None = None) -> list[MetasploitModule]:
         modules = list(self.metasploit_modules.values())
         if platform:
             modules = [m for m in modules if m.platform == platform]
         return modules
 
-    def get_wordlists(self, use_case: Optional[str] = None) -> List[Wordlist]:
+    def get_wordlists(self, use_case: str | None = None) -> list[Wordlist]:
         wls = list(self.wordlists.values())
         if use_case:
             wls = [w for w in wls if use_case in w.use_cases]
         return wls
 
-    def suggest_tools(self, task: str) -> List[str]:
+    def suggest_tools(self, task: str) -> list[str]:
         """Suggest tools based on task description."""
         task_lower = task.lower()
         suggestions = []
@@ -347,7 +368,7 @@ class KaliBlueprint:
     # SYSTEM PROFILER
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _detect_installed_tools(self) -> Set[str]:
+    def _detect_installed_tools(self) -> set[str]:
         """Detect which tools are actually installed on the system."""
         if self._installed_cache is not None:
             return self._installed_cache
@@ -365,16 +386,16 @@ class KaliBlueprint:
         self._installed_cache = installed
         return installed
 
-    def get_installed_tools(self) -> List[str]:
+    def get_installed_tools(self) -> list[str]:
         """Return list of tool names that are actually installed."""
         return sorted(self._detect_installed_tools())
 
-    def get_missing_tools(self) -> List[str]:
+    def get_missing_tools(self) -> list[str]:
         """Return list of tool names that are NOT installed."""
         installed = self._detect_installed_tools()
         return sorted([t for t in self.tools if t not in installed])
 
-    def get_system_profile(self) -> Dict[str, Any]:
+    def get_system_profile(self) -> dict[str, Any]:
         """Get a full profile of the system's security tools."""
         installed = self._detect_installed_tools()
         return {

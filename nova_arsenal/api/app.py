@@ -7,6 +7,7 @@ and serves the web dashboard.
 
 import logging
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
         # Start API key cleanup task
         try:
             import asyncio
+
             from nova_arsenal.auth.cleanup import start_cleanup_task
             asyncio.create_task(start_cleanup_task(interval_seconds=3600))
             logger.info("API key cleanup task started (hourly)")

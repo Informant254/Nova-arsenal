@@ -5,11 +5,9 @@ Takes detected services and their versions, then searches
 public databases for known vulnerabilities and exploits.
 """
 
-import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +24,7 @@ class CveResult:
     published_date: str = ""
     remediation: str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "cve_id": self.cve_id,
             "description": self.description[:200],
@@ -45,11 +43,11 @@ class ServiceCveResult:
     service: str
     port: int
     version: str
-    cves: List[CveResult] = field(default_factory=list)
+    cves: list[CveResult] = field(default_factory=list)
     has_exploit: bool = False
     risk_score: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "service": self.service,
             "port": self.port,
@@ -61,7 +59,7 @@ class ServiceCveResult:
         }
 
 
-SERVICE_CVE_MAP: Dict[str, List[Tuple[str, str, str, str, float, str]]] = {
+SERVICE_CVE_MAP: dict[str, list[tuple[str, str, str, str, float, str]]] = {
     "http": [
         (r"apache httpd (\d+\.\d+\.\d+)", "Apache HTTPD {version} vulnerable to path traversal",
          "CVE-2021-41773", "high", 7.5, "Exploit available: curl http://target/cgi-bin/.%2e/%2e%2e/..."),
@@ -99,7 +97,7 @@ SERVICE_CVE_MAP: Dict[str, List[Tuple[str, str, str, str, float, str]]] = {
 }
 
 
-KNOWN_EXPLOIT_PATTERNS: Dict[str, List[str]] = {
+KNOWN_EXPLOIT_PATTERNS: dict[str, list[str]] = {
     "eternalblue": ["MS17-010", "eternalblue", "CVE-2017-0144"],
     "bluekeep": ["bluekeep", "CVE-2019-0708"],
     "log4j": ["log4j", "log4shell", "CVE-2021-44228"],
@@ -124,7 +122,7 @@ class CveResearch:
     """
 
     def __init__(self) -> None:
-        self._cache: Dict[str, ServiceCveResult] = {}
+        self._cache: dict[str, ServiceCveResult] = {}
 
     async def research(self, service: str, version: str, port: int) -> ServiceCveResult:
         cache_key = f"{service}:{version}:{port}"
@@ -153,8 +151,8 @@ class CveResearch:
         self._cache[cache_key] = result
         return result
 
-    def _lookup_cves(self, service: str, version: str) -> List[CveResult]:
-        results: List[CveResult] = []
+    def _lookup_cves(self, service: str, version: str) -> list[CveResult]:
+        results: list[CveResult] = []
         service_key = service.lower()
 
         if service_key not in SERVICE_CVE_MAP:
@@ -185,8 +183,8 @@ class CveResearch:
 
         return results
 
-    def _check_known_exploit(self, service: str, version: str) -> List[CveResult]:
-        results: List[CveResult] = []
+    def _check_known_exploit(self, service: str, version: str) -> list[CveResult]:
+        results: list[CveResult] = []
         combined = f"{service} {version}".lower()
 
         for exploit_name, indicators in KNOWN_EXPLOIT_PATTERNS.items():
@@ -217,7 +215,7 @@ class CveResearch:
 
         return results
 
-    def _calculate_risk(self, cves: List[CveResult]) -> float:
+    def _calculate_risk(self, cves: list[CveResult]) -> float:
         if not cves:
             return 0.0
 
