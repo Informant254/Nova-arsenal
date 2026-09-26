@@ -8,19 +8,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy application
-COPY pyproject.toml .
+# Copy package metadata and application
+COPY pyproject.toml README.md ./
 COPY nova_arsenal/ nova_arsenal/
 
 # Install Python package
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir .
 
 # Create workspace directory
 RUN mkdir -p /workspace
 
-# Health check
+# Health check the actual API, not merely whether the package imports.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import nova_arsenal; print('ok')"
+    CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
-# Default command
-CMD ["nova-agent", "--help"]
+EXPOSE 8000
+
+# Container default is the API service. CLI commands remain available via docker exec.
+CMD ["python", "-m", "nova_arsenal.api"]

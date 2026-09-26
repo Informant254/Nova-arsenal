@@ -76,7 +76,9 @@ async def add_chat_message(
 
     session = await get_chat_session(db, session_id)
     if session:
-        session.updated_at = datetime.now(timezone.utc)
+        # SQLAlchemy's SQLite DateTime round-trips as naive values. Store UTC
+        # without tzinfo here so in-memory and database-loaded values compare cleanly.
+        session.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         if role == "user" and (not session.title or session.title == "New Chat"):
             compact = " ".join((content or "").split())
             if compact:

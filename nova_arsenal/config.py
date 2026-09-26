@@ -29,7 +29,8 @@ from nova_arsenal.llm.keys import (
 
 logger = logging.getLogger(__name__)
 
-
+# Safe fallback for ad-hoc local development. It is stable for this process only,
+# so real deployments must set JWT_SECRET explicitly.
 _EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
 
 

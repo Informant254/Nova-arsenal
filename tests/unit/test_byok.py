@@ -50,7 +50,7 @@ class TestKeysHelpers:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-12345678")
         assert resolve_api_key("openai") == "sk-test-12345678"
         assert resolve_api_key("openai", "explicit") == "explicit"
-        assert resolve_model("openai") == "gpt-4o"
+        assert resolve_model("openai") == "gpt-5.6-terra"
 
     def test_gemini_alias_env(self, monkeypatch):
         from nova_arsenal.llm.keys import normalize_provider, resolve_api_key
