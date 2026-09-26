@@ -1,4 +1,0 @@
-# Targeted type-fix batch
-
-Errors: 0
-Warnings: 0
