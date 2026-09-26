@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  low-risk-lint-cleanup:
+  final-ruff-cleanup:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +20,7 @@ jobs:
           cache: pip
       - name: Install package and development tools
         run: pip install -e ".[dev]"
-      - name: Apply low-risk lint fixes
+      - name: Remove remaining Ruff diagnostics without dropping side effects
         shell: bash
         run: |
           set -e
@@ -28,53 +28,48 @@ jobs:
           from pathlib import Path
 
           replacements = {
-              "nova_arsenal/auth/cleanup.py": [
-                  ("ApiKey.is_active == True", "ApiKey.is_active.is_(True)"),
+              "nova_arsenal/agent_runner.py": [
+                  ("        recon_tools = self.blueprint.get_tools_by_category(\"recon\")", "        _recon_tools = self.blueprint.get_tools_by_category(\"recon\")"),
+                  ("        strategy = await self._generate_strategy()", "        _strategy = await self._generate_strategy()"),
               ],
-              "nova_arsenal/auth/middleware.py": [
-                  ("ApiKey.is_active == True", "ApiKey.is_active.is_(True)"),
+              "nova_arsenal/arch/mhc.py": [
+                  ("            capacity = int(L * self.capacity_factor)", "            _capacity = int(L * self.capacity_factor)"),
               ],
-              "nova_arsenal/auth/routes.py": [
-                  ("User.is_active == True", "User.is_active.is_(True)"),
-                  ("ApiKey.is_active == True", "ApiKey.is_active.is_(True)"),
+              "nova_arsenal/cli.py": [
+                  ("    sub = parser.add_subparsers(dest=\"cmd\")", "    _sub = parser.add_subparsers(dest=\"cmd\")"),
               ],
-              "nova_arsenal/data_generation/core.py": [
-                  ("weights = [dist[l] for l in levels]", "weights = [dist[level] for level in levels]"),
+              "nova_arsenal/context/compression.py": [
+                  ("        word_set = set(words)", "        _word_set = set(words)"),
               ],
-              "nova_arsenal/training/glm_agentic_rl.py": [
-                  (
-                      "max_deviation = max(abs(l - avg_load) / avg_load for l in loads)",
-                      "max_deviation = max(abs(load - avg_load) / avg_load for load in loads)",
-                  ),
+              "nova_arsenal/exploitation/attack_chaining.py": [
+                  ("            terminal_node = self._attack_graph[terminal_node_id]", "            _terminal_node = self._attack_graph[terminal_node_id]"),
               ],
-              "alembic/env.py": [
-                  (
-                      "from nova_arsenal.db.models import Base\n",
-                      "from nova_arsenal.db.models import Base  # noqa: E402\n",
-                  ),
+              "nova_arsenal/exploitation/safe_engine.py": [
+                  ("        technique = technique_id.strip().upper()\n        evidence = \"\"", "        technique = technique_id.strip().upper()\n        _evidence = \"\""),
+              ],
+              "nova_arsenal/intelligence/osint_chain.py": [
+                  ("        loop = asyncio.get_event_loop()", "        _loop = asyncio.get_event_loop()"),
               ],
               "nova_arsenal/prompt_builder.py": [
-                  (
-                      "import logging\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Any, Union",
-                      "import json\nimport logging\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Any",
-                  ),
-                  (
-                      "PromptNode = Union[Scope, First, Empty, Isolate, Text, ChatMessage, ToolDefinition, ChainOfThought, AdaptiveThinking]",
-                      "PromptNode = Scope | First | Empty | Isolate | Text | ChatMessage | ToolDefinition | ChainOfThought | AdaptiveThinking",
-                  ),
-                  ("\n\nimport json\n", "\n"),
+                  ("\n\nimport json", ""),
+                  ("import logging\nfrom dataclasses import dataclass, field", "import json\nimport logging\nfrom dataclasses import dataclass, field"),
+                  ("    best_text = None", "    _best_text = None"),
+                  ("    best_empty = 0", "    _best_empty = 0"),
+                  ("    best_chats = None", "    _best_chats = None"),
+                  ("    best_tools = None", "    _best_tools = None"),
+                  ("            best_text = text", "            _best_text = text"),
+                  ("            best_empty = empty", "            _best_empty = empty"),
+                  ("            best_chats = chats", "            _best_chats = chats"),
+                  ("            best_tools = tools", "            _best_tools = tools"),
               ],
-              "nova_arsenal/mcp/server.py": [
-                  (
-                      "from mcp import MCPServer, Prompt, Resource, TextContent, Tool",
-                      "from mcp import MCPServer, Resource, Tool",
-                  ),
+              "nova_arsenal/ransomware/emulator.py": [
+                  ("                file_hash = hashlib.sha256(fake_path.encode()).hexdigest()", "                _file_hash = hashlib.sha256(fake_path.encode()).hexdigest()"),
               ],
-              "tests/integration/__init__.py": [
-                  ("\nimport pytest\n", "\n"),
+              "nova_arsenal/streaming/realtime.py": [
+                  ("        event_json = event.to_json()", "        _event_json = event.to_json()"),
               ],
-              "tests/unit/__init__.py": [
-                  ("\nimport pytest\n", "\n"),
+              "tests/unit/test_byok.py": [
+                  ("        catalog = {p[\"provider\"]: p for p in status[\"provider_catalog\"]}", "        _catalog = {p[\"provider\"]: p for p in status[\"provider_catalog\"]}"),
               ],
           }
 
@@ -88,10 +83,11 @@ jobs:
               path.write_text(text)
           PY
 
-          ruff check . --select F401,UP007
+          ruff check tests/integration/__init__.py tests/unit/__init__.py --select I001 --fix
+          ruff check .
           git diff --check
           pytest -q
-      - name: Capture remaining diagnostics
+      - name: Capture final Ruff and current type-check diagnostics
         shell: bash
         run: |
           set +e
@@ -138,7 +134,7 @@ jobs:
               lines.append("")
           Path(".hardening/detail.txt").write_text("\n".join(lines) + "\n")
           PY
-      - name: Commit tested lint cleanup and diagnostics
+      - name: Commit tested Ruff cleanup and diagnostics
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -147,6 +143,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes"
           else
-            git commit -m "chore(hardening): apply low-risk lint cleanup"
+            git commit -m "style(hardening): clear remaining Ruff diagnostics"
             git push
           fi
