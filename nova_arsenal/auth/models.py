@@ -46,17 +46,27 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     """JWT token payload model."""
-    sub: int
+    sub: str
     email: str
     role: str
     exp: datetime
     type: str = "access"  # "access" or "refresh"
 
 
+class RefreshTokenRequest(BaseModel):
+    """Refresh request. Keep credentials in the request body, not the URL."""
+    refresh_token: str = Field(..., min_length=1)
+
+
 class PasswordChange(BaseModel):
     """Password change model."""
     current_password: str
     new_password: str = Field(..., min_length=8)
+
+
+class UserRoleUpdate(BaseModel):
+    """Admin-only user role update."""
+    role: str = Field(..., pattern=r"^(viewer|analyst|admin)$")
 
 
 # ── OAuth Models ─────────────────────────────────────────────────────────────

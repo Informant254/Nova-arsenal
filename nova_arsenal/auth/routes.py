@@ -9,9 +9,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from sqlalchemy import select
+import jwt
+from jwt.exceptions import InvalidTokenError
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import secrets
@@ -24,7 +24,7 @@ from nova_arsenal.auth.audit import (
     audit_oauth_login,
     audit_subscription_upgraded,
 )
-from nova_arsenal.auth.middleware import get_current_user
+from nova_arsenal.auth.middleware import get_current_user as require_current_user, require_admin
 from nova_arsenal.auth.models import (
     ApiKeyCreateRequest,
     ApiKeyListResponse,
@@ -32,12 +32,14 @@ from nova_arsenal.auth.models import (
     OAuthAccountResponse,
     OAuthLoginResponse,
     PasswordChange,
+    RefreshTokenRequest,
     SubscriptionResponse,
     SubscriptionUpgradeRequest,
     Token,
     UserCreate,
     UserLogin,
     UserResponse,
+    UserRoleUpdate,
 )
 from nova_arsenal.auth.oauth import (
     extract_pkce_verifier,
@@ -59,26 +61,21 @@ from nova_arsenal.db.models import (
     UserRole,
 )
 
+from nova_arsenal.auth.passwords import (
+    DUMMY_PASSWORD_HASH,
+    get_password_hash,
+    verify_and_upgrade_password,
+    verify_password,
+)
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password."""
-    return pwd_context.hash(password)
-
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create an access token."""
     config = get_config()
     to_encode = data.copy()
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=config.auth.access_token_expire_minutes)
     )
@@ -90,6 +87,8 @@ def create_refresh_token(data: dict) -> str:
     """Create a refresh token."""
     config = get_config()
     to_encode = data.copy()
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + timedelta(days=config.auth.refresh_token_expire_days)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, config.auth.jwt_secret, algorithm="HS256")
@@ -119,11 +118,19 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         email=user_data.email,
         username=user_data.username,
         hashed_password=get_password_hash(user_data.password),
-        role=UserRole.ANALYST,
+        role=UserRole.VIEWER,
     )
     db.add(user)
     await db.flush()
     await db.refresh(user)
+
+    db.add(
+        Subscription(
+            user_id=user.id,
+            tier=SubscriptionTier.FREE,
+            api_calls_limit=get_config().auth.oauth.free_api_calls_per_day,
+        )
+    )
 
     return UserResponse(
         id=user.id,
@@ -146,12 +153,26 @@ async def login(
     result = await db.execute(select(User).where(User.email == credentials.email))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(credentials.password, user.hashed_password):
+    if user:
+        valid_password, upgraded_hash = verify_and_upgrade_password(
+            credentials.password,
+            user.hashed_password,
+        )
+    else:
+        # Keep missing-user login work comparable to a real password check.
+        verify_password(credentials.password, DUMMY_PASSWORD_HASH)
+        valid_password, upgraded_hash = False, None
+
+    if not user or not valid_password:
         audit_login_failure(credentials.email, client_ip, "invalid_credentials")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    if upgraded_hash:
+        user.hashed_password = upgraded_hash
+        await db.flush()
 
     if not user.is_active:
         audit_login_failure(credentials.email, client_ip, "account_disabled")
@@ -163,7 +184,7 @@ async def login(
     audit_login_success(user.id, user.email, client_ip)
 
     # Create tokens
-    token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
@@ -174,25 +195,47 @@ async def login(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
-    """Refresh access token using refresh token."""
+async def refresh_token(
+    body: RefreshTokenRequest | None = None,
+    refresh_token: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Refresh access token.
+
+    JSON body is the preferred transport. The query parameter remains temporarily
+    supported for backwards compatibility with older Nova clients.
+    """
+    token_value = body.refresh_token if body else (refresh_token or "")
+    if not token_value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="refresh_token is required",
+        )
+
     config = get_config()
     try:
         payload = jwt.decode(
-            refresh_token, config.auth.jwt_secret, algorithms=["HS256"]
+            token_value, config.auth.jwt_secret, algorithms=["HS256"]
         )
         if payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token type",
             )
-    except JWTError:
+    except InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
         )
 
-    user_id = payload.get("sub")
+    raw_user_id = payload.get("sub")
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject",
+        )
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
@@ -203,7 +246,7 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
         )
 
     # Create new tokens
-    token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     new_access_token = create_access_token(token_data)
     new_refresh_token = create_refresh_token(token_data)
 
@@ -215,7 +258,7 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
 ):
     """Get current user profile."""
     return UserResponse(
@@ -225,6 +268,49 @@ async def get_current_user(
         role=current_user.role.value,
         is_active=current_user.is_active,
         created_at=current_user.created_at,
+    )
+
+
+@router.patch("/users/{user_id}/role", response_model=UserResponse)
+async def update_user_role(
+    user_id: int,
+    body: UserRoleUpdate,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change a user's role. Admin only."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    new_role = UserRole(body.role)
+    if user.role == UserRole.ADMIN and new_role != UserRole.ADMIN:
+        admin_count_result = await db.execute(
+            select(func.count(User.id)).where(
+                User.role == UserRole.ADMIN,
+                User.is_active == True,
+            )
+        )
+        if int(admin_count_result.scalar_one()) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot demote the last active administrator",
+            )
+
+    user.role = new_role
+    await db.flush()
+    await db.refresh(user)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        role=user.role.value,
+        is_active=user.is_active,
+        created_at=user.created_at,
     )
 
 
@@ -306,7 +392,7 @@ async def oauth_callback(
                 email=user_info.email,
                 username=user_info.username,
                 hashed_password="",
-                role=UserRole.ANALYST,
+                role=UserRole.VIEWER,
             )
             db.add(user)
             await db.flush()
@@ -341,7 +427,7 @@ async def oauth_callback(
     audit_oauth_login(provider, user.id, user.email, client_ip, is_new_user)
 
     # Create JWT tokens
-    token_data = {"sub": user.id, "email": user.email, "role": user.role.value}
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     access_token = create_access_token(token_data)
     refresh_token_str = create_refresh_token(token_data)
 
@@ -354,7 +440,7 @@ async def oauth_callback(
 
 @router.get("/oauth/accounts", response_model=list[OAuthAccountResponse])
 async def list_oauth_accounts(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List OAuth accounts linked to current user."""
@@ -376,7 +462,7 @@ async def list_oauth_accounts(
 @router.delete("/oauth/{provider}")
 async def unlink_oauth_account(
     provider: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Unlink an OAuth account."""
@@ -415,7 +501,7 @@ async def unlink_oauth_account(
 
 @router.get("/subscription", response_model=SubscriptionResponse)
 async def get_subscription(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get current user's subscription details."""
@@ -447,37 +533,16 @@ async def get_subscription(
 @router.post("/subscription/upgrade")
 async def upgrade_subscription(
     request: SubscriptionUpgradeRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_current_user),
 ):
-    """Upgrade subscription tier."""
-    result = await db.execute(
-        select(Subscription).where(Subscription.user_id == current_user.id)
+    """Self-service upgrades are disabled until a verified billing flow exists."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=(
+            "Self-service subscription upgrades are not configured. "
+            "Connect a verified billing provider before enabling paid tiers."
+        ),
     )
-    sub = result.scalar_one_or_none()
-
-    new_tier = SubscriptionTier(request.tier)
-    limit_map = {
-        SubscriptionTier.FREE: get_config().auth.oauth.free_api_calls_per_day,
-        SubscriptionTier.PRO: get_config().auth.oauth.pro_api_calls_per_day,
-        SubscriptionTier.ENTERPRISE: get_config().auth.oauth.enterprise_api_calls_per_day,
-    }
-
-    if sub:
-        sub.tier = new_tier
-        sub.api_calls_limit = limit_map[new_tier]
-        sub.is_active = True
-    else:
-        sub = Subscription(
-            user_id=current_user.id,
-            tier=new_tier,
-            api_calls_limit=limit_map[new_tier],
-        )
-        db.add(sub)
-
-    await db.commit()
-    audit_subscription_upgraded(current_user.id, new_tier.value)
-    return {"message": f"Subscription upgraded to {new_tier.value}"}
 
 
 # ── API Key Routes ───────────────────────────────────────────────────────────
@@ -497,7 +562,7 @@ def generate_api_key() -> tuple[str, str, str]:
 @router.post("/api-keys", response_model=ApiKeyResponse)
 async def create_api_key(
     request: ApiKeyCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a new API key for subscription-based access."""
@@ -538,7 +603,7 @@ async def create_api_key(
 
 @router.get("/api-keys", response_model=list[ApiKeyListResponse])
 async def list_api_keys(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List API keys for the current user."""
@@ -565,7 +630,7 @@ async def list_api_keys(
 @router.delete("/api-keys/{key_id}")
 async def revoke_api_key(
     key_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Revoke an API key."""
@@ -589,7 +654,7 @@ async def revoke_api_key(
 
 @router.get("/api-keys/usage")
 async def get_api_key_usage(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get API key usage statistics."""
