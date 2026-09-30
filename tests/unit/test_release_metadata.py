@@ -1,13 +1,12 @@
 """Regression tests for release/version metadata alignment."""
 
+import importlib.metadata
 import json
-from importlib.metadata import version as installed_version
 from pathlib import Path
 
 from nova_arsenal import __version__
 from nova_arsenal.api.app import create_app
 from nova_arsenal.config import AgentConfig
-
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_VERSION = "2.0.0"
@@ -15,7 +14,7 @@ EXPECTED_VERSION = "2.0.0"
 
 def test_python_version_surfaces_match() -> None:
     assert __version__ == EXPECTED_VERSION
-    assert installed_version("nova-arsenal") == EXPECTED_VERSION
+    assert importlib.metadata.version("nova-arsenal") == EXPECTED_VERSION
     assert AgentConfig().version == EXPECTED_VERSION
     assert create_app().version == EXPECTED_VERSION
 
