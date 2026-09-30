@@ -11,6 +11,7 @@ services:
       - NOVA_LLM_URL=http://llm:11434
       - NOVA_WORKSPACE=/workspace
       - JWT_SECRET=${JWT_SECRET:?Set a strong JWT_SECRET in .env}
+      - NOVA_CORS_ORIGINS=${NOVA_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - NOVA_ADMIN_EMAIL=${NOVA_ADMIN_EMAIL:-}
       - NOVA_ADMIN_USERNAME=${NOVA_ADMIN_USERNAME:-admin}
