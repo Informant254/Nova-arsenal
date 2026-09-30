@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+---
+
+## [2.0.0] - 2026-10-01
+
 ### Added
 - **Concurrent work sessions + sub-agents** — `SessionManager` runs recon/web/osint/researcher/exploit/validator/reporter **in parallel** under one session; API `/api/work-sessions`, CLI `nova-agent session`, consensus aggregation, event stream, disk persistence
 - **Natural multi-turn chat** — conversation-first system prompts, full history, fixed SSE streaming via LLMRouter (not broken `active_providers`), offline fallback that still talks; web UI welcome copy for “chat like ChatGPT”
@@ -61,6 +67,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A (initial release)
 
 ### Security
+- Privileged MCP and shared LLM-management APIs require analyst/admin authentication
+- Nmap MCP execution uses validated argument-vector subprocesses instead of shell interpolation
+- Credentialed CORS rejects wildcard origins and production Compose requires explicit secrets/origins
+- Authentication uses PyJWT + Argon2 with transparent legacy bcrypt migration
+- Internal provider/MCP exceptions are logged server-side and redacted from client responses
+- CI enforces Ruff formatting/linting, BasedPyright, Python 3.10–3.13 tests, web/VS Code builds, and Docker builds
+- Security CI runs dependency audit, Trivy secret scanning, and CodeQL
 - Capability dropping in all containers
 - Network isolation for sandbox
 - Secret redaction in logs
@@ -68,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2026-XX-XX
+## Pre-2.0 development history
 
 ### Added
 - Core agent system with autonomous reasoning
@@ -91,8 +104,7 @@ We use [SemVer](https://semver.org/) for versioning. For the versions available,
 
 ## Release Process
 
-1. Update version in `pyproject.toml`
-2. Update `CHANGELOG.md`
-3. Create a git tag: `git tag v1.0.0`
-4. Push: `git push origin v1.0.0`
-5. CI/CD will automatically publish to PyPI, Docker Hub, and GHCR
+See [`docs/RELEASING.md`](docs/RELEASING.md). The tag must exactly match the package version
+(for example, package `2.0.0` requires tag `v2.0.0`). The release workflow validates the
+tag/version pair and full Python quality gate before publishing to PyPI, GHCR, Docker Hub,
+and GitHub Releases.
