@@ -1016,8 +1016,9 @@ def account_status() -> dict[str, Any]:
         from nova_arsenal.llm.local_llm import local_llm_status
 
         local_status = local_llm_status()
-    except Exception as exc:  # noqa: BLE001
-        local_status = {"available": False, "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Local LLM status probe failed")
+        local_status = {"available": False, "error": "local_llm_status_unavailable"}
 
     return {
         "store_path": str(store.path),
