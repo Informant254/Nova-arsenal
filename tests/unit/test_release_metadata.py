@@ -1,7 +1,7 @@
 """Regression tests for release/version metadata alignment."""
 
-from importlib.metadata import version as installed_version
 import json
+from importlib.metadata import version as installed_version
 from pathlib import Path
 
 from nova_arsenal import __version__
@@ -40,7 +40,7 @@ def test_release_workflow_publishes_all_runtime_images() -> None:
     production_compose = (ROOT / "docker-compose.prod.yml").read_text()
 
     assert "image: [agent, web, kali]" in workflow
-    assert "ghcr.io/informant254/nova-${{ matrix.image }}" in workflow
+    assert "${{ env.REGISTRY_GHCR }}/informant254/nova-${{ matrix.image }}" in workflow
     assert workflow.count("needs: validate") >= 3
 
     for image in ("agent", "web", "kali"):
