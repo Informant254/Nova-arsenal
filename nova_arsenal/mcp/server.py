@@ -361,7 +361,7 @@ class NovaMcpServer:
                 )
                 try:
                     stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-                except TimeoutError:
+                except asyncio.TimeoutError:
                     proc.kill()
                     await proc.communicate()
                     logger.warning("Nmap process timed out for validated target")
