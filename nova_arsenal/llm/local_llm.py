@@ -88,7 +88,7 @@ def probe_ollama(base_url: str = "", timeout: float = 3.0) -> LocalLLMEndpoint:
                 return ep
             ep.error = f"HTTP {r.status_code}"
     except Exception as exc:  # noqa: BLE001
-        ep.error = str(exc)
+        ep.error = "probe_failed"
         logger.debug("Ollama probe failed at %s: %s", url, exc)
     return ep
 
@@ -121,7 +121,8 @@ def probe_openai_compatible(base_url: str, timeout: float = 3.0) -> LocalLLMEndp
                     return ep
             ep.error = "no /v1/models endpoint"
     except Exception as exc:  # noqa: BLE001
-        ep.error = str(exc)
+        ep.error = "probe_failed"
+        logger.debug("OpenAI-compatible probe failed at %s: %s", url, exc)
     return ep
 
 
