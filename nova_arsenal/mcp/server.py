@@ -1,9 +1,70 @@
 import asyncio
+import ipaddress
 import json
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_NMAP_ALLOWED_FLAGS = frozenset({"-sV", "-sC", "-sT", "-Pn", "-n", "-O", "--version-light"})
+_HOSTNAME_RE = re.compile(
+    r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+)
+
+
+def _validate_nmap_target(value: object) -> str:
+    target = str(value).strip()
+    if not target:
+        raise ValueError("target is required")
+    try:
+        if "/" in target:
+            ipaddress.ip_network(target, strict=False)
+        else:
+            ipaddress.ip_address(target)
+        return target
+    except ValueError:
+        if "/" in target or not _HOSTNAME_RE.fullmatch(target):
+            raise ValueError("invalid target") from None
+        return target
+
+
+def _validate_nmap_ports(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    normalized: list[str] = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            raise ValueError("invalid port specification")
+        if "-" in token:
+            if token.count("-") != 1:
+                raise ValueError("invalid port range")
+            start_text, end_text = token.split("-", 1)
+            if not start_text.isdigit() or not end_text.isdigit():
+                raise ValueError("invalid port range")
+            start, end = int(start_text), int(end_text)
+            if not (1 <= start <= end <= 65535):
+                raise ValueError("port range out of bounds")
+            normalized.append(f"{start}-{end}")
+        else:
+            if not token.isdigit():
+                raise ValueError("invalid port")
+            port = int(token)
+            if not 1 <= port <= 65535:
+                raise ValueError("port out of bounds")
+            normalized.append(str(port))
+    return ",".join(normalized)
+
+
+def _validate_nmap_flags(value: object) -> list[str]:
+    flags = str(value or "-sV -sC").split()
+    if any(flag not in _NMAP_ALLOWED_FLAGS for flag in flags):
+        raise ValueError("unsupported nmap flag")
+    return flags
+
 
 MCPServer: Any = None
 Resource: Any = None
@@ -280,18 +341,39 @@ class NovaMcpServer:
 
         try:
             if tool_name == "nmap_scan":
-                target = arguments["target"]
-                ports = arguments.get("ports", "")
-                flags = arguments.get("flags", "-sV -sC")
-                cmd = f"nmap {flags} {target}"
+                try:
+                    target = _validate_nmap_target(arguments["target"])
+                    ports = _validate_nmap_ports(arguments.get("ports", ""))
+                    flags = _validate_nmap_flags(arguments.get("flags", "-sV -sC"))
+                except (KeyError, ValueError) as exc:
+                    logger.warning("Rejected invalid nmap request: %s", exc)
+                    return json.dumps({"error": "Invalid nmap request"})
+
+                command = ["nmap", *flags]
                 if ports:
-                    cmd += f" -p {ports}"
-                proc = await asyncio.create_subprocess_shell(
-                    f"{cmd} 2>/dev/null || echo 'nmap failed'",
+                    command.extend(["-p", ports])
+                command.append(target)
+
+                proc = await asyncio.create_subprocess_exec(
+                    *command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+                try:
+                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+                except TimeoutError:
+                    proc.kill()
+                    await proc.communicate()
+                    logger.warning("Nmap process timed out for validated target")
+                    return json.dumps({"error": "Nmap execution timed out"})
+
+                if proc.returncode != 0:
+                    logger.warning(
+                        "Nmap process failed with return code %s: %s",
+                        proc.returncode,
+                        stderr.decode(errors="replace")[:1000],
+                    )
+                    return json.dumps({"error": "Nmap execution failed"})
                 return stdout.decode(errors="replace")[:5000]
 
             elif tool_name == "osint_investigate":
