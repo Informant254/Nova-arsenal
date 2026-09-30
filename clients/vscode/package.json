@@ -2,7 +2,7 @@
   "name": "nova-arsenal",
   "displayName": "Nova Arsenal",
   "description": "Autonomous security research agent — chat, scan, and sign in with Claude Code / Codex-style accounts",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "publisher": "informant254",
   "license": "Apache-2.0",
   "repository": {
