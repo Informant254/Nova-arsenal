@@ -126,3 +126,12 @@ class TestNovaMcpServer:
         )
         parsed = json.loads(result)
         assert "solved" in parsed
+
+
+def test_handle_tool_call_redacts_internal_errors():
+    server = NovaMcpServer()
+    result = asyncio.run(server.handle_tool_call("cve_lookup", {}))
+    parsed = json.loads(result)
+
+    assert parsed == {"error": "Tool execution failed"}
+    assert "service" not in result
