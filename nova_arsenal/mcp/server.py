@@ -7,7 +7,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_NMAP_ALLOWED_FLAGS = frozenset({"-sV", "-sC", "-sT", "-Pn", "-n", "-O", "--version-light"})
+_NMAP_ALLOWED_FLAGS = frozenset(
+    {"-sV", "-sC", "-sT", "-Pn", "-n", "-O", "--version-light"}
+)
 _HOSTNAME_RE = re.compile(
     r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
