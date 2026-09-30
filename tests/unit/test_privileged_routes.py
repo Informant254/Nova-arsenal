@@ -1,18 +1,20 @@
 """Regression tests for privileged API access and CORS policy."""
 
-from fastapi.routing import APIRoute
-from fastapi.testclient import TestClient
-import pytest
+import inspect
 
+import pytest
+from fastapi.params import Depends
+from fastapi.testclient import TestClient
+
+from nova_arsenal.api import routes as api_routes
 from nova_arsenal.api.app import _cors_origins, create_app
 from nova_arsenal.auth.middleware import require_admin, require_analyst
 
 
-def _route_dependency_calls(app, path: str, method: str) -> set[object]:
-    for route in app.routes:
-        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
-            return {dependency.call for dependency in route.dependant.dependencies}
-    raise AssertionError(f"Route not found: {method} {path}")
+def _dependency_for(function, parameter: str):
+    default = inspect.signature(function).parameters[parameter].default
+    assert isinstance(default, Depends)
+    return default.dependency
 
 
 @pytest.mark.parametrize(
@@ -41,28 +43,18 @@ def test_privileged_routes_reject_unauthenticated_requests(
 
 
 def test_shared_llm_credential_mutations_require_admin() -> None:
-    app = create_app()
-    admin_routes = [
-        ("POST", "/api/llm/reload"),
-        ("GET", "/api/llm/accounts"),
-        ("POST", "/api/llm/accounts/login"),
-        ("POST", "/api/llm/accounts/import"),
-        ("DELETE", "/api/llm/accounts/{provider}"),
-    ]
-    for method, path in admin_routes:
-        assert require_admin in _route_dependency_calls(app, path, method)
+    assert _dependency_for(api_routes.llm_reload_config, "_current_user") is require_admin
+    assert _dependency_for(api_routes.llm_list_accounts, "_current_user") is require_admin
+    assert _dependency_for(api_routes.llm_account_login, "_current_user") is require_admin
+    assert _dependency_for(api_routes.llm_account_import, "_current_user") is require_admin
+    assert _dependency_for(api_routes.llm_account_logout, "_current_user") is require_admin
 
 
 def test_mcp_and_local_discovery_require_analyst() -> None:
-    app = create_app()
-    analyst_routes = [
-        ("GET", "/api/llm/local"),
-        ("GET", "/api/mcp/tools"),
-        ("GET", "/api/mcp/resources"),
-        ("POST", "/api/mcp/call"),
-    ]
-    for method, path in analyst_routes:
-        assert require_analyst in _route_dependency_calls(app, path, method)
+    assert _dependency_for(api_routes.llm_local_status, "_current_user") is require_analyst
+    assert _dependency_for(api_routes.mcp_tools, "_current_user") is require_analyst
+    assert _dependency_for(api_routes.mcp_resources, "_current_user") is require_analyst
+    assert _dependency_for(api_routes.mcp_call_tool, "_current_user") is require_analyst
 
 
 def test_cors_origins_reject_wildcard(monkeypatch) -> None:
