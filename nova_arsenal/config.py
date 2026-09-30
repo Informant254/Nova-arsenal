@@ -70,7 +70,7 @@ def _resolve_jwt_secret(configured: str = "") -> str:
 @dataclass
 class AgentConfig:
     name: str = "nova-agent"
-    version: str = "1.3.0"
+    version: str = "2.0.0"
     workspace: str = "~/nova_workspace"
     max_steps: int = 40
     reflect_every: int = 5
