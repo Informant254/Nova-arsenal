@@ -23,6 +23,22 @@ from nova_arsenal.sessions.api_routes import router as sessions_router
 
 logger = logging.getLogger(__name__)
 
+
+def _cors_origins() -> list[str]:
+    """Return explicit browser origins allowed to call the API."""
+    origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "NOVA_CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if origin.strip()
+    ]
+    if not origins or "*" in origins:
+        raise RuntimeError("NOVA_CORS_ORIGINS must contain explicit origins, never '*'")
+    return origins
+
+
 # ── App Factory ──────────────────────────────────────────────────────────────
 
 
@@ -39,14 +55,7 @@ def create_app() -> FastAPI:
     # The Next.js dashboard proxies API calls server-side, so browser CORS is
     # normally unnecessary. Explicit origins remain configurable for direct
     # development clients without combining wildcard origins with credentials.
-    cors_origins = [
-        origin.strip()
-        for origin in os.getenv(
-            "NOVA_CORS_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000",
-        ).split(",")
-        if origin.strip()
-    ]
+    cors_origins = _cors_origins()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
