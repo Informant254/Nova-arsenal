@@ -135,3 +135,82 @@ def test_handle_tool_call_redacts_internal_errors():
 
     assert parsed == {"error": "Tool execution failed"}
     assert "service" not in result
+
+
+def test_nmap_uses_argument_vector_not_shell(monkeypatch):
+    server = NovaMcpServer()
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    class Process:
+        returncode = 0
+
+        async def communicate(self):
+            return b"safe output", b""
+
+        def kill(self):
+            raise AssertionError("successful nmap process must not be killed")
+
+    async def fake_exec(*args, **kwargs):
+        calls.append((args, kwargs))
+        return Process()
+
+    async def shell_must_not_run(*args, **kwargs):
+        raise AssertionError("nmap must never be launched through a shell")
+
+    monkeypatch.setattr(
+        "nova_arsenal.mcp.server.asyncio.create_subprocess_exec",
+        fake_exec,
+    )
+    monkeypatch.setattr(
+        "nova_arsenal.mcp.server.asyncio.create_subprocess_shell",
+        shell_must_not_run,
+    )
+
+    result = asyncio.run(
+        server.handle_tool_call(
+            "nmap_scan",
+            {
+                "target": "example.com",
+                "ports": "80, 443",
+                "flags": "-sV -Pn",
+            },
+        )
+    )
+
+    assert result == "safe output"
+    assert len(calls) == 1
+    assert calls[0][0] == (
+        "nmap",
+        "-sV",
+        "-Pn",
+        "-p",
+        "80,443",
+        "example.com",
+    )
+
+
+def test_nmap_rejects_injection_before_spawning_process(monkeypatch):
+    server = NovaMcpServer()
+    spawned = False
+
+    async def fake_exec(*args, **kwargs):
+        nonlocal spawned
+        spawned = True
+        raise AssertionError("invalid nmap input must not spawn a process")
+
+    monkeypatch.setattr(
+        "nova_arsenal.mcp.server.asyncio.create_subprocess_exec",
+        fake_exec,
+    )
+
+    invalid_requests = [
+        {"target": "example.com; id"},
+        {"target": "example.com", "ports": "80;id"},
+        {"target": "example.com", "flags": "-sV --script vuln"},
+        {"target": "example.com", "ports": "70000"},
+    ]
+    for arguments in invalid_requests:
+        result = asyncio.run(server.handle_tool_call("nmap_scan", arguments))
+        assert json.loads(result) == {"error": "Invalid nmap request"}
+
+    assert spawned is False
