@@ -88,3 +88,21 @@ class TestAccountAuth:
         store.login_with_token("gemini", "g-token-123456789012345")
         assert store.remove("gemini") is True
         assert store.get_token("gemini") == ""
+
+
+def test_account_status_redacts_probe_errors(store, monkeypatch):
+    import nova_arsenal.llm.account_auth as aa
+    import nova_arsenal.llm.local_llm as local_llm
+
+    aa._store = store
+    secret = "internal-stack-secret"
+
+    def fail_status():
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr(local_llm, "local_llm_status", fail_status)
+    status = aa.account_status()
+
+    assert status["local_llm"]["available"] is False
+    assert status["local_llm"]["error"] == "local_llm_status_unavailable"
+    assert secret not in json.dumps(status)
