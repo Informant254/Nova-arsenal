@@ -461,9 +461,9 @@ class NovaMcpServer:
             else:
                 return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
-        except Exception as e:
-            logger.error(f"MCP tool error: {e}")
-            return json.dumps({"error": str(e)})
+        except Exception:
+            logger.exception("MCP tool execution failed")
+            return json.dumps({"error": "Tool execution failed"})
 
     async def run_stdio(self) -> None:
         if not MCP_AVAILABLE:
