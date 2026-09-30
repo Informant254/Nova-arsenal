@@ -8,31 +8,33 @@ The agent uses this to know exactly what's available and how to use it.
 
 import subprocess
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
 class ToolInfo:
     """Complete information about a Kali tool."""
+
     name: str
     category: str
     description: str
     install_path: str
     binary: str
     usage: str
-    examples: List[str]
-    flags: Dict[str, str]
-    depends_on: List[str] = field(default_factory=list)
+    examples: list[str]
+    flags: dict[str, str]
+    depends_on: list[str] = field(default_factory=list)
     man_page: str = ""
-    config_files: List[str] = field(default_factory=list)
-    output_formats: List[str] = field(default_factory=list)
-    tool_combos: List[str] = field(default_factory=list)
+    config_files: list[str] = field(default_factory=list)
+    output_formats: list[str] = field(default_factory=list)
+    tool_combos: list[str] = field(default_factory=list)
     notes: str = ""
 
 
 @dataclass
 class ServiceInfo:
     """Information about a system service."""
+
     name: str
     port: int
     protocol: str
@@ -42,23 +44,25 @@ class ServiceInfo:
     stop_cmd: str
     status_cmd: str
     description: str
-    default_creds: List[str] = field(default_factory=list)
-    common_vulns: List[str] = field(default_factory=list)
+    default_creds: list[str] = field(default_factory=list)
+    common_vulns: list[str] = field(default_factory=list)
 
 
 @dataclass
 class PathInfo:
     """Information about a filesystem path."""
+
     path: str
     description: str
     permissions: str
     owner: str
-    contents: List[str] = field(default_factory=list)
+    contents: list[str] = field(default_factory=list)
 
 
 @dataclass
 class NSEScript:
     """Nmap NSE script information."""
+
     name: str
     category: str
     description: str
@@ -69,22 +73,24 @@ class NSEScript:
 @dataclass
 class MetasploitModule:
     """Metasploit module information."""
+
     name: str
     path: str
     description: str
     platform: str
-    options: Dict[str, str] = field(default_factory=dict)
+    options: dict[str, str] = field(default_factory=dict)
     payload: str = ""
 
 
 @dataclass
 class Wordlist:
     """Wordlist information."""
+
     name: str
     path: str
     description: str
     size: str
-    use_cases: List[str] = field(default_factory=list)
+    use_cases: list[str] = field(default_factory=list)
 
 
 class KaliBlueprint:
@@ -104,15 +110,15 @@ class KaliBlueprint:
     """
 
     def __init__(self) -> None:
-        self.tools: Dict[str, ToolInfo] = {}
-        self.services: Dict[str, ServiceInfo] = {}
-        self.paths: Dict[str, PathInfo] = {}
-        self.tool_categories: Dict[str, List[str]] = {}
-        self.attack_chains: Dict[str, List[str]] = {}
-        self.nse_scripts: Dict[str, NSEScript] = {}
-        self.metasploit_modules: Dict[str, MetasploitModule] = {}
-        self.wordlists: Dict[str, Wordlist] = {}
-        self._installed_cache: Optional[Set[str]] = None
+        self.tools: dict[str, ToolInfo] = {}
+        self.services: dict[str, ServiceInfo] = {}
+        self.paths: dict[str, PathInfo] = {}
+        self.tool_categories: dict[str, list[str]] = {}
+        self.attack_chains: dict[str, list[str]] = {}
+        self.nse_scripts: dict[str, NSEScript] = {}
+        self.metasploit_modules: dict[str, MetasploitModule] = {}
+        self.wordlists: dict[str, Wordlist] = {}
+        self._installed_cache: set[str] | None = None
         self._build_blueprint()
 
     def _build_blueprint(self) -> None:
@@ -130,29 +136,70 @@ class KaliBlueprint:
     def _register_tools_from_data(self) -> None:
         """Import and register all tools from kali_tools_data and kali_tools_extended."""
         from nova_arsenal.kali_tools_data import (
-            RECON_TOOLS, WEB_TOOLS, NETWORK_TOOLS, EXPLOITATION_TOOLS,
-            PASSWORD_TOOLS, FORENSICS_TOOLS, WIRELESS_TOOLS,
-            REVERSE_ENGINEERING_TOOLS, SNIFFING_SPOOFING_TOOLS,
-            POST_EXPLOIT_TOOLS, STEGANOGRAPHY_TOOLS, TOOL_COMBINATIONS,
+            EXPLOITATION_TOOLS,
+            FORENSICS_TOOLS,
+            NETWORK_TOOLS,
+            PASSWORD_TOOLS,
+            POST_EXPLOIT_TOOLS,
+            RECON_TOOLS,
+            REVERSE_ENGINEERING_TOOLS,
+            SNIFFING_SPOOFING_TOOLS,
+            STEGANOGRAPHY_TOOLS,
+            TOOL_COMBINATIONS,
+            WEB_TOOLS,
+            WIRELESS_TOOLS,
         )
         from nova_arsenal.kali_tools_extended import (
-            MOBILE_TOOLS, CLOUD_TOOLS, AD_TOOLS, C2_TOOLS, API_FUZZING_TOOLS,
-            CODE_ANALYSIS_TOOLS, CONTAINER_TOOLS, SOCIAL_ENGINEERING_TOOLS,
-            FUZZING_TOOLS, IOT_SCADA_TOOLS, BLUETOOTH_TOOLS,
-            REVERSE_ENGINEERING_EXTRA, LOG_FORENSICS_TOOLS, ANONYMITY_TOOLS,
-            EXPLOIT_DEV_TOOLS, AI_SECURITY_TOOLS, HARDWARE_TOOLS, VEHICLE_TOOLS,
+            AD_TOOLS,
+            AI_SECURITY_TOOLS,
+            ANONYMITY_TOOLS,
+            API_FUZZING_TOOLS,
+            BLUETOOTH_TOOLS,
+            C2_TOOLS,
+            CLOUD_TOOLS,
+            CODE_ANALYSIS_TOOLS,
+            CONTAINER_TOOLS,
+            EXPLOIT_DEV_TOOLS,
+            FUZZING_TOOLS,
+            HARDWARE_TOOLS,
+            IOT_SCADA_TOOLS,
+            LOG_FORENSICS_TOOLS,
+            MOBILE_TOOLS,
+            REVERSE_ENGINEERING_EXTRA,
+            SOCIAL_ENGINEERING_TOOLS,
+            VEHICLE_TOOLS,
         )
+
         all_tools = (
-            RECON_TOOLS + WEB_TOOLS + NETWORK_TOOLS + EXPLOITATION_TOOLS +
-            PASSWORD_TOOLS + FORENSICS_TOOLS + WIRELESS_TOOLS +
-            REVERSE_ENGINEERING_TOOLS + SNIFFING_SPOOFING_TOOLS +
-            POST_EXPLOIT_TOOLS + STEGANOGRAPHY_TOOLS +
-            MOBILE_TOOLS + CLOUD_TOOLS + AD_TOOLS + C2_TOOLS +
-            API_FUZZING_TOOLS + CODE_ANALYSIS_TOOLS + CONTAINER_TOOLS +
-            SOCIAL_ENGINEERING_TOOLS + FUZZING_TOOLS + IOT_SCADA_TOOLS +
-            BLUETOOTH_TOOLS + REVERSE_ENGINEERING_EXTRA + LOG_FORENSICS_TOOLS +
-            ANONYMITY_TOOLS + EXPLOIT_DEV_TOOLS + AI_SECURITY_TOOLS +
-            HARDWARE_TOOLS + VEHICLE_TOOLS
+            RECON_TOOLS
+            + WEB_TOOLS
+            + NETWORK_TOOLS
+            + EXPLOITATION_TOOLS
+            + PASSWORD_TOOLS
+            + FORENSICS_TOOLS
+            + WIRELESS_TOOLS
+            + REVERSE_ENGINEERING_TOOLS
+            + SNIFFING_SPOOFING_TOOLS
+            + POST_EXPLOIT_TOOLS
+            + STEGANOGRAPHY_TOOLS
+            + MOBILE_TOOLS
+            + CLOUD_TOOLS
+            + AD_TOOLS
+            + C2_TOOLS
+            + API_FUZZING_TOOLS
+            + CODE_ANALYSIS_TOOLS
+            + CONTAINER_TOOLS
+            + SOCIAL_ENGINEERING_TOOLS
+            + FUZZING_TOOLS
+            + IOT_SCADA_TOOLS
+            + BLUETOOTH_TOOLS
+            + REVERSE_ENGINEERING_EXTRA
+            + LOG_FORENSICS_TOOLS
+            + ANONYMITY_TOOLS
+            + EXPLOIT_DEV_TOOLS
+            + AI_SECURITY_TOOLS
+            + HARDWARE_TOOLS
+            + VEHICLE_TOOLS
         )
         self._add_tools(all_tools)
         self._tool_combos_data = TOOL_COMBINATIONS
@@ -161,41 +208,245 @@ class KaliBlueprint:
 
     def _register_services(self) -> None:
         self.services = {
-            "ssh": ServiceInfo("sshd", 22, "tcp", "/etc/ssh/sshd_config", "/var/log/auth.log", "systemctl start ssh", "systemctl stop ssh", "systemctl status ssh", "OpenSSH server", ["root:toor", "kali:kali", "admin:admin"], ["Weak ciphers", "Root login enabled", "Password auth"]),
-            "apache": ServiceInfo("apache2", 80, "tcp", "/etc/apache2/", "/var/log/apache2/", "systemctl start apache2", "systemctl stop apache2", "systemctl status apache2", "Apache HTTP server", [], ["Default page", "Directory listing", "Server info disclosure"]),
-            "nginx": ServiceInfo("nginx", 80, "tcp", "/etc/nginx/", "/var/log/nginx/", "systemctl start nginx", "systemctl stop nginx", "systemctl status nginx", "Nginx web server"),
-            "mysql": ServiceInfo("mysql", 3306, "tcp", "/etc/mysql/", "/var/log/mysql/", "systemctl start mysql", "systemctl stop mysql", "systemctl status mysql", "MySQL database server", ["root:root", "root:password", "admin:admin"], ["Empty root password", "Remote root login"]),
-            "postgresql": ServiceInfo("postgresql", 5432, "tcp", "/etc/postgresql/", "/var/log/postgresql/", "systemctl start postgresql", "systemctl stop postgresql", "systemctl status postgresql", "PostgreSQL database server", ["postgres:postgres"]),
-            "smb": ServiceInfo("smbd", 445, "tcp", "/etc/samba/smb.conf", "/var/log/samba/", "systemctl start smbd", "systemctl stop smbd", "systemctl status smbd", "SMB/CIFS file sharing", ["admin:admin", "guest:guest", "administrator:administrator"], ["Null session", "Anonymous access", "SMBv1 enabled"]),
-            "ftp": ServiceInfo("vsftpd", 21, "tcp", "/etc/vsftpd.conf", "/var/log/vsftpd.log", "systemctl start vsftpd", "systemctl stop vsftpd", "systemctl status vsftpd", "FTP server", ["anonymous:anonymous", "ftp:ftp"], ["Anonymous login", "Weak credentials"]),
-            "rdp": ServiceInfo("xrdp", 3389, "tcp", "/etc/xrdp/", "/var/log/xrdp.log", "systemctl start xrdp", "systemctl stop xrdp", "systemctl status xrdp", "Remote Desktop Protocol", [], ["Weak password", "NLA disabled"]),
-            "telnet": ServiceInfo("telnetd", 23, "tcp", "/etc/inetd.conf", "/var/log/syslog", "systemctl start inetd", "systemctl stop inetd", "systemctl status inetd", "Telnet server", [], ["Cleartext credentials"]),
-            "snmp": ServiceInfo("snmpd", 161, "udp", "/etc/snmp/snmpd.conf", "/var/log/syslog", "systemctl start snmpd", "systemctl stop snmpd", "systemctl status snmpd", "SNMP agent", ["public:public", "private:private"], ["Default community strings", "SNMPv1/v2c no encryption"]),
-            "dns": ServiceInfo("named", 53, "tcp/udp", "/etc/bind/", "/var/log/syslog", "systemctl start named", "systemctl stop named", "systemctl status named", "DNS server (BIND)", [], ["Zone transfer allowed", "Open recursion"]),
-            "ldap": ServiceInfo("slapd", 389, "tcp", "/etc/ldap/", "/var/log/syslog", "systemctl start slapd", "systemctl stop slapd", "systemctl status slapd", "LDAP directory server", ["cn=admin:admin"], ["Anonymous bind", "Weak authentication"]),
+            "ssh": ServiceInfo(
+                "sshd",
+                22,
+                "tcp",
+                "/etc/ssh/sshd_config",
+                "/var/log/auth.log",
+                "systemctl start ssh",
+                "systemctl stop ssh",
+                "systemctl status ssh",
+                "OpenSSH server",
+                ["root:toor", "kali:kali", "admin:admin"],
+                ["Weak ciphers", "Root login enabled", "Password auth"],
+            ),
+            "apache": ServiceInfo(
+                "apache2",
+                80,
+                "tcp",
+                "/etc/apache2/",
+                "/var/log/apache2/",
+                "systemctl start apache2",
+                "systemctl stop apache2",
+                "systemctl status apache2",
+                "Apache HTTP server",
+                [],
+                ["Default page", "Directory listing", "Server info disclosure"],
+            ),
+            "nginx": ServiceInfo(
+                "nginx",
+                80,
+                "tcp",
+                "/etc/nginx/",
+                "/var/log/nginx/",
+                "systemctl start nginx",
+                "systemctl stop nginx",
+                "systemctl status nginx",
+                "Nginx web server",
+            ),
+            "mysql": ServiceInfo(
+                "mysql",
+                3306,
+                "tcp",
+                "/etc/mysql/",
+                "/var/log/mysql/",
+                "systemctl start mysql",
+                "systemctl stop mysql",
+                "systemctl status mysql",
+                "MySQL database server",
+                ["root:root", "root:password", "admin:admin"],
+                ["Empty root password", "Remote root login"],
+            ),
+            "postgresql": ServiceInfo(
+                "postgresql",
+                5432,
+                "tcp",
+                "/etc/postgresql/",
+                "/var/log/postgresql/",
+                "systemctl start postgresql",
+                "systemctl stop postgresql",
+                "systemctl status postgresql",
+                "PostgreSQL database server",
+                ["postgres:postgres"],
+            ),
+            "smb": ServiceInfo(
+                "smbd",
+                445,
+                "tcp",
+                "/etc/samba/smb.conf",
+                "/var/log/samba/",
+                "systemctl start smbd",
+                "systemctl stop smbd",
+                "systemctl status smbd",
+                "SMB/CIFS file sharing",
+                ["admin:admin", "guest:guest", "administrator:administrator"],
+                ["Null session", "Anonymous access", "SMBv1 enabled"],
+            ),
+            "ftp": ServiceInfo(
+                "vsftpd",
+                21,
+                "tcp",
+                "/etc/vsftpd.conf",
+                "/var/log/vsftpd.log",
+                "systemctl start vsftpd",
+                "systemctl stop vsftpd",
+                "systemctl status vsftpd",
+                "FTP server",
+                ["anonymous:anonymous", "ftp:ftp"],
+                ["Anonymous login", "Weak credentials"],
+            ),
+            "rdp": ServiceInfo(
+                "xrdp",
+                3389,
+                "tcp",
+                "/etc/xrdp/",
+                "/var/log/xrdp.log",
+                "systemctl start xrdp",
+                "systemctl stop xrdp",
+                "systemctl status xrdp",
+                "Remote Desktop Protocol",
+                [],
+                ["Weak password", "NLA disabled"],
+            ),
+            "telnet": ServiceInfo(
+                "telnetd",
+                23,
+                "tcp",
+                "/etc/inetd.conf",
+                "/var/log/syslog",
+                "systemctl start inetd",
+                "systemctl stop inetd",
+                "systemctl status inetd",
+                "Telnet server",
+                [],
+                ["Cleartext credentials"],
+            ),
+            "snmp": ServiceInfo(
+                "snmpd",
+                161,
+                "udp",
+                "/etc/snmp/snmpd.conf",
+                "/var/log/syslog",
+                "systemctl start snmpd",
+                "systemctl stop snmpd",
+                "systemctl status snmpd",
+                "SNMP agent",
+                ["public:public", "private:private"],
+                ["Default community strings", "SNMPv1/v2c no encryption"],
+            ),
+            "dns": ServiceInfo(
+                "named",
+                53,
+                "tcp/udp",
+                "/etc/bind/",
+                "/var/log/syslog",
+                "systemctl start named",
+                "systemctl stop named",
+                "systemctl status named",
+                "DNS server (BIND)",
+                [],
+                ["Zone transfer allowed", "Open recursion"],
+            ),
+            "ldap": ServiceInfo(
+                "slapd",
+                389,
+                "tcp",
+                "/etc/ldap/",
+                "/var/log/syslog",
+                "systemctl start slapd",
+                "systemctl stop slapd",
+                "systemctl status slapd",
+                "LDAP directory server",
+                ["cn=admin:admin"],
+                ["Anonymous bind", "Weak authentication"],
+            ),
         }
 
     # ── Filesystem ────────────────────────────────────────────────────────
 
     def _register_filesystem(self) -> None:
         self.paths = {
-            "/usr/share/wordlists": PathInfo("/usr/share/wordlists", "Password and directory wordlists", "drwxr-xr-x", "root", ["rockyou.txt", "dirb/", "dirbuster/", "seclists/"]),
-            "/usr/share/seclists": PathInfo("/usr/share/seclists", "Security wordlists (SecLists by Daniel Miessler)", "drwxr-xr-x", "root", ["Passwords/", "Discovery/", "Web-Content/", "Fuzzing/", "Usernames/"]),
-            "/usr/share/nmap/scripts": PathInfo("/usr/share/nmap/scripts", "Nmap NSE scripts (600+)", "drwxr-xr-x", "root", ["*.nse"]),
-            "/usr/share/metasploit-framework": PathInfo("/usr/share/metasploit-framework", "Metasploit framework", "drwxr-xr-x", "root", ["modules/", "plugins/", "scripts/", "data/"]),
-            "/usr/share/nuclei-templates": PathInfo("/usr/share/nuclei-templates", "Nuclei vulnerability templates (9000+)", "drwxr-xr-x", "root", ["cves/", "technologies/", "misconfigurations/", "exposures/"]),
-            "/usr/share/exploitdb/exploits": PathInfo("/usr/share/exploitdb/exploits", "Exploit-DB exploits", "drwxr-xr-x", "root", ["linux/", "windows/", "macos/", "webapps/"]),
-            "/etc/": PathInfo("/etc/", "System configuration", "drwxr-xr-x", "root", ["ssh/", "nginx/", "apache2/", "mysql/", "samba/", "snmp/"]),
-            "/var/log": PathInfo("/var/log", "System logs", "drwxr-xr-x", "root", ["syslog", "auth.log", "kern.log", "apache2/"]),
-            "/opt": PathInfo("/opt", "Optional software", "drwxr-xr-x", "root", ["metasploit-framework/", "ghidra/"]),
-            "/tmp": PathInfo("/tmp", "Temporary directory (world-writable)", "drwxrwxrwt", "root", []),
-            "/root": PathInfo("/root", "Root home directory", "drwx------", "root", [".msf4/", ".john/", ".hashcat/"]),
+            "/usr/share/wordlists": PathInfo(
+                "/usr/share/wordlists",
+                "Password and directory wordlists",
+                "drwxr-xr-x",
+                "root",
+                ["rockyou.txt", "dirb/", "dirbuster/", "seclists/"],
+            ),
+            "/usr/share/seclists": PathInfo(
+                "/usr/share/seclists",
+                "Security wordlists (SecLists by Daniel Miessler)",
+                "drwxr-xr-x",
+                "root",
+                ["Passwords/", "Discovery/", "Web-Content/", "Fuzzing/", "Usernames/"],
+            ),
+            "/usr/share/nmap/scripts": PathInfo(
+                "/usr/share/nmap/scripts",
+                "Nmap NSE scripts (600+)",
+                "drwxr-xr-x",
+                "root",
+                ["*.nse"],
+            ),
+            "/usr/share/metasploit-framework": PathInfo(
+                "/usr/share/metasploit-framework",
+                "Metasploit framework",
+                "drwxr-xr-x",
+                "root",
+                ["modules/", "plugins/", "scripts/", "data/"],
+            ),
+            "/usr/share/nuclei-templates": PathInfo(
+                "/usr/share/nuclei-templates",
+                "Nuclei vulnerability templates (9000+)",
+                "drwxr-xr-x",
+                "root",
+                ["cves/", "technologies/", "misconfigurations/", "exposures/"],
+            ),
+            "/usr/share/exploitdb/exploits": PathInfo(
+                "/usr/share/exploitdb/exploits",
+                "Exploit-DB exploits",
+                "drwxr-xr-x",
+                "root",
+                ["linux/", "windows/", "macos/", "webapps/"],
+            ),
+            "/etc/": PathInfo(
+                "/etc/",
+                "System configuration",
+                "drwxr-xr-x",
+                "root",
+                ["ssh/", "nginx/", "apache2/", "mysql/", "samba/", "snmp/"],
+            ),
+            "/var/log": PathInfo(
+                "/var/log",
+                "System logs",
+                "drwxr-xr-x",
+                "root",
+                ["syslog", "auth.log", "kern.log", "apache2/"],
+            ),
+            "/opt": PathInfo(
+                "/opt",
+                "Optional software",
+                "drwxr-xr-x",
+                "root",
+                ["metasploit-framework/", "ghidra/"],
+            ),
+            "/tmp": PathInfo(
+                "/tmp", "Temporary directory (world-writable)", "drwxrwxrwt", "root", []
+            ),
+            "/root": PathInfo(
+                "/root",
+                "Root home directory",
+                "drwx------",
+                "root",
+                [".msf4/", ".john/", ".hashcat/"],
+            ),
         }
 
     # ── NSE Scripts ───────────────────────────────────────────────────────
 
     def _register_nse_scripts(self) -> None:
         from nova_arsenal.kali_tools_data import NSE_SCRIPTS
+
         for script in NSE_SCRIPTS:
             self.nse_scripts[script.name] = script
 
@@ -203,6 +454,7 @@ class KaliBlueprint:
 
     def _register_metasploit_modules(self) -> None:
         from nova_arsenal.kali_tools_data import METASPLOIT_MODULES
+
         for module in METASPLOIT_MODULES:
             self.metasploit_modules[module.name] = module
 
@@ -210,6 +462,7 @@ class KaliBlueprint:
 
     def _register_wordlists(self) -> None:
         from nova_arsenal.kali_tools_data import WORDLISTS
+
         for wl in WORDLISTS:
             self.wordlists[wl.name] = wl
 
@@ -217,6 +470,7 @@ class KaliBlueprint:
 
     def _register_attack_chains(self) -> None:
         from nova_arsenal.kali_tools_data import TOOL_COMBINATIONS
+
         for chain_name, chain_data in TOOL_COMBINATIONS.items():
             self.attack_chains[chain_name] = chain_data["steps"]
 
@@ -224,51 +478,51 @@ class KaliBlueprint:
     # HELPERS
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _add_tools(self, tools: List[ToolInfo]) -> None:
+    def _add_tools(self, tools: list[ToolInfo]) -> None:
         for tool in tools:
             self.tools[tool.name] = tool
             if tool.category not in self.tool_categories:
                 self.tool_categories[tool.category] = []
             self.tool_categories[tool.category].append(tool.name)
 
-    def get_tool(self, name: str) -> Optional[ToolInfo]:
+    def get_tool(self, name: str) -> ToolInfo | None:
         return self.tools.get(name)
 
-    def get_tools_by_category(self, category: str) -> List[ToolInfo]:
+    def get_tools_by_category(self, category: str) -> list[ToolInfo]:
         names = self.tool_categories.get(category, [])
         return [self.tools[n] for n in names if n in self.tools]
 
-    def get_attack_chain(self, chain_name: str) -> List[str]:
+    def get_attack_chain(self, chain_name: str) -> list[str]:
         return self.attack_chains.get(chain_name, [])
 
-    def get_all_categories(self) -> List[str]:
+    def get_all_categories(self) -> list[str]:
         return sorted(self.tool_categories.keys())
 
-    def get_service(self, name: str) -> Optional[ServiceInfo]:
+    def get_service(self, name: str) -> ServiceInfo | None:
         return self.services.get(name)
 
-    def get_path_info(self, path: str) -> Optional[PathInfo]:
+    def get_path_info(self, path: str) -> PathInfo | None:
         return self.paths.get(path)
 
-    def get_nse_scripts(self, category: Optional[str] = None) -> List[NSEScript]:
+    def get_nse_scripts(self, category: str | None = None) -> list[NSEScript]:
         scripts = list(self.nse_scripts.values())
         if category:
             scripts = [s for s in scripts if s.category == category]
         return scripts
 
-    def get_metasploit_modules(self, platform: Optional[str] = None) -> List[MetasploitModule]:
+    def get_metasploit_modules(self, platform: str | None = None) -> list[MetasploitModule]:
         modules = list(self.metasploit_modules.values())
         if platform:
             modules = [m for m in modules if m.platform == platform]
         return modules
 
-    def get_wordlists(self, use_case: Optional[str] = None) -> List[Wordlist]:
+    def get_wordlists(self, use_case: str | None = None) -> list[Wordlist]:
         wls = list(self.wordlists.values())
         if use_case:
             wls = [w for w in wls if use_case in w.use_cases]
         return wls
 
-    def suggest_tools(self, task: str) -> List[str]:
+    def suggest_tools(self, task: str) -> list[str]:
         """Suggest tools based on task description."""
         task_lower = task.lower()
         suggestions = []
@@ -347,17 +601,14 @@ class KaliBlueprint:
     # SYSTEM PROFILER
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _detect_installed_tools(self) -> Set[str]:
+    def _detect_installed_tools(self) -> set[str]:
         """Detect which tools are actually installed on the system."""
         if self._installed_cache is not None:
             return self._installed_cache
         installed = set()
         for tool in self.tools.values():
             try:
-                result = subprocess.run(
-                    ["which", tool.binary],
-                    capture_output=True, timeout=3
-                )
+                result = subprocess.run(["which", tool.binary], capture_output=True, timeout=3)
                 if result.returncode == 0:
                     installed.add(tool.name)
             except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -365,16 +616,16 @@ class KaliBlueprint:
         self._installed_cache = installed
         return installed
 
-    def get_installed_tools(self) -> List[str]:
+    def get_installed_tools(self) -> list[str]:
         """Return list of tool names that are actually installed."""
         return sorted(self._detect_installed_tools())
 
-    def get_missing_tools(self) -> List[str]:
+    def get_missing_tools(self) -> list[str]:
         """Return list of tool names that are NOT installed."""
         installed = self._detect_installed_tools()
         return sorted([t for t in self.tools if t not in installed])
 
-    def get_system_profile(self) -> Dict[str, Any]:
+    def get_system_profile(self) -> dict[str, Any]:
         """Get a full profile of the system's security tools."""
         installed = self._detect_installed_tools()
         return {
@@ -475,11 +726,17 @@ class KaliBlueprint:
                 lines.append("")
 
         # Relevant services
-        if any(kw in task_lower for kw in ["ssh", "web", "http", "smb", "ftp", "mysql", "dns", "ldap"]):
+        if any(
+            kw in task_lower for kw in ["ssh", "web", "http", "smb", "ftp", "mysql", "dns", "ldap"]
+        ):
             lines.append("## Relevant Services")
             for name, svc in self.services.items():
                 if any(kw in name for kw in task_lower.split()):
-                    creds = f" | Default creds: {', '.join(svc.default_creds)}" if svc.default_creds else ""
+                    creds = (
+                        f" | Default creds: {', '.join(svc.default_creds)}"
+                        if svc.default_creds
+                        else ""
+                    )
                     lines.append(f"  {name}: port {svc.port} ({svc.description}){creds}")
 
         return "\n".join(lines)

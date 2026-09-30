@@ -11,10 +11,11 @@ DeepSeek V4 Pro uses this as the primary pre-training optimizer.
 """
 
 import logging
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from collections.abc import Callable, Iterable
+from typing import Any
 
-import torch
-from torch.optim.optimizer import Optimizer
+import torch  # type: ignore[reportMissingImports]
+from torch.optim.optimizer import Optimizer  # type: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +84,12 @@ class Muon(Optimizer):
         self,
         params: Iterable[torch.nn.Parameter],
         lr: float = 1e-4,
-        betas: Tuple[float, float] = (0.9, 0.999),
+        betas: tuple[float, float] = (0.9, 0.999),
         eps: float = 1e-8,
         weight_decay: float = 0.0,
-        muon_params: Optional[Callable[[torch.nn.Parameter], bool]] = None,
+        muon_params: Callable[[torch.nn.Parameter], bool] | None = None,
         ns_iters: int = 5,
-        adamw_params: Optional[Callable[[torch.nn.Parameter], bool]] = None,
+        adamw_params: Callable[[torch.nn.Parameter], bool] | None = None,
     ):
         defaults = dict(
             lr=lr,
@@ -110,9 +111,9 @@ class Muon(Optimizer):
             self._adamw_filter = adamw_params
 
         self._ns_iters = ns_iters
-        self._adamw_optimizer: Optional[Optimizer] = None
-        self._muon_param_groups: List[Dict[str, Any]] = []
-        self._adamw_param_groups: List[Dict[str, Any]] = []
+        self._adamw_optimizer: Optimizer | None = None
+        self._muon_param_groups: list[dict[str, Any]] = []
+        self._adamw_param_groups: list[dict[str, Any]] = []
 
         self._partition_params()
 
@@ -124,8 +125,8 @@ class Muon(Optimizer):
 
     def _partition_params(self) -> None:
         for group in self.param_groups:
-            muon_params: List[torch.nn.Parameter] = []
-            adamw_params: List[torch.nn.Parameter] = []
+            muon_params: list[torch.nn.Parameter] = []
+            adamw_params: list[torch.nn.Parameter] = []
 
             for p in group["params"]:
                 if self._muon_filter(p):
@@ -162,7 +163,7 @@ class Muon(Optimizer):
             )
 
     @torch.no_grad()
-    def step(self, closure: Optional[Callable[[], float]] = None) -> Optional[float]:
+    def step(self, closure: Callable[[], float] | None = None) -> float | None:
         """Perform a single optimization step.
 
         Applies Muon (Newton-Schulz orthogonalization) to 2D weight matrices,
@@ -206,11 +207,11 @@ class Muon(Optimizer):
         if self._adamw_optimizer is not None:
             self._adamw_optimizer.zero_grad(set_to_none=set_to_none)
 
-    def add_param_group(self, param_group: Dict[str, Any]) -> None:
+    def add_param_group(self, param_group: dict[str, Any]) -> None:
         super().add_param_group(param_group)
         self._partition_params()
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         return dict(self._stats)
 
 
@@ -226,7 +227,7 @@ class MuonAdamW(Muon):
         self,
         params: Iterable[torch.nn.Parameter],
         lr: float = 1e-4,
-        betas: Tuple[float, float] = (0.9, 0.999),
+        betas: tuple[float, float] = (0.9, 0.999),
         eps: float = 1e-8,
         weight_decay: float = 0.1,
         ns_iters: int = 5,

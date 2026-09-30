@@ -4,6 +4,7 @@ Fix Verification — NodeZero-inspired 1-click retesting.
 Verifies that remediated vulnerabilities are actually fixed by
 re-running the original exploit chain and confirming failure.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class VerificationStatus(Enum):
     """Status of a fix verification."""
+
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     VERIFIED_FIXED = "verified_fixed"
@@ -31,6 +33,7 @@ class VerificationStatus(Enum):
 @dataclass
 class OriginalFinding:
     """Reference to the original finding being retested."""
+
     finding_id: str
     title: str
     target: str
@@ -55,6 +58,7 @@ class OriginalFinding:
 @dataclass
 class VerificationResult:
     """Result of a fix verification attempt."""
+
     verification_id: str
     finding: OriginalFinding
     status: VerificationStatus
@@ -154,7 +158,9 @@ class FixVerifier:
             step_passed = await self._verify_step(step, finding.target, context)
             if step_passed:
                 steps_passed += 1
-                evidence_parts.append(f"Step {i + 1}: STILL VULNERABLE - {step.get('description', '')}")
+                evidence_parts.append(
+                    f"Step {i + 1}: STILL VULNERABLE - {step.get('description', '')}"
+                )
             else:
                 evidence_parts.append(f"Step {i + 1}: BLOCKED - {step.get('description', '')}")
 
@@ -233,13 +239,9 @@ class FixVerifier:
         total = len(self._results)
         fixed = sum(1 for r in self._results if r.is_fixed)
         still_vuln = sum(
-            1 for r in self._results
-            if r.status == VerificationStatus.STILL_VULNERABLE
+            1 for r in self._results if r.status == VerificationStatus.STILL_VULNERABLE
         )
-        partial = sum(
-            1 for r in self._results
-            if r.status == VerificationStatus.PARTIALLY_FIXED
-        )
+        partial = sum(1 for r in self._results if r.status == VerificationStatus.PARTIALLY_FIXED)
         return {
             "total_verifications": total,
             "verified_fixed": fixed,
@@ -257,11 +259,13 @@ class FixVerifier:
                 prev = history[-2]
                 curr = history[-1]
                 if prev.is_fixed and curr.status == VerificationStatus.STILL_VULNERABLE:
-                    regressions.append({
-                        "finding_id": fid,
-                        "title": curr.finding.title,
-                        "previous_status": prev.status.value,
-                        "current_status": curr.status.value,
-                        "regression_detected": curr.timestamp.isoformat(),
-                    })
+                    regressions.append(
+                        {
+                            "finding_id": fid,
+                            "title": curr.finding.title,
+                            "previous_status": prev.status.value,
+                            "current_status": curr.status.value,
+                            "regression_detected": curr.timestamp.isoformat(),
+                        }
+                    )
         return regressions

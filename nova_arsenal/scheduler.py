@@ -7,11 +7,11 @@ and automated engagement execution.
 
 import asyncio
 import logging
-import re
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class CronExpression:
             return int(low) <= value <= int(high)
         return int(field) == value
 
-    def next_match(self, from_time: Optional[datetime] = None) -> Optional[datetime]:
+    def next_match(self, from_time: datetime | None = None) -> datetime | None:
         dt = (from_time or datetime.now(timezone.utc)).replace(second=0, microsecond=0)
 
         for _ in range(525600):
@@ -89,13 +89,13 @@ class ScheduleEntry:
     objective: str = "Find and exploit all critical vulnerabilities"
     max_steps: int = 20
     status: ScheduleStatus = ScheduleStatus.ACTIVE
-    last_run: Optional[datetime] = None
-    next_run: Optional[datetime] = None
+    last_run: datetime | None = None
+    next_run: datetime | None = None
     run_count: int = 0
-    last_result: Optional[Dict[str, Any]] = None
-    tags: List[str] = field(default_factory=list)
+    last_result: dict[str, Any] | None = None
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "cron": self.cron,
@@ -121,7 +121,7 @@ class ScheduleRunResult:
     error: str = ""
     summary: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "entry_name": self.entry_name,
             "start_time": self.start_time.isoformat(),
@@ -147,11 +147,11 @@ class NovaScheduler:
     """
 
     def __init__(self) -> None:
-        self._entries: List[ScheduleEntry] = []
+        self._entries: list[ScheduleEntry] = []
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._run_history: List[ScheduleRunResult] = []
-        self._callbacks: List[RunCallback] = []
+        self._task: asyncio.Task | None = None
+        self._run_history: list[ScheduleRunResult] = []
+        self._callbacks: list[RunCallback] = []
 
     def add_callback(self, callback: RunCallback) -> None:
         self._callbacks.append(callback)
@@ -174,13 +174,13 @@ class NovaScheduler:
                 return True
         return False
 
-    def get_entry(self, name: str) -> Optional[ScheduleEntry]:
+    def get_entry(self, name: str) -> ScheduleEntry | None:
         for entry in self._entries:
             if entry.name == name:
                 return entry
         return None
 
-    def list_entries(self) -> List[ScheduleEntry]:
+    def list_entries(self) -> list[ScheduleEntry]:
         return self._entries.copy()
 
     def pause_entry(self, name: str) -> bool:
@@ -217,16 +217,14 @@ class NovaScheduler:
             self._task = None
         logger.info("Scheduler stopped")
 
-    def get_history(self, limit: int = 10) -> List[ScheduleRunResult]:
+    def get_history(self, limit: int = 10) -> list[ScheduleRunResult]:
         return self._run_history[-limit:]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         active = sum(1 for e in self._entries if e.status == ScheduleStatus.ACTIVE)
         total_runs = sum(e.run_count for e in self._entries)
         total_findings = sum(
-            e.last_result.get("findings_count", 0)
-            for e in self._entries
-            if e.last_result
+            e.last_result.get("findings_count", 0) for e in self._entries if e.last_result
         )
 
         return {
@@ -244,7 +242,8 @@ class NovaScheduler:
             try:
                 now = datetime.now(timezone.utc)
                 due_entries = [
-                    e for e in self._entries
+                    e
+                    for e in self._entries
                     if e.status == ScheduleStatus.ACTIVE
                     and e.next_run is not None
                     and now >= e.next_run
@@ -286,7 +285,9 @@ class NovaScheduler:
             entry.next_run = cron.next_match(from_time=start_time)
 
             self._run_history.append(result)
-            logger.info(f"Completed scheduled task: {entry.name} ({'success' if result.success else 'failed'})")
+            logger.info(
+                f"Completed scheduled task: {entry.name} ({'success' if result.success else 'failed'})"
+            )
 
         except Exception as e:
             result.error = str(e)

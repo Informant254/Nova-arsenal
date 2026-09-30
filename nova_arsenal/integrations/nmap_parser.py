@@ -14,7 +14,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NmapPort:
     """A discovered open port."""
+
     port: int
     protocol: str
     state: str
@@ -35,7 +36,7 @@ class NmapPort:
     def key(self) -> str:
         return f"{self.protocol}/{self.port}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "port": self.port,
             "protocol": self.protocol,
@@ -51,16 +52,17 @@ class NmapPort:
 @dataclass
 class NmapHost:
     """A discovered host."""
+
     ip: str
     hostname: str = ""
     state: str = "up"
     os: str = ""
     os_accuracy: int = 0
     mac: str = ""
-    ports: List[NmapPort] = field(default_factory=list)
-    scripts: List[Dict[str, Any]] = field(default_factory=list)
+    ports: list[NmapPort] = field(default_factory=list)
+    scripts: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ip": self.ip,
             "hostname": self.hostname,
@@ -78,14 +80,15 @@ class NmapHost:
 @dataclass
 class NmapScanResult:
     """Complete parsed nmap scan."""
+
     cmdline: str = ""
     start_time: str = ""
     runtime: str = ""
-    hosts: List[NmapHost] = field(default_factory=list)
+    hosts: list[NmapHost] = field(default_factory=list)
     raw_xml: str = ""
 
     @property
-    def all_ports(self) -> List[NmapPort]:
+    def all_ports(self) -> list[NmapPort]:
         ports = []
         for host in self.hosts:
             ports.extend(host.ports)
@@ -96,8 +99,8 @@ class NmapScanResult:
         return sum(1 for p in self.all_ports if p.state == "open")
 
     @property
-    def services(self) -> Dict[str, List[int]]:
-        services: Dict[str, List[int]] = {}
+    def services(self) -> dict[str, list[int]]:
+        services: dict[str, list[int]] = {}
         for port in self.all_ports:
             if port.state == "open":
                 svc = port.service.lower()
@@ -106,7 +109,7 @@ class NmapScanResult:
                 services[svc].append(port.port)
         return services
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "cmdline": self.cmdline,
             "start_time": self.start_time,
@@ -138,9 +141,7 @@ class NmapParser:
 
         # Extract scan metadata
         result.cmdline = NmapParser._extract(xml_content, r'<nmaprun[^>]* args="([^"]*)"')
-        result.start_time = NmapParser._extract(
-            xml_content, r'<nmaprun[^>]* start="(\d+)"'
-        )
+        result.start_time = NmapParser._extract(xml_content, r'<nmaprun[^>]* start="(\d+)"')
         if result.start_time:
             try:
                 ts = int(result.start_time)
@@ -159,8 +160,7 @@ class NmapParser:
                 result.hosts.append(host)
 
         logger.info(
-            f"Parsed nmap scan: {len(result.hosts)} hosts, "
-            f"{result.total_open_ports} open ports"
+            f"Parsed nmap scan: {len(result.hosts)} hosts, {result.total_open_ports} open ports"
         )
         return result
 
@@ -168,7 +168,7 @@ class NmapParser:
     def parse_file(filepath: str) -> NmapScanResult:
         """Read and parse an nmap XML file."""
         try:
-            with open(filepath, "r", errors="replace") as f:
+            with open(filepath, errors="replace") as f:
                 content = f.read()
             return NmapParser.parse(content)
         except FileNotFoundError:
@@ -185,7 +185,7 @@ class NmapParser:
         return m.group(group) if m else ""
 
     @staticmethod
-    def _find_sections(text: str, tag: str) -> List[str]:
+    def _find_sections(text: str, tag: str) -> list[str]:
         """Find all top-level XML sections with given tag."""
         sections = []
         pattern = rf"<{tag}[^>]*>.*?</{tag}>"
@@ -194,17 +194,15 @@ class NmapParser:
         return sections
 
     @staticmethod
-    def _parse_host(host_xml: str) -> Optional[NmapHost]:
+    def _parse_host(host_xml: str) -> NmapHost | None:
         """Parse a single host section."""
         # Extract IP address
         ip = NmapParser._extract(
-            host_xml,
-            r'<address[^>]* addr="(\d+\.\d+\.\d+\.\d+)"[^>]* addrtype="ipv4"'
+            host_xml, r'<address[^>]* addr="(\d+\.\d+\.\d+\.\d+)"[^>]* addrtype="ipv4"'
         )
         if not ip:
             ip = NmapParser._extract(
-                host_xml,
-                r'<address[^>]* addr="([^"]*)"[^>]* addrtype="ipv[46]"'
+                host_xml, r'<address[^>]* addr="([^"]*)"[^>]* addrtype="ipv[46]"'
             )
         if not ip:
             return None
@@ -224,10 +222,7 @@ class NmapParser:
         )
 
         # OS detection
-        os_match = re.search(
-            r'<osmatch[^>]* name="([^"]*)"[^>]* accuracy="(\d+)"',
-            host_xml
-        )
+        os_match = re.search(r'<osmatch[^>]* name="([^"]*)"[^>]* accuracy="(\d+)"', host_xml)
         if os_match:
             host.os = os_match.group(1)
             host.os_accuracy = int(os_match.group(2))
@@ -245,15 +240,17 @@ class NmapParser:
             script_id = NmapParser._extract(script_xml, r'id="([^"]*)"')
             script_output = NmapParser._extract(script_xml, r'output="([^"]*)"')
             if script_id:
-                host.scripts.append({
-                    "id": script_id,
-                    "output": script_output,
-                })
+                host.scripts.append(
+                    {
+                        "id": script_id,
+                        "output": script_output,
+                    }
+                )
 
         return host
 
     @staticmethod
-    def _parse_port(port_xml: str) -> Optional[NmapPort]:
+    def _parse_port(port_xml: str) -> NmapPort | None:
         """Parse a single port section."""
         port_id = NmapParser._extract(port_xml, r'portid="(\d+)"')
         protocol = NmapParser._extract(port_xml, r'protocol="([^"]*)"')
@@ -276,56 +273,64 @@ class NmapParser:
 
         # Service details
         service_section = NmapParser._extract(
-            port_xml, r'(<service[^>]*/>|<service[^>]*>.*?</service>)'
+            port_xml, r"(<service[^>]*/>|<service[^>]*>.*?</service>)"
         )
         if service_section:
             port.service = NmapParser._extract(service_section, r'name="([^"]*)"')
             port.product = NmapParser._extract(service_section, r'product="([^"]*)"')
             port.version = NmapParser._extract(service_section, r'version="([^"]*)"')
             port.extra_info = NmapParser._extract(service_section, r'extrainfo="([^"]*)"')
-            port.cpe = NmapParser._extract(service_section, r'<cpe>[^<]*</cpe>')
+            port.cpe = NmapParser._extract(service_section, r"<cpe>[^<]*</cpe>")
 
         return port
 
     @staticmethod
-    def extract_findings(result: NmapScanResult) -> List[Dict[str, Any]]:
+    def extract_findings(result: NmapScanResult) -> list[dict[str, Any]]:
         """Extract security-relevant findings from parsed scan data."""
         findings = []
 
         # Map service names to port numbers
         for svc, ports in result.services.items():
             if svc in ("http", "https", "http-proxy"):
-                findings.append({
-                    "title": f"Web Service Detected ({svc.upper()})",
-                    "severity": "info",
-                    "description": f"Web service running on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": f"Web Service Detected ({svc.upper()})",
+                        "severity": "info",
+                        "description": f"Web service running on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
             elif svc in ("smb", "microsoft-ds", "netbios-ssn"):
-                findings.append({
-                    "title": "SMB Service Detected",
-                    "severity": "medium",
-                    "description": f"SMB service on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": "SMB Service Detected",
+                        "severity": "medium",
+                        "description": f"SMB service on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
             elif svc in ("mysql", "postgresql", "ms-sql-s", "oracle-tns"):
-                findings.append({
-                    "title": f"Database Service Detected ({svc})",
-                    "severity": "medium",
-                    "description": f"Database service on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": f"Database Service Detected ({svc})",
+                        "severity": "medium",
+                        "description": f"Database service on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
             elif svc in ("ssh",):
-                findings.append({
-                    "title": "SSH Service Detected",
-                    "severity": "low",
-                    "description": f"SSH service on port(s): {', '.join(map(str, ports))}",
-                    "ports": ports,
-                    "service": svc,
-                })
+                findings.append(
+                    {
+                        "title": "SSH Service Detected",
+                        "severity": "low",
+                        "description": f"SSH service on port(s): {', '.join(map(str, ports))}",
+                        "ports": ports,
+                        "service": svc,
+                    }
+                )
 
         # Check for outdated versions
         for port in result.all_ports:
@@ -333,12 +338,14 @@ class NmapParser:
                 version_str = f"{port.product} {port.version}".lower()
                 outdated = ["2.4.", "1.0.", "0.9.", "old", "deprecated"]
                 if any(x in version_str for x in outdated):
-                    findings.append({
-                        "title": f"Potentially Outdated Service: {port.service}",
-                        "severity": "medium",
-                        "description": f"{port.product} {port.version} on port {port.port}",
-                        "ports": [port.port],
-                        "service": port.service,
-                    })
+                    findings.append(
+                        {
+                            "title": f"Potentially Outdated Service: {port.service}",
+                            "severity": "medium",
+                            "description": f"{port.product} {port.version} on port {port.port}",
+                            "ports": [port.port],
+                            "service": port.service,
+                        }
+                    )
 
         return findings

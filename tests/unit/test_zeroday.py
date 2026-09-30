@@ -1,11 +1,11 @@
 """Unit tests for the zero-day research pipeline."""
+
 import asyncio
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
 
 from nova_arsenal.zeroday import (
     AttackSurfaceMapper,
@@ -56,7 +56,13 @@ class TestVariantAnalyzer:
         va = VariantAnalyzer()
         assert "rce" in va.classify("remote code execution via template")
         hyps = va.analyze(
-            [{"cve_id": "CVE-2021-41773", "description": "path traversal in Apache", "severity": "high"}],
+            [
+                {
+                    "cve_id": "CVE-2021-41773",
+                    "description": "path traversal in Apache",
+                    "severity": "high",
+                }
+            ],
             services={"http": [80]},
         )
         assert len(hyps) >= 1
@@ -165,8 +171,8 @@ class TestLiveFuzzWorker:
 
     def test_dry_run_splits_runnable(self):
         from nova_arsenal.zeroday import LiveFuzzWorker
-        from nova_arsenal.zeroday.surface import SurfaceEndpoint
         from nova_arsenal.zeroday.fuzz_orchestrator import FuzzOrchestrator
+        from nova_arsenal.zeroday.surface import SurfaceEndpoint
 
         orch = FuzzOrchestrator(max_jobs=5)
         campaign = orch.plan(
@@ -255,13 +261,16 @@ class TestZeroDayHunter:
         assert result.fuzz_campaign is not None
         assert result.fuzz_campaign["job_count"] >= 1
         assert len(result.candidates) >= 1
-        assert any(c.source_stage in {"variant", "static", "crash_triage", "surface"} for c in result.candidates)
+        assert any(
+            c.source_stage in {"variant", "static", "crash_triage", "surface"}
+            for c in result.candidates
+        )
         d = result.to_dict()
         assert "disclaimer" in d
         assert d["candidate_count"] == len(result.candidates)
 
     def test_exports(self):
-        from nova_arsenal.zeroday import ZeroDayHunter, ZeroDayHuntConfig
+        from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter
 
         assert ZeroDayHunter is not None
         assert ZeroDayHuntConfig is not None

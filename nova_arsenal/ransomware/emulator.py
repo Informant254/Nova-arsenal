@@ -4,6 +4,7 @@ Ransomware Emulation — Pentera-inspired safe ransomware simulation.
 Simulates ransomware behavior (encryption, credential harvesting, shadow copy deletion)
 without actual destruction. All operations are reversible and controlled.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class RansomwarePhase(Enum):
     """Phases of a ransomware attack chain."""
+
     RECONNAISSANCE = "reconnaissance"
     INITIAL_ACCESS = "initial_access"
     CREDENTIAL_HARVESTING = "credential_harvesting"
@@ -37,6 +39,7 @@ class RansomwarePhase(Enum):
 
 class EmulationMode(Enum):
     """How strictly the emulation mimics real ransomware."""
+
     SAFE = "safe"
     MODERATE = "moderate"
     AGGRESSIVE = "aggressive"
@@ -45,6 +48,7 @@ class EmulationMode(Enum):
 @dataclass
 class RansomwareAction:
     """A single action in the ransomware emulation."""
+
     action_id: str
     phase: RansomwarePhase
     description: str
@@ -53,6 +57,7 @@ class RansomwareAction:
     executed: bool = False
     success: bool = False
     duration_ms: float = 0.0
+    start_time: float = 0.0
     evidence: str = ""
     artifacts: list[dict] = field(default_factory=list)
 
@@ -74,6 +79,7 @@ class RansomwareAction:
 @dataclass
 class RansomwareEmulationResult:
     """Result of a complete ransomware emulation."""
+
     emulation_id: str
     target: str
     mode: EmulationMode
@@ -115,7 +121,9 @@ class RansomwareEmulator:
     are logged but not executed, and ransom notes are written to a safe directory.
     """
 
-    def __init__(self, mode: EmulationMode = EmulationMode.SAFE, output_dir: str = "/tmp/nova_ransomware_emu"):
+    def __init__(
+        self, mode: EmulationMode = EmulationMode.SAFE, output_dir: str = "/tmp/nova_ransomware_emu"
+    ):
         self.mode = mode
         self.output_dir = output_dir
         self._emulations: list[RansomwareEmulationResult] = []
@@ -148,7 +156,7 @@ class RansomwareEmulator:
                 action.success = success
                 action.evidence = evidence
                 action.artifacts = artifacts
-                action.duration_ms = (time.monotonic() - getattr(action, 'start_time', time.monotonic())) * 1000
+                action.duration_ms = (time.monotonic() - action.start_time) * 1000
                 actions.append(action)
 
                 if success:
@@ -213,12 +221,16 @@ class RansomwareEmulator:
                 RansomwareAction(str(uuid.uuid4()), phase, "Archive collected data", True, 5),
             ],
             RansomwarePhase.SHADOW_COPY_DELETION: [
-                RansomwareAction(str(uuid.uuid4()), phase, "Delete shadow copies (simulated)", True, 9),
+                RansomwareAction(
+                    str(uuid.uuid4()), phase, "Delete shadow copies (simulated)", True, 9
+                ),
                 RansomwareAction(str(uuid.uuid4()), phase, "Disable recovery (simulated)", True, 8),
             ],
             RansomwarePhase.BACKUP_DISCOVERY: [
                 RansomwareAction(str(uuid.uuid4()), phase, "Discover backup solutions", True, 4),
-                RansomwareAction(str(uuid.uuid4()), phase, "Enumerate backup repositories", True, 5),
+                RansomwareAction(
+                    str(uuid.uuid4()), phase, "Enumerate backup repositories", True, 5
+                ),
             ],
             RansomwarePhase.ENCRYPTION: [
                 RansomwareAction(str(uuid.uuid4()), phase, "Simulate file encryption", True, 10),
@@ -259,32 +271,40 @@ class RansomwareEmulator:
         else:
             return True, f"{action.description} completed (simulated)", []
 
-    async def _simulate_encryption(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _simulate_encryption(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Simulate encryption by computing hashes without modifying files."""
         extensions = [".doc", ".pdf", ".xls", ".jpg", ".png", ".sql", ".bak", ".zip"]
         file_count = 0
         for ext in extensions:
             for i in range(10):
                 fake_path = f"/simulated/{target}/file_{i}{ext}"
-                file_hash = hashlib.sha256(fake_path.encode()).hexdigest()
+                _file_hash = hashlib.sha256(fake_path.encode()).hexdigest()
                 file_count += 1
 
         evidence = f"Simulated encryption of {file_count} files (hash-only, no modification)"
         artifacts = [{"count": file_count, "extensions": extensions, "mode": "hash_only"}]
         return True, evidence, artifacts
 
-    async def _simulate_shadow_deletion(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _simulate_shadow_deletion(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Simulate shadow copy deletion."""
         shadow_copies = [
             "\\Device\\HarddiskVolumeShadowCopy1",
             "\\Device\\HarddiskVolumeShadowCopy2",
             "\\Device\\HarddiskVolumeShadowCopy3",
         ]
-        evidence = f"Identified {len(shadow_copies)} shadow copies (deletion simulated, not executed)"
+        evidence = (
+            f"Identified {len(shadow_copies)} shadow copies (deletion simulated, not executed)"
+        )
         artifacts = [{"count": len(shadow_copies), "copies": shadow_copies}]
         return True, evidence, artifacts
 
-    async def _simulate_credential_harvest(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _simulate_credential_harvest(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Simulate credential harvesting."""
         creds_found = [
             {"type": "ntlm", "user": "Administrator"},
@@ -295,7 +315,9 @@ class RansomwareEmulator:
         artifacts = [{"count": len(creds_found), "types": [c["type"] for c in creds_found]}]
         return True, evidence, artifacts
 
-    async def _simulate_backup_discovery(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _simulate_backup_discovery(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Simulate backup solution discovery."""
         backups = [
             {"solution": "Veeam", "path": "\\\\backup-server\\Veeam"},
@@ -306,7 +328,9 @@ class RansomwareEmulator:
         artifacts = [{"count": len(backups), "solutions": backups}]
         return True, evidence, artifacts
 
-    async def _deliver_ransom_note(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _deliver_ransom_note(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Deliver a simulated ransom note to output directory."""
         note = {
             "emulation": True,
@@ -326,17 +350,27 @@ class RansomwareEmulator:
         artifacts = [{"path": note_path, "type": "ransom_note"}]
         return True, evidence, artifacts
 
-    async def _simulate_data_collection(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _simulate_data_collection(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Simulate data collection for exfiltration."""
         sensitive_patterns = [
-            "*.sql", "*.bak", "*.key", "*.pem", "*.env",
-            "*password*", "*secret*", "*credential*",
+            "*.sql",
+            "*.bak",
+            "*.key",
+            "*.pem",
+            "*.env",
+            "*password*",
+            "*secret*",
+            "*credential*",
         ]
         evidence = f"Enumerated {len(sensitive_patterns)} sensitive file patterns (simulated)"
         artifacts = [{"count": len(sensitive_patterns), "patterns": sensitive_patterns}]
         return True, evidence, artifacts
 
-    async def _simulate_exfiltration(self, target: str, context: dict) -> tuple[bool, str, list[dict]]:
+    async def _simulate_exfiltration(
+        self, target: str, context: dict
+    ) -> tuple[bool, str, list[dict]]:
         """Simulate data exfiltration."""
         evidence = "Simulated exfiltration of collected data to staging area"
         artifacts = [{"staging_path": "/simulated/staging", "size_mb": 0}]
@@ -355,10 +389,7 @@ class RansomwareEmulator:
     def get_stats(self) -> dict:
         """Return emulation statistics."""
         total_actions = sum(len(e.actions) for e in self._emulations)
-        successful = sum(
-            sum(1 for a in e.actions if a.success)
-            for e in self._emulations
-        )
+        successful = sum(sum(1 for a in e.actions if a.success) for e in self._emulations)
         return {
             "total_emulations": len(self._emulations),
             "total_actions": total_actions,

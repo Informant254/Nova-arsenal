@@ -3,12 +3,11 @@ import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
 
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +30,18 @@ class KeyPair:
 
 
 class KeyManager:
-    def __init__(self, storage_dir: Optional[str] = None) -> None:
+    def __init__(self, storage_dir: str | None = None) -> None:
         if storage_dir is None:
             storage_dir = os.environ.get("NOVA_KEYS_DIR", "keys")
         self.storage_dir = storage_dir
-        self._active_key_id: Optional[str] = None
-        self._keys: Dict[str, KeyPair] = {}
-        self._symmetric_keys: Dict[str, bytes] = {}
+        self._active_key_id: str | None = None
+        self._keys: dict[str, KeyPair] = {}
+        self._symmetric_keys: dict[str, bytes] = {}
         os.makedirs(storage_dir, exist_ok=True)
 
-    def generate_rsa_keypair(self, key_size: KeySize = KeySize.RSA_4096,
-                             key_id: Optional[str] = None) -> KeyPair:
+    def generate_rsa_keypair(
+        self, key_size: KeySize = KeySize.RSA_4096, key_id: str | None = None
+    ) -> KeyPair:
         private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=key_size.value,
@@ -65,6 +65,7 @@ class KeyManager:
         fingerprint = fp.finalize().hex()[:16]
 
         from datetime import datetime, timezone
+
         kp = KeyPair(
             public_key_pem=public_pem,
             private_key_pem=private_pem,
@@ -80,15 +81,16 @@ class KeyManager:
         logger.info(f"Generated RSA-{key_size.value} keypair: {kid}")
         return kp
 
-    def generate_aes_key(self, key_size: KeySize = KeySize.AES_256,
-                         key_id: Optional[str] = None) -> bytes:
+    def generate_aes_key(
+        self, key_size: KeySize = KeySize.AES_256, key_id: str | None = None
+    ) -> bytes:
         key = AESGCM.generate_key(bit_length=key_size.value * 8)
         kid = key_id or f"aes-{key.hex()[:8]}"
         self._symmetric_keys[kid] = key
         logger.info(f"Generated AES-{key_size.value * 8} key: {kid}")
         return key
 
-    def load_keypair(self, key_id: str) -> Optional[KeyPair]:
+    def load_keypair(self, key_id: str) -> KeyPair | None:
         path = os.path.join(self.storage_dir, f"{key_id}.json")
         if os.path.exists(path):
             with open(path) as f:
@@ -111,31 +113,35 @@ class KeyManager:
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
 
-    def get_active_key_id(self) -> Optional[str]:
+    def get_active_key_id(self) -> str | None:
         return self._active_key_id
 
-    def get_public_key(self, key_id: Optional[str] = None) -> Optional[str]:
+    def get_public_key(self, key_id: str | None = None) -> str | None:
         kid = key_id or self._active_key_id
         if kid and kid in self._keys:
             return self._keys[kid].public_key_pem
         return None
 
-    def list_keys(self) -> List[Dict[str, str]]:
+    def list_keys(self) -> list[dict[str, str]]:
         keys = []
         for kid, kp in self._keys.items():
-            keys.append({
-                "key_id": kid,
-                "type": "rsa",
-                "size": str(kp.key_size.value),
-                "fingerprint": kp.fingerprint,
-                "created_at": kp.created_at,
-            })
+            keys.append(
+                {
+                    "key_id": kid,
+                    "type": "rsa",
+                    "size": str(kp.key_size.value),
+                    "fingerprint": kp.fingerprint,
+                    "created_at": kp.created_at,
+                }
+            )
         for kid in self._symmetric_keys:
-            keys.append({
-                "key_id": kid,
-                "type": "aes",
-                "size": str(len(self._symmetric_keys[kid]) * 8),
-            })
+            keys.append(
+                {
+                    "key_id": kid,
+                    "type": "aes",
+                    "size": str(len(self._symmetric_keys[kid]) * 8),
+                }
+            )
         return keys
 
     def rotate_key(self) -> KeyPair:

@@ -5,7 +5,7 @@ Abstract base class for all LLM providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Dict, Optional
+from collections.abc import AsyncGenerator
 
 
 class LLMProvider(ABC):
@@ -14,7 +14,7 @@ class LLMProvider(ABC):
     def __init__(self, name: str, model: str, api_key: str = "", **kwargs):
         """
         Initialize the provider.
-        
+
         Args:
             name: Provider name (e.g., "ollama", "openai")
             model: Model name (e.g., "gpt-4o", "deepseek-r1")
@@ -30,20 +30,20 @@ class LLMProvider(ABC):
     async def complete(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs,
     ) -> str:
         """
         Generate a completion.
-        
+
         Args:
             prompt: User prompt
             system_prompt: Optional system prompt
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
-            
+
         Returns:
             Generated text
         """
@@ -53,20 +53,20 @@ class LLMProvider(ABC):
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a completion.
-        
+
         Args:
             prompt: User prompt
             system_prompt: Optional system prompt
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
-            
+
         Yields:
             Generated text chunks
 
@@ -82,7 +82,7 @@ class LLMProvider(ABC):
     async def health_check(self) -> bool:
         """
         Check if the provider is available.
-        
+
         Returns:
             True if healthy, False otherwise
         """
@@ -91,7 +91,7 @@ class LLMProvider(ABC):
     async def get_models(self) -> list[str]:
         """
         Get available models from this provider.
-        
+
         Returns:
             List of model names
         """

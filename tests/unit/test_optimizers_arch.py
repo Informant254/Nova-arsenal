@@ -7,24 +7,29 @@ import pytest
 
 try:
     import torch
+
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
 
 # ── Muon Optimizer Tests ──────────────────────────────────────────────────────
 
+
 @pytest.mark.skipif(not HAS_TORCH, reason="PyTorch not installed")
 class TestMuonOptimizer:
     def test_newton_schulz_exists(self):
         from nova_arsenal.optimizers.muon import newton_schulz
+
         assert callable(newton_schulz)
 
     def test_muon_exists(self):
         from nova_arsenal.optimizers.muon import Muon
+
         assert Muon is not None
 
     def test_muon_adamw_exists(self):
         from nova_arsenal.optimizers.muon import MuonAdamW
+
         assert MuonAdamW is not None
 
 
@@ -78,6 +83,7 @@ class TestMuonAdamW:
 
 
 # ── mHC Architecture Tests ───────────────────────────────────────────────────
+
 
 @pytest.mark.skipif(not HAS_TORCH, reason="PyTorch not installed")
 class TestManifoldConstrainedHyperConnection:

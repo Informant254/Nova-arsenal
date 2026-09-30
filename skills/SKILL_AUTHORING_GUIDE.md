@@ -32,15 +32,16 @@ easiest way to contribute to Nova Arsenal.
    ```python
    from platform_connector import PlatformConnector, PlatformKind, Target
 
+
    class BugcrowdConnector(PlatformConnector):
        platform_name = "bugcrowd"
        platform_kind = PlatformKind.BUG_BOUNTY
 
-       def list_targets(self, limit=50) -> list[Target]:
-           ...  # call Bugcrowd's API, return Target objects
+       def list_targets(
+           self, limit=50
+       ) -> list[Target]: ...  # call Bugcrowd's API, return Target objects
 
-       def get_target_detail(self, target_id: str) -> Target:
-           ...
+       def get_target_detail(self, target_id: str) -> Target: ...
    ```
 
 4. Test it locally:
@@ -88,9 +89,7 @@ program and a HackTheBox machine both reduce to the same shape:
 
 ```python
 Target(
-    id, platform, kind, name, url,
-    scope_summary, tags, difficulty,
-    max_reward_usd, asset_types, raw
+    id, platform, kind, name, url, scope_summary, tags, difficulty, max_reward_usd, asset_types, raw
 )
 ```
 

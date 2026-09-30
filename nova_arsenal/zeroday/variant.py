@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # Bug-class templates used to expand a known CVE into nearby research angles.
-_VARIANT_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
+_VARIANT_TEMPLATES: dict[str, list[dict[str, Any]]] = {
     "path_traversal": [
         {
             "title": "Alternate encoding path traversal",
@@ -106,14 +107,17 @@ _VARIANT_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
     ],
 }
 
-_CLASS_KEYWORDS: List[tuple[str, tuple[str, ...]]] = [
+_CLASS_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("path_traversal", ("path traversal", "directory traversal", "lfi", "arbitrary file")),
     ("rce", ("remote code", "rce", "command injection", "code execution", "os command")),
     ("auth_bypass", ("authentication bypass", "auth bypass", "broken auth", "improper auth")),
     ("ssrf", ("ssrf", "server-side request")),
     ("sqli", ("sql injection", "sqli")),
     ("xss", ("cross-site scripting", "xss")),
-    ("memory_corruption", ("buffer overflow", "use after free", "uaf", "heap overflow", "out-of-bounds")),
+    (
+        "memory_corruption",
+        ("buffer overflow", "use after free", "uaf", "heap overflow", "out-of-bounds"),
+    ),
     ("privilege_escalation", ("privilege escalation", "privesc", "elevation of privilege")),
 ]
 
@@ -128,12 +132,12 @@ class VariantHypothesis:
     hypothesis: str
     target_service: str
     severity: str
-    test_ideas: List[str] = field(default_factory=list)
+    test_ideas: list[str] = field(default_factory=list)
     confidence: float = 0.5
-    related_components: List[str] = field(default_factory=list)
+    related_components: list[str] = field(default_factory=list)
     notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "source_cve": self.source_cve,
             "bug_class": self.bug_class,
@@ -151,9 +155,9 @@ class VariantHypothesis:
 class VariantAnalyzer:
     """Expand known CVEs into variant / patch-gap research plans."""
 
-    def classify(self, text: str) -> List[str]:
+    def classify(self, text: str) -> list[str]:
         text_l = (text or "").lower()
-        classes: List[str] = []
+        classes: list[str] = []
         for cls, kws in _CLASS_KEYWORDS:
             if any(k in text_l for k in kws):
                 classes.append(cls)
@@ -161,13 +165,13 @@ class VariantAnalyzer:
 
     def analyze(
         self,
-        cves: Sequence[Dict[str, Any]],
-        services: Optional[Dict[str, Any]] = None,
+        cves: Sequence[dict[str, Any]],
+        services: dict[str, Any] | None = None,
         max_hypotheses: int = 50,
-    ) -> List[VariantHypothesis]:
+    ) -> list[VariantHypothesis]:
         services = services or {}
         service_names = {str(k).lower() for k in services.keys()} or {"generic"}
-        hypotheses: List[VariantHypothesis] = []
+        hypotheses: list[VariantHypothesis] = []
 
         for cve in cves:
             cve_id = str(cve.get("cve_id") or cve.get("id") or "UNKNOWN")
@@ -214,7 +218,7 @@ class VariantAnalyzer:
 
         # Dedup by (source, title, service)
         seen: set = set()
-        unique: List[VariantHypothesis] = []
+        unique: list[VariantHypothesis] = []
         for h in sorted(hypotheses, key=lambda x: x.confidence, reverse=True):
             key = (h.source_cve, h.title, h.target_service)
             if key in seen:
@@ -227,11 +231,13 @@ class VariantAnalyzer:
         logger.info("Variant analysis produced %d hypotheses from %d CVEs", len(unique), len(cves))
         return unique
 
-    async def analyze_async(self, *args: Any, **kwargs: Any) -> List[VariantHypothesis]:
+    async def analyze_async(self, *args: Any, **kwargs: Any) -> list[VariantHypothesis]:
         return self.analyze(*args, **kwargs)
 
-    def _extract_components(self, text: str) -> List[str]:
+    def _extract_components(self, text: str) -> list[str]:
         # Lightweight: product-like tokens and module paths
-        comps = re.findall(r"\b(?:mod_|lib|module|plugin|handler|parser|servlet)[\w.-]+\b", text, re.I)
+        comps = re.findall(
+            r"\b(?:mod_|lib|module|plugin|handler|parser|servlet)[\w.-]+\b", text, re.I
+        )
         products = re.findall(r"\b[A-Z][A-Za-z0-9.+-]{2,20}\b", text)
         return list(dict.fromkeys([*comps, *products]))[:10]

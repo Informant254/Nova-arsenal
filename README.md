@@ -175,8 +175,11 @@ nova-agent --target lab.example.local --swarm --authorized --auth-ref ENG-42 --l
 
 ```python
 from nova_arsenal import (
-    ZeroDayHunter, ZeroDayHuntConfig, LiveFuzzWorker,
-    SwarmOrchestrator, findings_to_services,
+    ZeroDayHunter,
+    ZeroDayHuntConfig,
+    LiveFuzzWorker,
+    SwarmOrchestrator,
+    findings_to_services,
 )
 
 # Standalone hunt
@@ -186,8 +189,8 @@ result = await ZeroDayHunter().hunt(
     config=ZeroDayHuntConfig(
         authorized=True,
         authorization_ref="ENG-42",
-        execute_fuzz=True,      # live worker
-        dry_run_fuzz=False,     # actually run available engines
+        execute_fuzz=True,  # live worker
+        dry_run_fuzz=False,  # actually run available engines
         live_fuzz=True,
         fuzz_job_timeout=60,
     ),
@@ -264,10 +267,10 @@ Nova-Arsenal v1.1+ includes enterprise-grade resilience patterns:
 from nova_arsenal.resilient_agent_core import ResilientNovaAgent, ResilientAgentConfig
 
 config = ResilientAgentConfig(
-    step_timeout=120.0,        # Timeout per action
-    total_timeout=600.0,       # 10-minute maximum execution
-    max_concurrent_tasks=5,    # Prevent task explosion
-    max_tool_calls_per_step=10, # Rate limit tool usage
+    step_timeout=120.0,  # Timeout per action
+    total_timeout=600.0,  # 10-minute maximum execution
+    max_concurrent_tasks=5,  # Prevent task explosion
+    max_tool_calls_per_step=10,  # Rate limit tool usage
 )
 
 agent = ResilientNovaAgent(

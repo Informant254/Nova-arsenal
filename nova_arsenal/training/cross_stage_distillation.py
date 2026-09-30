@@ -10,13 +10,12 @@ Ported from GLM-5.1 Section 3.5 (arXiv 2602.15763):
 - Training prompts sampled from each teacher's RL training set
 """
 
-import asyncio
 import logging
-import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from nova_arsenal.training.config import OPDConfig
 
@@ -38,6 +37,7 @@ class TeacherSnapshot:
     - Training prompts sampled from teacher's RL training set
     - Teachers mixed in proportion to their stage's data volume
     """
+
     stage: RLStage
     model_name: str
     sampling_weight: float = 1.0
@@ -53,6 +53,7 @@ class CrossStageDistillationConfig:
     - batch_size = 1024 (feasible because no group estimation needed)
     - Multiple teachers mixed proportionally
     """
+
     use_inference_engine_for_teacher: bool = True
     group_size: int = 1
     batch_size: int = 1024
@@ -75,18 +76,19 @@ class TeacherLogitCache:
     many samples. Caching logits for identical prefixes reduces
     inference cost.
     """
-    cache: Dict[str, List[float]] = field(default_factory=dict)
+
+    cache: dict[str, list[float]] = field(default_factory=dict)
     hits: int = 0
     misses: int = 0
 
-    def get(self, key: str) -> Optional[List[float]]:
+    def get(self, key: str) -> list[float] | None:
         if key in self.cache:
             self.hits += 1
             return self.cache[key]
         self.misses += 1
         return None
 
-    def put(self, key: str, logits: List[float]) -> None:
+    def put(self, key: str, logits: list[float]) -> None:
         self.cache[key] = logits
 
     def clear(self) -> None:
@@ -101,9 +103,9 @@ class TeacherLogitCache:
 
 
 def compute_cross_stage_advantage(
-    teacher_log_probs: List[float],
-    student_log_probs: List[float],
-) -> List[float]:
+    teacher_log_probs: list[float],
+    student_log_probs: list[float],
+) -> list[float]:
     """Compute advantage from teacher-student log-probability gap.
 
     Ported from GLM-5 Equation 2 (Section 3.5):
@@ -114,7 +116,7 @@ def compute_cross_stage_advantage(
     group_size=1 is feasible because advantage is computed directly
     from the gap with teacher models instead of group statistics.
     """
-    advantages: List[float] = []
+    advantages: list[float] = []
     for t_lp, s_lp in zip(teacher_log_probs, student_log_probs):
         adv = t_lp - s_lp
         advantages.append(adv)
@@ -144,14 +146,14 @@ class CrossStageDistillationTrainer:
         config: CrossStageDistillationConfig,
         opd_config: OPDConfig,
         student_llm_complete: Callable[..., Any],
-        teacher_llm_complete: Optional[Callable[..., Any]] = None,
+        teacher_llm_complete: Callable[..., Any] | None = None,
     ):
         self.config = config
         self.opd_config = opd_config
         self._student_llm = student_llm_complete
         self._teacher_llm = teacher_llm_complete or student_llm_complete
 
-        self._teachers: List[TeacherSnapshot] = []
+        self._teachers: list[TeacherSnapshot] = []
         self._logit_cache = TeacherLogitCache(
             cache={},
         )
@@ -179,15 +181,14 @@ class CrossStageDistillationTrainer:
         )
         self._teachers.append(teacher)
         logger.info(
-            f"Registered teacher for stage {stage.value}: {model_name} "
-            f"(weight={sampling_weight})"
+            f"Registered teacher for stage {stage.value}: {model_name} (weight={sampling_weight})"
         )
         return teacher
 
     def remove_teacher(self, stage: RLStage) -> None:
         self._teachers = [t for t in self._teachers if t.stage != stage]
 
-    def _sample_teacher(self) -> Optional[TeacherSnapshot]:
+    def _sample_teacher(self) -> TeacherSnapshot | None:
         if not self._teachers:
             return None
 
@@ -210,6 +211,7 @@ class CrossStageDistillationTrainer:
 
         normalized = [w / total for w in weights]
         import random
+
         return random.choices(eligible, weights=normalized, k=1)[0]
 
     async def fetch_teacher_log_probs(
@@ -217,7 +219,7 @@ class CrossStageDistillationTrainer:
         teacher: TeacherSnapshot,
         prompt: str,
         response: str,
-    ) -> Optional[List[float]]:
+    ) -> list[float] | None:
         """Fetch teacher log-probabilities for a student-generated response.
 
         Ported from GLM-5: currently uses inference engine for teacher logits.
@@ -260,17 +262,15 @@ class CrossStageDistillationTrainer:
             return log_probs
 
         except Exception as e:
-            logger.warning(
-                f"Failed to fetch teacher logprobs for {teacher.model_name}: {e}"
-            )
+            logger.warning(f"Failed to fetch teacher logprobs for {teacher.model_name}: {e}")
             return None
 
     async def distill_step(
         self,
         prompt: str,
         ground_truth: str = "",
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        system_prompt: str | None = None,
+    ) -> dict[str, Any]:
         """Execute one distillation step.
 
         Ported from GLM-5 Section 3.5:
@@ -316,9 +316,7 @@ class CrossStageDistillationTrainer:
 
         self._stats["distill_steps"] += 1
         self._stats["total_advantage"] += avg_adv
-        self._stats["avg_advantage"] = (
-            self._stats["total_advantage"] / self._stats["distill_steps"]
-        )
+        self._stats["avg_advantage"] = self._stats["total_advantage"] / self._stats["distill_steps"]
         self._stats["total_loss"] += loss
         self._stats["cache_hit_rate"] = self._logit_cache.hit_rate
 
@@ -343,9 +341,9 @@ class CrossStageDistillationTrainer:
 
     async def distill(
         self,
-        prompts: List[Dict[str, str]],
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        prompts: list[dict[str, str]],
+        system_prompt: str | None = None,
+    ) -> dict[str, Any]:
         """Run full distillation over a batch of prompts.
 
         Uses batch_size=1024 and group_size=1 as per GLM-5 recipe.
@@ -379,11 +377,11 @@ class CrossStageDistillationTrainer:
 
     async def distill_with_staged_curriculum(
         self,
-        reasoning_prompts: List[Dict[str, str]],
-        agentic_prompts: List[Dict[str, str]],
-        general_prompts: List[Dict[str, str]],
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        reasoning_prompts: list[dict[str, str]],
+        agentic_prompts: list[dict[str, str]],
+        general_prompts: list[dict[str, str]],
+        system_prompt: str | None = None,
+    ) -> dict[str, Any]:
         """Run staged distillation curriculum across all three RL stages.
 
         Ported from GLM-5 Section 3.5: training prompts are sampled
@@ -398,30 +396,24 @@ class CrossStageDistillationTrainer:
         Returns:
             Per-stage distillation results
         """
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
 
         if self.config.distill_reasoning and reasoning_prompts:
             self.config.distill_agentic = False
             self.config.distill_general = False
-            results["reasoning"] = await self.distill(
-                reasoning_prompts, system_prompt
-            )
+            results["reasoning"] = await self.distill(reasoning_prompts, system_prompt)
             self.config.distill_reasoning = True
 
         if self.config.distill_agentic and agentic_prompts:
             self.config.distill_reasoning = False
             self.config.distill_general = False
-            results["agentic"] = await self.distill(
-                agentic_prompts, system_prompt
-            )
+            results["agentic"] = await self.distill(agentic_prompts, system_prompt)
             self.config.distill_agentic = True
 
         if self.config.distill_general and general_prompts:
             self.config.distill_reasoning = False
             self.config.distill_agentic = False
-            results["general"] = await self.distill(
-                general_prompts, system_prompt
-            )
+            results["general"] = await self.distill(general_prompts, system_prompt)
             self.config.distill_general = True
 
         self.config.distill_reasoning = True
@@ -430,7 +422,7 @@ class CrossStageDistillationTrainer:
 
         return results
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         s = dict(self._stats)
         s["num_teachers"] = len(self._teachers)
         s["teachers"] = [

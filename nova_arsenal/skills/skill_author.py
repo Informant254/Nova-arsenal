@@ -29,8 +29,6 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
-
 
 DEFAULT_PENDING_DIR = Path("pending_skills")
 DEFAULT_APPROVED_DIR = Path("skills")
@@ -95,9 +93,9 @@ class SkillAuthor:
         entry_class: str,
         skill_type: str = "tool",
         author: str = "nova-self-authored",
-        requires_credentials: Optional[list[str]] = None,
-        python_requires: Optional[list[str]] = None,
-        tags: Optional[list[str]] = None,
+        requires_credentials: list[str] | None = None,
+        python_requires: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> DraftedSkill:
         """
         Write a new candidate skill to pending_skills/<name>/.
@@ -214,9 +212,8 @@ class SkillAuthor:
             raise SkillAuthoringError(f"No pending skill named '{name}' found at {src}")
 
         import shutil
+
         rejected_log = self.pending_dir / "_rejected.log"
         with rejected_log.open("a") as f:
-            f.write(
-                f"{datetime.now(timezone.utc).isoformat()} | {name} | {reason}\n"
-            )
+            f.write(f"{datetime.now(timezone.utc).isoformat()} | {name} | {reason}\n")
         shutil.rmtree(src)

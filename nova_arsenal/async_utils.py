@@ -7,10 +7,10 @@ circuit breakers, and retry budgets.
 
 import asyncio
 import logging
-from typing import Any, Callable, Optional, TypeVar, Coroutine, Dict
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from enum import Enum
-
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,16 @@ T = TypeVar("T")
 
 class CircuitBreakerState(Enum):
     """Circuit breaker state machine."""
-    CLOSED = "closed"        # Normal operation
-    OPEN = "open"            # Failing, reject requests
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing recovery
 
 
 @dataclass
 class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
+
     failure_threshold: int = 5  # Failures before opening
     recovery_timeout: float = 30.0  # Seconds before half-open
     success_threshold: int = 2  # Successes to close
@@ -35,12 +37,12 @@ class CircuitBreakerConfig:
 class CircuitBreaker:
     """Circuit breaker for preventing cascading failures."""
 
-    def __init__(self, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None):
         self.config = config or CircuitBreakerConfig()
         self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.success_count = 0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
 
     async def call(
         self,
@@ -52,7 +54,11 @@ class CircuitBreaker:
         if self.state == CircuitBreakerState.OPEN:
             # Check if recovery timeout has passed
             import time
-            if self.last_failure_time and time.time() - self.last_failure_time > self.config.recovery_timeout:
+
+            if (
+                self.last_failure_time
+                and time.time() - self.last_failure_time > self.config.recovery_timeout
+            ):
                 self.state = CircuitBreakerState.HALF_OPEN
                 self.success_count = 0
                 logger.info("Circuit breaker entering HALF_OPEN state")
@@ -63,7 +69,7 @@ class CircuitBreaker:
             result = await func(*args, **kwargs)
             self._on_success()
             return result
-        except Exception as e:
+        except Exception:
             self._on_failure()
             raise
 
@@ -80,6 +86,7 @@ class CircuitBreaker:
     def _on_failure(self) -> None:
         """Handle failed call."""
         import time
+
         self.last_failure_time = time.time()
         self.failure_count += 1
         if self.failure_count >= self.config.failure_threshold:
@@ -92,6 +99,7 @@ class CircuitBreaker:
 
 class AsyncTimeoutError(Exception):
     """Raised when an async operation exceeds timeout."""
+
     pass
 
 
@@ -101,15 +109,15 @@ async def async_timeout(
     operation_name: str = "operation",
 ) -> T:
     """Execute coroutine with timeout guard.
-    
+
     Args:
         coro: Coroutine to execute
         timeout_seconds: Maximum execution time
         operation_name: Name for logging
-        
+
     Returns:
         Result of coroutine
-        
+
     Raises:
         AsyncTimeoutError: If timeout exceeded
     """
@@ -120,14 +128,13 @@ async def async_timeout(
         return result
     except asyncio.TimeoutError:
         logger.error(f"{operation_name} timed out after {timeout_seconds}s")
-        raise AsyncTimeoutError(
-            f"{operation_name} exceeded {timeout_seconds}s timeout"
-        ) from None
+        raise AsyncTimeoutError(f"{operation_name} exceeded {timeout_seconds}s timeout") from None
 
 
 @dataclass
 class RetryConfig:
     """Retry policy configuration."""
+
     max_retries: int = 3
     backoff_base: float = 2.0  # Exponential backoff multiplier
     initial_delay: float = 1.0  # First retry delay in seconds
@@ -136,28 +143,28 @@ class RetryConfig:
 
 async def async_retry(
     func: Callable[..., Coroutine[Any, Any, T]],
-    config: Optional[RetryConfig] = None,
+    config: RetryConfig | None = None,
     operation_name: str = "operation",
     *args: Any,
     **kwargs: Any,
 ) -> T:
     """Execute async function with retry logic.
-    
+
     Args:
         func: Async function to execute
         config: Retry configuration
         operation_name: Name for logging
         *args: Positional arguments for func
         **kwargs: Keyword arguments for func
-        
+
     Returns:
         Result of function
-        
+
     Raises:
         Last exception if all retries exhausted
     """
     config = config or RetryConfig()
-    last_exception = None
+    last_exception: Exception | None = None
 
     for attempt in range(config.max_retries + 1):
         try:
@@ -167,7 +174,7 @@ async def async_retry(
             last_exception = e
             if attempt < config.max_retries:
                 delay = min(
-                    config.initial_delay * (config.backoff_base ** attempt),
+                    config.initial_delay * (config.backoff_base**attempt),
                     config.max_delay,
                 )
                 logger.warning(
@@ -177,12 +184,15 @@ async def async_retry(
             else:
                 logger.error(f"{operation_name} failed after {config.max_retries + 1} attempts")
 
+    if last_exception is None:
+        raise RuntimeError(f"{operation_name} failed without an exception")
     raise last_exception
 
 
 @dataclass
 class ResourceLimits:
     """Resource limits for agent execution."""
+
     max_concurrent_tasks: int = 5
     max_memory_mb: int = 512
     max_execution_time_seconds: float = 600.0
@@ -192,22 +202,23 @@ class ResourceLimits:
 class ResourceTracker:
     """Track resource usage during agent execution."""
 
-    def __init__(self, limits: Optional[ResourceLimits] = None):
+    def __init__(self, limits: ResourceLimits | None = None):
         self.limits = limits or ResourceLimits()
         self.active_tasks = 0
         self.total_tool_calls = 0
-        self.start_time: Optional[float] = None
+        self.start_time: float | None = None
 
     def start_execution(self) -> None:
         """Mark execution start."""
         import time
+
         self.start_time = time.time()
         self.total_tool_calls = 0
         self.active_tasks = 0
 
     def check_limits(self) -> tuple:
         """Check if any resource limits exceeded.
-        
+
         Returns:
             (is_within_limits, message)
         """
@@ -216,13 +227,17 @@ class ResourceTracker:
             return False, f"Max concurrent tasks ({self.limits.max_concurrent_tasks}) exceeded"
 
         if self.total_tool_calls > self.limits.max_tool_calls_per_step:
-            return False, f"Tool call budget exceeded"
+            return False, "Tool call budget exceeded"
 
         if self.start_time:
             import time
+
             elapsed = time.time() - self.start_time
             if elapsed > self.limits.max_execution_time_seconds:
-                return False, f"Execution time exceeded ({elapsed:.1f}s > {self.limits.max_execution_time_seconds}s)"
+                return (
+                    False,
+                    f"Execution time exceeded ({elapsed:.1f}s > {self.limits.max_execution_time_seconds}s)",
+                )
 
         return True, "Within limits"
 

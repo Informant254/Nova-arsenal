@@ -5,7 +5,6 @@ Shared fixtures and test utilities.
 """
 
 import pytest
-from pathlib import Path
 
 
 @pytest.fixture
@@ -28,6 +27,7 @@ def mock_target():
 def nova_config():
     """Nova configuration for testing."""
     from nova_arsenal.config import NovaConfig
+
     return NovaConfig()
 
 
@@ -35,6 +35,7 @@ def nova_config():
 def nova_skills_library():
     """Nova skills library for testing."""
     from nova_skills import SkillLibrary
+
     return SkillLibrary()
 
 
@@ -42,6 +43,7 @@ def nova_skills_library():
 def nova_toolkit(sample_scope):
     """Nova tool kit for testing."""
     from nova_tool_kit import NovaToolKit, PermissionProfile
+
     return NovaToolKit(
         profile=PermissionProfile.SCOPED,
         scope=sample_scope,

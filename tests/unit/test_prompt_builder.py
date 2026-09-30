@@ -1,15 +1,28 @@
 """Tests for Cursor-inspired Priority Prompt Builder and Tool Definitions."""
 
-import pytest
 from nova_arsenal.prompt_builder import (
-    Scope, First, Empty, Isolate, Text, ChatMessage, ToolDefinition,
-    BASE_PRIORITY, render, PromptBuilder, RenderResult,
-    compute_priority_levels, _render_with_level,
-    system_message, user_message, assistant_message,
+    BASE_PRIORITY,
+    Empty,
+    First,
+    Isolate,
+    PromptBuilder,
+    Scope,
+    Text,
+    _render_with_level,
+    assistant_message,
+    compute_priority_levels,
+    render,
+    system_message,
+    user_message,
 )
 from nova_arsenal.tool_definitions import (
-    ToolSchema, CURSOR_BUILTIN_TOOLS, NOVA_SECURITY_TOOLS,
-    ALL_TOOLS, get_tool_by_name, tools_to_openai_format, tools_to_anthropic_format,
+    ALL_TOOLS,
+    CURSOR_BUILTIN_TOOLS,
+    NOVA_SECURITY_TOOLS,
+    ToolSchema,
+    get_tool_by_name,
+    tools_to_anthropic_format,
+    tools_to_openai_format,
 )
 
 
@@ -113,21 +126,25 @@ class TestRender:
 
     def test_first_picks_highest_priority_child(self):
         tree = [
-            First([
-                Scope(priority=100, children=[Text("best ")]),
-                Scope(priority=-100, children=[Text("fallback ")]),
-                Scope(priority=-500, children=[Text("last_resort")]),
-            ]),
+            First(
+                [
+                    Scope(priority=100, children=[Text("best ")]),
+                    Scope(priority=-100, children=[Text("fallback ")]),
+                    Scope(priority=-500, children=[Text("last_resort")]),
+                ]
+            ),
         ]
         text, empty, chats, tools = _render_with_level(tree, 50, None)
         assert text == "best "
 
     def test_first_falls_through(self):
         tree = [
-            First([
-                Scope(priority=100, children=[Text("best ")]),
-                Scope(priority=-100, children=[Text("fallback ")]),
-            ]),
+            First(
+                [
+                    Scope(priority=100, children=[Text("best ")]),
+                    Scope(priority=-100, children=[Text("fallback ")]),
+                ]
+            ),
         ]
         text, empty, chats, tools = _render_with_level(tree, 200, None)
         # both priorities < 200, so neither renders; text is None (no output)
@@ -150,10 +167,13 @@ class TestChatMessages:
         assert msg.content == "I can help with that."
 
     def test_chat_in_scope(self):
-        tree = Scope(priority=0, children=[
-            system_message("sys"),
-            user_message("user"),
-        ])
+        tree = Scope(
+            priority=0,
+            children=[
+                system_message("sys"),
+                user_message("user"),
+            ],
+        )
         text, empty, chats, tools = _render_with_level(tree, 0, None)
         assert chats is not None
         assert len(chats) == 2
@@ -164,17 +184,21 @@ class TestChatMessages:
 class TestPromptBuilder:
     def test_builder_basic(self):
         builder = PromptBuilder(token_limit=4096)
-        result = builder.render([
-            Scope(priority=0, children=[Text("Hello world")]),
-        ])
+        result = builder.render(
+            [
+                Scope(priority=0, children=[Text("Hello world")]),
+            ]
+        )
         assert result.text == "Hello world"
         assert result.token_limit == 4096
 
     def test_builder_token_count(self):
         builder = PromptBuilder(token_limit=4096)
-        result = builder.render([
-            Scope(priority=0, children=[Text("Hello world")]),
-        ])
+        result = builder.render(
+            [
+                Scope(priority=0, children=[Text("Hello world")]),
+            ]
+        )
         assert result.token_count > 0
         assert result.token_count < 10
 
@@ -184,10 +208,12 @@ class TestPromptBuilder:
         high_text = "X" * 100
         # 500 chars ≈ 125 tokens (too big, pushed over the limit)
         low_text = "M" * 500
-        result = builder.render([
-            Scope(priority=0, children=[Text(high_text)]),
-            Scope(priority=-5000, children=[Text(low_text)]),
-        ])
+        result = builder.render(
+            [
+                Scope(priority=0, children=[Text(high_text)]),
+                Scope(priority=-5000, children=[Text(low_text)]),
+            ]
+        )
         assert "X" in result.text
         assert result.text.count("X") == 100
         assert "M" not in result.text
@@ -218,14 +244,26 @@ class TestToolDefinitions:
         assert tool is None
 
     def test_tools_to_openai_format(self):
-        tools = [ToolSchema(name="test_tool", description="A test", parameters={"type": "object", "properties": {}})]
+        tools = [
+            ToolSchema(
+                name="test_tool",
+                description="A test",
+                parameters={"type": "object", "properties": {}},
+            )
+        ]
         result = tools_to_openai_format(tools)
         assert len(result) == 1
         assert result[0]["type"] == "function"
         assert result[0]["function"]["name"] == "test_tool"
 
     def test_tools_to_anthropic_format(self):
-        tools = [ToolSchema(name="test_tool", description="A test", parameters={"type": "object", "properties": {}})]
+        tools = [
+            ToolSchema(
+                name="test_tool",
+                description="A test",
+                parameters={"type": "object", "properties": {}},
+            )
+        ]
         result = tools_to_anthropic_format(tools)
         assert len(result) == 1
         assert result[0]["name"] == "test_tool"
@@ -233,13 +271,13 @@ class TestToolDefinitions:
 
     def test_cursor_tool_has_schema(self):
         for tool in CURSOR_BUILTIN_TOOLS:
-            assert tool.name, f"Tool missing name"
+            assert tool.name, "Tool missing name"
             assert tool.description, f"Tool {tool.name} missing description"
             assert "type" in tool.parameters
 
     def test_nova_tool_has_schema(self):
         for tool in NOVA_SECURITY_TOOLS:
-            assert tool.name, f"Tool missing name"
+            assert tool.name, "Tool missing name"
             assert tool.description, f"Tool {tool.name} missing description"
             assert "type" in tool.parameters
 

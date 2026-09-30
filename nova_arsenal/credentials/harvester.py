@@ -4,10 +4,9 @@ Credential Harvesting — NodeZero-inspired advanced credential access.
 Extracts credentials from SAM dumps, NTLM hashes, DPAPI, Kerberoasting,
 and LLM-powered credential validation.
 """
+
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import re
 import time
@@ -22,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class CredentialType(Enum):
     """Types of credentials that can be harvested."""
+
     PASSWORD = "password"
     NTLM_HASH = "ntlm_hash"
     LM_HASH = "lm_hash"
@@ -39,6 +39,7 @@ class CredentialType(Enum):
 
 class HarvestMethod(Enum):
     """Methods for credential harvesting."""
+
     SAM_DUMP = "sam_dump"
     LSASS_DUMP = "lsass_dump"
     KERBEROAST = "kerberoasting"
@@ -59,6 +60,7 @@ class HarvestMethod(Enum):
 @dataclass
 class HarvestedCredential:
     """A credential that has been harvested."""
+
     credential_id: str
     username: str
     domain: str
@@ -95,6 +97,7 @@ class HarvestedCredential:
 @dataclass
 class DataPilferingResult:
     """Result of a data pilfering operation."""
+
     pilfer_id: str
     target: str
     credentials_found: list[HarvestedCredential]
@@ -170,9 +173,7 @@ class CredentialHarvester:
 
         return all_credentials
 
-    async def pilfer_data(
-        self, target: str, context: dict | None = None
-    ) -> DataPilferingResult:
+    async def pilfer_data(self, target: str, context: dict | None = None) -> DataPilferingResult:
         """Advanced data pilfering — extract credentials, configs, sensitive files."""
         start = time.monotonic()
         context = context or {}
@@ -221,9 +222,7 @@ class CredentialHarvester:
         self._pilfer_results.append(result)
         return result
 
-    async def validate_credential(
-        self, credential: HarvestedCredential, target: str
-    ) -> bool:
+    async def validate_credential(self, credential: HarvestedCredential, target: str) -> bool:
         """Validate a harvested credential by attempting authentication."""
         if credential.credential_type == CredentialType.NTLM_HASH:
             credential.validated = True
@@ -274,7 +273,10 @@ class CredentialHarvester:
             analysis["risk_level"] = "high"
             analysis["crackability"] = "not_applicable"
             analysis["recommendation"] = "Revoke and regenerate API token"
-        elif credential.credential_type in (CredentialType.GOLDEN_TICKET, CredentialType.SILVER_TICKET):
+        elif credential.credential_type in (
+            CredentialType.GOLDEN_TICKET,
+            CredentialType.SILVER_TICKET,
+        ):
             analysis["risk_level"] = "critical"
             analysis["crackability"] = "not_applicable"
             analysis["recommendation"] = "Reset KRBTGT account password twice"
@@ -343,147 +345,171 @@ class CredentialHarvester:
         """Simulate SAM database dump."""
         creds = []
         sam_entries = [
-            ("Administrator", "500", "aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0"),
+            (
+                "Administrator",
+                "500",
+                "aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0",
+            ),
             ("Guest", "501", "aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0"),
         ]
         for username, rid, hash_val in sam_entries:
-            creds.append(HarvestedCredential(
-                credential_id=str(uuid.uuid4()),
-                username=username,
-                domain=context.get("domain", "WORKGROUP"),
-                credential_type=CredentialType.NTLM_HASH,
-                value=hash_val,
-                source="SAM_DATABASE",
-                method=HarvestMethod.SAM_DUMP,
-                host=target,
-                hash_algorithm="NTLM",
-            ))
+            creds.append(
+                HarvestedCredential(
+                    credential_id=str(uuid.uuid4()),
+                    username=username,
+                    domain=context.get("domain", "WORKGROUP"),
+                    credential_type=CredentialType.NTLM_HASH,
+                    value=hash_val,
+                    source="SAM_DATABASE",
+                    method=HarvestMethod.SAM_DUMP,
+                    host=target,
+                    hash_algorithm="NTLM",
+                )
+            )
         return creds
 
     async def _kerberoast(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Simulate Kerberoasting attack."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="svc_sql",
-            domain=context.get("domain", "CORP"),
-            credential_type=CredentialType.KERBEROS_SERVICE,
-            value="$krb5tgs$23$*svc_sql$CORP$spn*$" + "a" * 64,
-            source=target,
-            method=HarvestMethod.KERBEROAST,
-            host=target,
-            service="MSSQLSvc",
-            hash_algorithm="RC4_HMAC_MD5",
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="svc_sql",
+                domain=context.get("domain", "CORP"),
+                credential_type=CredentialType.KERBEROS_SERVICE,
+                value="$krb5tgs$23$*svc_sql$CORP$spn*$" + "a" * 64,
+                source=target,
+                method=HarvestMethod.KERBEROAST,
+                host=target,
+                service="MSSQLSvc",
+                hash_algorithm="RC4_HMAC_MD5",
+            )
+        ]
 
     async def _as_rep_roast(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Simulate AS-REP Roasting."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="jsmith",
-            domain=context.get("domain", "CORP"),
-            credential_type=CredentialType.KERBEROS_TGT,
-            value="$krb5asrep$23$jsmith@CORP:" + "b" * 128,
-            source=target,
-            method=HarvestMethod.AS_REP_ROAST,
-            host=target,
-            hash_algorithm="RC4_HMAC_MD5",
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="jsmith",
+                domain=context.get("domain", "CORP"),
+                credential_type=CredentialType.KERBEROS_TGT,
+                value="$krb5asrep$23$jsmith@CORP:" + "b" * 128,
+                source=target,
+                method=HarvestMethod.AS_REP_ROAST,
+                host=target,
+                hash_algorithm="RC4_HMAC_MD5",
+            )
+        ]
 
     async def _dpapi_extract(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Simulate DPAPI credential extraction."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username=context.get("current_user", "user"),
-            domain="",
-            credential_type=CredentialType.DPAPI_KEY,
-            value="DPAPI_MASTER_KEY:" + "c" * 64,
-            source="DPAPI",
-            method=HarvestMethod.DPAPI,
-            host=target,
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username=context.get("current_user", "user"),
+                domain="",
+                credential_type=CredentialType.DPAPI_KEY,
+                value="DPAPI_MASTER_KEY:" + "c" * 64,
+                source="DPAPI",
+                method=HarvestMethod.DPAPI,
+                host=target,
+            )
+        ]
 
     async def _brute_force(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Simulate brute force attack."""
         common_passwords = ["Password123!", "Admin@2024", "Welcome1!"]
         creds = []
         for i, pwd in enumerate(common_passwords):
-            creds.append(HarvestedCredential(
-                credential_id=str(uuid.uuid4()),
-                username=f"user{i}",
-                domain=context.get("domain", ""),
-                credential_type=CredentialType.PASSWORD,
-                value=pwd,
-                source=target,
-                method=HarvestMethod.BRUTE_FORCE,
-                host=target,
-                validated=True,
-                validation_method="brute_force_success",
-            ))
+            creds.append(
+                HarvestedCredential(
+                    credential_id=str(uuid.uuid4()),
+                    username=f"user{i}",
+                    domain=context.get("domain", ""),
+                    credential_type=CredentialType.PASSWORD,
+                    value=pwd,
+                    source=target,
+                    method=HarvestMethod.BRUTE_FORCE,
+                    host=target,
+                    validated=True,
+                    validation_method="brute_force_success",
+                )
+            )
         return creds
 
     async def _ldap_query(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Simulate LDAP enumeration for credentials."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="ldap_bind",
-            domain=context.get("domain", ""),
-            credential_type=CredentialType.PASSWORD,
-            value="LdapSecret1!",
-            source=target,
-            method=HarvestMethod.LDAP_QUERY,
-            host=target,
-            service="LDAP",
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="ldap_bind",
+                domain=context.get("domain", ""),
+                credential_type=CredentialType.PASSWORD,
+                value="LdapSecret1!",
+                source=target,
+                method=HarvestMethod.LDAP_QUERY,
+                host=target,
+                service="LDAP",
+            )
+        ]
 
     async def _gpp_password(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Simulate Group Policy Preference password extraction."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="Administrator",
-            domain=context.get("domain", ""),
-            credential_type=CredentialType.PASSWORD,
-            value="GPPPassword123",
-            source="SYSVOL/Groups.xml",
-            method=HarvestMethod.GPP_PASSWORD,
-            host=target,
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="Administrator",
+                domain=context.get("domain", ""),
+                credential_type=CredentialType.PASSWORD,
+                value="GPPPassword123",
+                source="SYSVOL/Groups.xml",
+                method=HarvestMethod.GPP_PASSWORD,
+                host=target,
+            )
+        ]
 
     async def _unattended_install(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Extract credentials from unattended install files."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="Administrator",
-            domain=context.get("domain", ""),
-            credential_type=CredentialType.PASSWORD,
-            value="UnattendPass1!",
-            source="unattend.xml",
-            method=HarvestMethod.UNATTENDED_INSTALL,
-            host=target,
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="Administrator",
+                domain=context.get("domain", ""),
+                credential_type=CredentialType.PASSWORD,
+                value="UnattendPass1!",
+                source="unattend.xml",
+                method=HarvestMethod.UNATTENDED_INSTALL,
+                host=target,
+            )
+        ]
 
     async def _config_file_extract(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Extract credentials from configuration files."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="db_admin",
-            domain="",
-            credential_type=CredentialType.PASSWORD,
-            value="ConfigDbPass1!",
-            source="application.config",
-            method=HarvestMethod.CONFIG_FILE,
-            host=target,
-            service="database",
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="db_admin",
+                domain="",
+                credential_type=CredentialType.PASSWORD,
+                value="ConfigDbPass1!",
+                source="application.config",
+                method=HarvestMethod.CONFIG_FILE,
+                host=target,
+                service="database",
+            )
+        ]
 
     async def _memory_dump(self, target: str, context: dict) -> list[HarvestedCredential]:
         """Extract credentials from memory dumps."""
-        return [HarvestedCredential(
-            credential_id=str(uuid.uuid4()),
-            username="System",
-            domain="",
-            credential_type=CredentialType.PASSWORD,
-            value="MemoryExtracted1!",
-            source="lsass.exe",
-            method=HarvestMethod.MEMORY_DUMP,
-            host=target,
-        )]
+        return [
+            HarvestedCredential(
+                credential_id=str(uuid.uuid4()),
+                username="System",
+                domain="",
+                credential_type=CredentialType.PASSWORD,
+                value="MemoryExtracted1!",
+                source="lsass.exe",
+                method=HarvestMethod.MEMORY_DUMP,
+                host=target,
+            )
+        ]

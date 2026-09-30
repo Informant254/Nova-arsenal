@@ -4,14 +4,14 @@ Nova Swarm Module - Multi-agent coordination for security research.
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 
 class KnowledgeGraph:
     """Shared knowledge graph for swarm agents."""
 
     def __init__(self) -> None:
-        self.graph: Dict[str, Any] = {
+        self.graph: dict[str, Any] = {
             "nodes": {},
             "edges": [],
             "findings": [],
@@ -21,7 +21,7 @@ class KnowledgeGraph:
         self,
         node_id: str,
         node_type: str,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         agent: str = "",
     ) -> None:
         """Add a node to the knowledge graph."""
@@ -39,29 +39,27 @@ class KnowledgeGraph:
         agent: str = "",
     ) -> None:
         """Add an edge between two nodes."""
-        self.graph["edges"].append({
-            "source": source,
-            "target": target,
-            "relation": relation,
-            "agent": agent,
-        })
+        self.graph["edges"].append(
+            {
+                "source": source,
+                "target": target,
+                "relation": relation,
+                "agent": agent,
+            }
+        )
 
     def add_finding(
         self,
-        finding: Dict[str, Any],
+        finding: dict[str, Any],
         agent: str = "",
     ) -> None:
         """Add a finding to the knowledge graph."""
         finding["agent"] = agent
         self.graph["findings"].append(finding)
 
-    def get_nodes_by_type(self, node_type: str) -> Dict[str, Any]:
+    def get_nodes_by_type(self, node_type: str) -> dict[str, Any]:
         """Get all nodes of a given type."""
-        return {
-            nid: node
-            for nid, node in self.graph["nodes"].items()
-            if node["type"] == node_type
-        }
+        return {nid: node for nid, node in self.graph["nodes"].items() if node["type"] == node_type}
 
 
 @dataclass
@@ -72,8 +70,8 @@ class SwarmAgent:
     role: str = "scanner"
     target: str = ""
     status: str = "idle"
-    findings: List[Dict[str, Any]] = field(default_factory=list)
-    capabilities: List[str] = field(default_factory=list)
+    findings: list[dict[str, Any]] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
 
 
 class NovaSwarm:
@@ -82,12 +80,12 @@ class NovaSwarm:
     def __init__(
         self,
         target: str,
-        roles: Optional[List[str]] = None,
+        roles: list[str] | None = None,
     ) -> None:
         self.target = target
         self._roles = roles or ["recon", "scanner", "exploiter", "reporter"]
-        self._agents: Dict[str, SwarmAgent] = {}
-        self._shared_findings: List[Dict[str, Any]] = []
+        self._agents: dict[str, SwarmAgent] = {}
+        self._shared_findings: list[dict[str, Any]] = []
         self._initialize_agents()
 
     def _initialize_agents(self) -> None:
@@ -100,7 +98,7 @@ class NovaSwarm:
             )
             self._agents[agent.id] = agent
 
-    def _get_capabilities(self, role: str) -> List[str]:
+    def _get_capabilities(self, role: str) -> list[str]:
         """Return capabilities for a given role."""
         caps = {
             "recon": ["subdomain_enum", "port_scan", "service_detection"],
@@ -110,11 +108,11 @@ class NovaSwarm:
         }
         return caps.get(role, [])
 
-    def get_agent(self, agent_id: str) -> Optional[SwarmAgent]:
+    def get_agent(self, agent_id: str) -> SwarmAgent | None:
         """Get an agent by ID."""
         return self._agents.get(agent_id)
 
-    def list_agents(self) -> List[SwarmAgent]:
+    def list_agents(self) -> list[SwarmAgent]:
         """List all agents in the swarm."""
         return list(self._agents.values())
 
@@ -126,7 +124,7 @@ class NovaSwarm:
         agent.status = f"working: {task}"
         return True
 
-    def share_finding(self, agent_id: str, finding: Dict[str, Any]) -> None:
+    def share_finding(self, agent_id: str, finding: dict[str, Any]) -> None:
         """Share a finding from an agent to the global pool."""
         finding["source_agent"] = agent_id
         self._shared_findings.append(finding)
@@ -134,15 +132,15 @@ class NovaSwarm:
         if agent:
             agent.findings.append(finding)
 
-    def get_all_findings(self) -> List[Dict[str, Any]]:
+    def get_all_findings(self) -> list[dict[str, Any]]:
         """Get all shared findings from the swarm."""
         return list(self._shared_findings)
 
-    def status(self) -> Dict[str, str]:
+    def status(self) -> dict[str, str]:
         """Get status of all agents."""
         return {aid: agent.status for aid, agent in self._agents.items()}
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Get a summary of the swarm state."""
         return {
             "target": self.target,

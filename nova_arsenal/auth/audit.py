@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("nova_arsenal.auth.audit")
 
@@ -33,13 +33,13 @@ class AuditEventType(str, Enum):
 @dataclass
 class AuditEvent:
     event_type: AuditEventType
-    user_id: Optional[int] = None
-    email: Optional[str] = None
-    ip_address: Optional[str] = None
-    provider: Optional[str] = None
-    key_prefix: Optional[str] = None
-    tier: Optional[str] = None
-    detail: Optional[str] = None
+    user_id: int | None = None
+    email: str | None = None
+    ip_address: str | None = None
+    provider: str | None = None
+    key_prefix: str | None = None
+    tier: str | None = None
+    detail: str | None = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -59,11 +59,16 @@ class AuditEvent:
 def audit_log(event: AuditEvent) -> None:
     """Emit a structured audit log entry."""
     data = event.to_dict()
-    level = logging.WARNING if event.event_type in (
-        AuditEventType.LOGIN_FAILURE,
-        AuditEventType.UNAUTHORIZED_ACCESS,
-        AuditEventType.QUOTA_EXCEEDED,
-    ) else logging.INFO
+    level = (
+        logging.WARNING
+        if event.event_type
+        in (
+            AuditEventType.LOGIN_FAILURE,
+            AuditEventType.UNAUTHORIZED_ACCESS,
+            AuditEventType.QUOTA_EXCEEDED,
+        )
+        else logging.INFO
+    )
     logger.log(level, "auth_audit %s", data)
 
 
@@ -75,12 +80,19 @@ def audit_login_failure(email: str, ip: str, reason: str = "") -> None:
     audit_log(AuditEvent(AuditEventType.LOGIN_FAILURE, email=email, ip_address=ip, detail=reason))
 
 
-def audit_oauth_login(provider: str, user_id: int, email: str, ip: str, is_new: bool = False) -> None:
-    audit_log(AuditEvent(
-        AuditEventType.OAUTH_LOGIN,
-        user_id=user_id, email=email, ip_address=ip, provider=provider,
-        detail="new_user" if is_new else "existing_user",
-    ))
+def audit_oauth_login(
+    provider: str, user_id: int, email: str, ip: str, is_new: bool = False
+) -> None:
+    audit_log(
+        AuditEvent(
+            AuditEventType.OAUTH_LOGIN,
+            user_id=user_id,
+            email=email,
+            ip_address=ip,
+            provider=provider,
+            detail="new_user" if is_new else "existing_user",
+        )
+    )
 
 
 def audit_api_key_created(user_id: int, key_prefix: str) -> None:

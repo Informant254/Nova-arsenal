@@ -50,8 +50,7 @@ class TryHackMeConnector(PlatformConnector):
         super().__init__(credentials)
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for the TryHackMe connector. "
-                "Install it with: pip install httpx"
+                "httpx is required for the TryHackMe connector. Install it with: pip install httpx"
             )
         self._cookie = credentials.get("session_cookie", "")
         self._client = httpx.Client(
@@ -84,7 +83,9 @@ class TryHackMeConnector(PlatformConnector):
             rooms = r.json().get("rooms", r.json().get("data", []))
         except Exception as e:
             print(f"  [!] TryHackMe list_targets failed: {e}")
-            print("      (this connector relies on an unofficial endpoint — see connector.py docstring)")
+            print(
+                "      (this connector relies on an unofficial endpoint — see connector.py docstring)"
+            )
             return targets
 
         for room in rooms[:limit]:

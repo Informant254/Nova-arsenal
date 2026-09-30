@@ -4,21 +4,24 @@ Safety Controls — Pentera-inspired emergency stop, stealth modes, and guardrai
 Every action must pass through the safety checker before execution.
 Emergency stop halts ALL operations immediately.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class StealthMode(Enum):
     """Noise levels for testing operations."""
+
     LOUD = "loud"
     NORMAL = "normal"
     QUIET = "quiet"
@@ -27,6 +30,7 @@ class StealthMode(Enum):
 
 class OperationStatus(Enum):
     """Status of a tracked operation."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -38,6 +42,7 @@ class OperationStatus(Enum):
 @dataclass
 class OperationRequest:
     """A request to perform an operation that must pass safety checks."""
+
     operation_id: str
     operation_type: str
     target: str
@@ -68,6 +73,7 @@ class OperationRequest:
 @dataclass
 class SafetyRule:
     """A rule that gates operation execution."""
+
     rule_id: str
     description: str
     max_risk_level: int = 10
@@ -82,6 +88,7 @@ class SafetyRule:
 @dataclass
 class SafetyAuditEntry:
     """An audit log entry for safety decisions."""
+
     entry_id: str
     operation_id: str
     decision: str
@@ -120,7 +127,7 @@ class SafetyController:
         self._active_operations: dict[str, OperationRequest] = {}
         self._audit_log: list[SafetyAuditEntry] = []
         self._emergency_stopped = False
-        self._approval_callbacks: dict[str, callable] = {}
+        self._approval_callbacks: dict[str, Callable[..., Any]] = {}
         self._lock = asyncio.Lock()
 
     @property
@@ -143,10 +150,14 @@ class SafetyController:
 
         if request.risk_level > self.rule.max_risk_level:
             self._audit(
-                request.operation_id, "BLOCKED",
+                request.operation_id,
+                "BLOCKED",
                 f"Risk {request.risk_level} exceeds max {self.rule.max_risk_level}",
             )
-            return False, f"Risk level {request.risk_level} exceeds maximum {self.rule.max_risk_level}"
+            return (
+                False,
+                f"Risk level {request.risk_level} exceeds maximum {self.rule.max_risk_level}",
+            )
 
         if self.rule.require_reversible and not request.reversible:
             self._audit(request.operation_id, "BLOCKED", "Non-reversible operation blocked")
@@ -154,20 +165,26 @@ class SafetyController:
 
         if self.active_count >= self.rule.max_concurrent:
             self._audit(
-                request.operation_id, "BLOCKED",
+                request.operation_id,
+                "BLOCKED",
                 f"Max concurrent {self.rule.max_concurrent} reached",
             )
             return False, f"Max concurrent operations ({self.rule.max_concurrent}) reached"
 
         if request.risk_level > self.rule.require_approval_above and not request.approved:
             self._audit(request.operation_id, "PENDING_APPROVAL", "High-risk operation")
-            return False, f"Operation requires approval (risk {request.risk_level} > {self.rule.require_approval_above})"
+            return (
+                False,
+                f"Operation requires approval (risk {request.risk_level} > {self.rule.require_approval_above})",
+            )
 
         if request.operation_type in self.rule.allowed_types and self.rule.allowed_types:
             pass
         elif request.risk_level > 5:
             self._audit(request.operation_id, "WARNING", "High-risk operation allowed")
-            logger.warning(f"High-risk operation {request.operation_id} allowed: risk={request.risk_level}")
+            logger.warning(
+                f"High-risk operation {request.operation_id} allowed: risk={request.risk_level}"
+            )
 
         self._audit(request.operation_id, "ALLOWED", "All safety checks passed")
         return True, "All safety checks passed"

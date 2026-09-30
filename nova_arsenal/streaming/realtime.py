@@ -4,23 +4,24 @@ Real-time Finding Streaming — XBOW-inspired live updates.
 Streams findings, agent reasoning traces, and status updates
 to connected clients via WebSocket or SSE.
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
 
 class StreamEventType(Enum):
     """Types of events that can be streamed."""
+
     FINDING_NEW = "finding_new"
     FINDING_UPDATED = "finding_updated"
     FINDING_VALIDATED = "finding_validated"
@@ -41,6 +42,7 @@ class StreamEventType(Enum):
 @dataclass
 class StreamEvent:
     """A single event in the real-time stream."""
+
     event_id: str
     event_type: StreamEventType
     timestamp: datetime
@@ -50,15 +52,18 @@ class StreamEvent:
     metadata: dict = field(default_factory=dict)
 
     def to_json(self) -> str:
-        return json.dumps({
-            "event_id": self.event_id,
-            "event_type": self.event_type.value,
-            "timestamp": self.timestamp.isoformat(),
-            "source": self.source,
-            "data": self.data,
-            "severity": self.severity,
-            "metadata": self.metadata,
-        }, default=str)
+        return json.dumps(
+            {
+                "event_id": self.event_id,
+                "event_type": self.event_type.value,
+                "timestamp": self.timestamp.isoformat(),
+                "source": self.source,
+                "data": self.data,
+                "severity": self.severity,
+                "metadata": self.metadata,
+            },
+            default=str,
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -75,6 +80,7 @@ class StreamEvent:
 @dataclass
 class StreamSubscriber:
     """A client subscribed to the event stream."""
+
     subscriber_id: str
     name: str
     filters: list[StreamEventType] = field(default_factory=list)
@@ -87,6 +93,7 @@ class StreamSubscriber:
 @dataclass
 class AgentReasoningTrace:
     """A reasoning trace from an agent."""
+
     trace_id: str
     agent_id: str
     agent_type: str
@@ -201,7 +208,7 @@ class RealTimeStreamer:
         async with self._lock:
             self._event_history.append(event)
             if len(self._event_history) > self.max_history:
-                self._event_history = self._event_history[-self.max_history:]
+                self._event_history = self._event_history[-self.max_history :]
 
         await self._broadcast(event)
         return event
@@ -217,7 +224,11 @@ class RealTimeStreamer:
 
     async def emit_validation(self, finding_id: str, validated: bool, evidence: str) -> StreamEvent:
         """Emit a validation result event."""
-        event_type = StreamEventType.FINDING_VALIDATED if validated else StreamEventType.FINDING_FALSE_POSITIVE
+        event_type = (
+            StreamEventType.FINDING_VALIDATED
+            if validated
+            else StreamEventType.FINDING_FALSE_POSITIVE
+        )
         return await self.emit(
             event_type,
             "validator",
@@ -226,8 +237,13 @@ class RealTimeStreamer:
         )
 
     async def emit_agent_reasoning(
-        self, agent_id: str, agent_type: str, step: int,
-        thought: str, action: str | None = None, observation: str | None = None,
+        self,
+        agent_id: str,
+        agent_type: str,
+        step: int,
+        thought: str,
+        action: str | None = None,
+        observation: str | None = None,
         confidence: float = 0.0,
     ) -> StreamEvent:
         """Emit an agent reasoning trace."""
@@ -266,7 +282,12 @@ class RealTimeStreamer:
         return await self.emit(
             StreamEventType.PROGRESS,
             "coordinator",
-            {"task": task, "current": current, "total": total, "percent": (current / total * 100) if total > 0 else 0},
+            {
+                "task": task,
+                "current": current,
+                "total": total,
+                "percent": (current / total * 100) if total > 0 else 0,
+            },
         )
 
     async def emit_status(self, status: str, details: dict | None = None) -> StreamEvent:
@@ -296,8 +317,7 @@ class RealTimeStreamer:
     def get_all_traces(self) -> dict[str, list[dict]]:
         """Return all reasoning traces grouped by agent."""
         return {
-            aid: [t.to_dict() for t in traces]
-            for aid, traces in self._reasoning_traces.items()
+            aid: [t.to_dict() for t in traces] for aid, traces in self._reasoning_traces.items()
         }
 
     def get_subscribers(self) -> list[dict]:
@@ -315,7 +335,7 @@ class RealTimeStreamer:
 
     async def _broadcast(self, event: StreamEvent) -> None:
         """Broadcast an event to all matching subscribers."""
-        event_json = event.to_json()
+        _event_json = event.to_json()
         disconnected: list[str] = []
 
         for sid, subscriber in self._subscribers.items():

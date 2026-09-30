@@ -3,7 +3,7 @@ Nova Skills Module - Prompt templates and skill library for security research.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -15,10 +15,10 @@ class Skill:
     description: str
     system: str
     template: str
-    params: List[str]
-    tags: List[str] = field(default_factory=list)
+    params: list[str]
+    tags: list[str] = field(default_factory=list)
 
-    def render(self, **kwargs: Any) -> Dict[str, str]:
+    def render(self, **kwargs: Any) -> dict[str, str]:
         """Render the skill with given parameters."""
         missing = [p for p in self.params if p not in kwargs]
         if missing:
@@ -28,7 +28,7 @@ class Skill:
             "user": self.template.format(**kwargs),
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize skill to dictionary."""
         return {
             "name": self.name,
@@ -39,7 +39,7 @@ class Skill:
         }
 
 
-BUILTIN_SKILLS: Dict[str, Skill] = {
+BUILTIN_SKILLS: dict[str, Skill] = {
     "sqli_analysis": Skill(
         name="sqli_analysis",
         category="attack",
@@ -153,12 +153,14 @@ BUILTIN_SKILLS: Dict[str, Skill] = {
 class SkillLibrary:
     """Library of security research skills."""
 
-    def __init__(self, extra_skills: Optional[Dict[str, Skill]] = None) -> None:
-        self._skills: Dict[str, Skill] = dict(BUILTIN_SKILLS)
+    def __init__(self, extra_skills: dict[str, Skill] | None = None) -> None:
+        self._skills: dict[str, Skill] = dict(BUILTIN_SKILLS)
         if extra_skills:
             self._skills.update(extra_skills)
 
-    def list_skills(self, category: Optional[str] = None, tag: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_skills(
+        self, category: str | None = None, tag: str | None = None
+    ) -> list[dict[str, Any]]:
         """List available skills, optionally filtered by category or tag."""
         results = []
         for skill in self._skills.values():
@@ -169,7 +171,7 @@ class SkillLibrary:
             results.append(skill.to_dict())
         return results
 
-    def categories(self) -> List[str]:
+    def categories(self) -> list[str]:
         """Return list of unique skill categories."""
         return sorted({s.category for s in self._skills.values()})
 
@@ -179,7 +181,7 @@ class SkillLibrary:
             raise KeyError(f"Unknown skill: {name}")
         return self._skills[name]
 
-    def render(self, name: str, **kwargs: Any) -> Dict[str, str]:
+    def render(self, name: str, **kwargs: Any) -> dict[str, str]:
         """Render a skill by name with given parameters."""
         skill = self.get(name)
         return skill.render(**kwargs)

@@ -5,16 +5,14 @@ FastAPI routes for user authentication, OAuth, subscription, and API keys.
 """
 
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
 import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import secrets
 
 from nova_arsenal.auth.audit import (
     audit_api_key_created,
@@ -22,16 +20,15 @@ from nova_arsenal.auth.audit import (
     audit_login_failure,
     audit_login_success,
     audit_oauth_login,
-    audit_subscription_upgraded,
 )
-from nova_arsenal.auth.middleware import get_current_user as require_current_user, require_admin
+from nova_arsenal.auth.middleware import get_current_user as require_current_user
+from nova_arsenal.auth.middleware import require_admin
 from nova_arsenal.auth.models import (
     ApiKeyCreateRequest,
     ApiKeyListResponse,
     ApiKeyResponse,
     OAuthAccountResponse,
     OAuthLoginResponse,
-    PasswordChange,
     RefreshTokenRequest,
     SubscriptionResponse,
     SubscriptionUpgradeRequest,
@@ -42,12 +39,17 @@ from nova_arsenal.auth.models import (
     UserRoleUpdate,
 )
 from nova_arsenal.auth.oauth import (
+    PKCEChallenge,
     extract_pkce_verifier,
-    extract_redirect,
     generate_oauth_state,
     get_oauth_provider,
-    PKCEChallenge,
     verify_oauth_state,
+)
+from nova_arsenal.auth.passwords import (
+    DUMMY_PASSWORD_HASH,
+    get_password_hash,
+    verify_and_upgrade_password,
+    verify_password,
 )
 from nova_arsenal.config import get_config
 from nova_arsenal.db import get_db
@@ -61,16 +63,10 @@ from nova_arsenal.db.models import (
     UserRole,
 )
 
-from nova_arsenal.auth.passwords import (
-    DUMMY_PASSWORD_HASH,
-    get_password_hash,
-    verify_and_upgrade_password,
-    verify_password,
-)
-
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create an access token."""
     config = get_config()
     to_encode = data.copy()
@@ -214,9 +210,7 @@ async def refresh_token(
 
     config = get_config()
     try:
-        payload = jwt.decode(
-            token_value, config.auth.jwt_secret, algorithms=["HS256"]
-        )
+        payload = jwt.decode(token_value, config.auth.jwt_secret, algorithms=["HS256"])
         if payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -229,6 +223,11 @@ async def refresh_token(
         )
 
     raw_user_id = payload.get("sub")
+    if raw_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject",
+        )
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
@@ -292,7 +291,7 @@ async def update_user_role(
         admin_count_result = await db.execute(
             select(func.count(User.id)).where(
                 User.role == UserRole.ADMIN,
-                User.is_active == True,
+                User.is_active.is_(True),
             )
         )
         if int(admin_count_result.scalar_one()) <= 1:
@@ -315,6 +314,7 @@ async def update_user_role(
 
 
 # ── OAuth Routes ─────────────────────────────────────────────────────────────
+
 
 @router.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, redirect: str = ""):
@@ -381,9 +381,7 @@ async def oauth_callback(
             existing_account.expires_at = user_info.expires_at
     else:
         # Check if user exists with this email
-        result = await db.execute(
-            select(User).where(User.email == user_info.email)
-        )
+        result = await db.execute(select(User).where(User.email == user_info.email))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -444,9 +442,7 @@ async def list_oauth_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """List OAuth accounts linked to current user."""
-    result = await db.execute(
-        select(OAuthAccount).where(OAuthAccount.user_id == current_user.id)
-    )
+    result = await db.execute(select(OAuthAccount).where(OAuthAccount.user_id == current_user.id))
     accounts = result.scalars().all()
     return [
         OAuthAccountResponse(
@@ -499,15 +495,14 @@ async def unlink_oauth_account(
 
 # ── Subscription Routes ──────────────────────────────────────────────────────
 
+
 @router.get("/subscription", response_model=SubscriptionResponse)
 async def get_subscription(
     current_user: User = Depends(require_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get current user's subscription details."""
-    result = await db.execute(
-        select(Subscription).where(Subscription.user_id == current_user.id)
-    )
+    result = await db.execute(select(Subscription).where(Subscription.user_id == current_user.id))
     sub = result.scalar_one_or_none()
 
     if not sub:
@@ -547,6 +542,7 @@ async def upgrade_subscription(
 
 # ── API Key Routes ───────────────────────────────────────────────────────────
 
+
 def generate_api_key() -> tuple[str, str, str]:
     """Generate a new API key. Returns (full_key, key_prefix, key_hash).
 
@@ -567,9 +563,7 @@ async def create_api_key(
 ):
     """Generate a new API key for subscription-based access."""
     # Check subscription exists
-    result = await db.execute(
-        select(Subscription).where(Subscription.user_id == current_user.id)
-    )
+    result = await db.execute(select(Subscription).where(Subscription.user_id == current_user.id))
     sub = result.scalar_one_or_none()
     if not sub or not sub.is_active:
         raise HTTPException(
@@ -610,7 +604,7 @@ async def list_api_keys(
     result = await db.execute(
         select(ApiKey).where(
             ApiKey.user_id == current_user.id,
-            ApiKey.is_active == True,
+            ApiKey.is_active.is_(True),
         )
     )
     keys = result.scalars().all()
@@ -658,9 +652,7 @@ async def get_api_key_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Get API key usage statistics."""
-    result = await db.execute(
-        select(ApiKey).where(ApiKey.user_id == current_user.id)
-    )
+    result = await db.execute(select(ApiKey).where(ApiKey.user_id == current_user.id))
     keys = result.scalars().all()
     total = len(keys)
     active = sum(1 for k in keys if k.is_active)

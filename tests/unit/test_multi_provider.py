@@ -27,17 +27,25 @@ class TestTaskClassifier:
     def test_classify_code_generation(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
 
-        assert classify_task("write a python function to parse JSON") == TaskCategory.CODE_GENERATION
+        assert (
+            classify_task("write a python function to parse JSON") == TaskCategory.CODE_GENERATION
+        )
 
     def test_classify_security(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
 
-        assert classify_task("scan for SQL injection vulnerabilities") == TaskCategory.SECURITY_ANALYSIS
+        assert (
+            classify_task("scan for SQL injection vulnerabilities")
+            == TaskCategory.SECURITY_ANALYSIS
+        )
 
     def test_classify_reasoning(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
 
-        assert classify_task("analyze the logical argument and prove it wrong") == TaskCategory.REASONING
+        assert (
+            classify_task("analyze the logical argument and prove it wrong")
+            == TaskCategory.REASONING
+        )
 
     def test_classify_creative(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
@@ -52,12 +60,17 @@ class TestTaskClassifier:
     def test_classify_analysis(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
 
-        assert classify_task("analyze the network traffic data for anomalies") == TaskCategory.ANALYSIS
+        assert (
+            classify_task("analyze the network traffic data for anomalies") == TaskCategory.ANALYSIS
+        )
 
     def test_classify_planning(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
 
-        assert classify_task("create an architecture plan for the microservices") == TaskCategory.PLANNING
+        assert (
+            classify_task("create an architecture plan for the microservices")
+            == TaskCategory.PLANNING
+        )
 
     def test_classify_conversation(self):
         from nova_arsenal.llm.multi_router import TaskCategory, classify_task
@@ -144,9 +157,7 @@ class TestMultiProviderRouter:
     def test_stats(self):
         from nova_arsenal.llm.multi_router import MultiProviderRouter
 
-        router = MultiProviderRouter(
-            providers={"openai": FakeProvider("openai", "model")}
-        )
+        router = MultiProviderRouter(providers={"openai": FakeProvider("openai", "model")})
         router.route("write code")
         stats = router.get_stats()
         assert stats["total_routes"] == 1

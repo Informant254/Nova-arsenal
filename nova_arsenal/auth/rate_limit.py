@@ -7,9 +7,7 @@ Configurable per-route and global limits.
 
 import asyncio
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
 
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -27,7 +25,7 @@ class TokenBucket:
         self.tokens = float(self.capacity)
         self.last_refill = time.monotonic()
 
-    def consume(self, now: float = None) -> bool:
+    def consume(self, now: float | None = None) -> bool:
         if now is None:
             now = time.monotonic()
         elapsed = now - self.last_refill
@@ -63,7 +61,7 @@ class RateLimitConfig:
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, config: Optional[RateLimitConfig] = None):
+    def __init__(self, app, config: RateLimitConfig | None = None):
         super().__init__(app)
         self.config = config or RateLimitConfig()
         self._buckets: dict[str, TokenBucket] = {}

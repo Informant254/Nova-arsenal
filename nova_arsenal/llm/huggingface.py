@@ -4,7 +4,7 @@ HuggingFace Provider - Access models via HuggingFace Inference API.
 
 import json
 import logging
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 import httpx
 
@@ -31,7 +31,7 @@ class HuggingFaceProvider(LLMProvider):
     async def complete(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs,
@@ -64,7 +64,7 @@ class HuggingFaceProvider(LLMProvider):
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs,

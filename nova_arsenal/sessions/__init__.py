@@ -9,10 +9,10 @@ Results and events stream into the session for chat/UI polling.
 from .models import (
     SessionEvent,
     SessionStatus,
+    SubAgentResult,
     SubAgentRole,
     SubAgentSpec,
     SubAgentStatus,
-    SubAgentResult,
     TaskSession,
 )
 from .runtime import SessionManager, get_session_manager

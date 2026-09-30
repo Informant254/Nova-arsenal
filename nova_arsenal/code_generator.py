@@ -7,7 +7,6 @@ are insufficient for a task.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class CodeLanguage(Enum):
@@ -20,6 +19,7 @@ class CodeLanguage(Enum):
 @dataclass
 class GeneratedCode:
     """A piece of generated code."""
+
     language: CodeLanguage
     code: str
     description: str
@@ -31,7 +31,7 @@ class GeneratedCode:
 class CodeGenerator:
     """
     Generates code for security tasks.
-    
+
     The agent uses this when:
     - No existing tool fits the task
     - Custom logic is needed
@@ -71,10 +71,10 @@ def scan_port(host: str, port: int, timeout: float = 2.0) -> tuple[int, bool, st
 def main():
     host = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
     ports = range(1, 1025)
-    
+
     print(f"Scanning {{host}}...")
     open_ports = []
-    
+
     with ThreadPoolExecutor(max_workers=100) as executor:
         futures = {executor.submit(scan_port, host, port): port for port in ports}
         for future in as_completed(futures):
@@ -82,13 +82,12 @@ def main():
             if is_open:
                 open_ports.append((port, service))
                 print(f"  Port {{port}}: OPEN ({{service}})")
-    
+
     print(f"\\nFound {{len(open_ports)}} open ports")
 
 if __name__ == "__main__":
     main()
 ''',
-
             "subdomain_enum": '''#!/usr/bin/env python3
 """Subdomain enumeration using DNS resolution."""
 
@@ -107,7 +106,7 @@ def check_subdomain(domain: str) -> tuple[str, bool, str]:
 def main():
     base_domain = sys.argv[1] if len(sys.argv) > 1 else "example.com"
     wordlist = sys.argv[2] if len(sys.argv) > 2 else None
-    
+
     # Default common subdomains
     prefixes = [
         "www", "mail", "ftp", "smtp", "pop", "ns1", "ns2", "dns",
@@ -117,14 +116,14 @@ def main():
         "grafana", "kibana", "elastic", "db", "mysql", "redis", "mongo",
         "backup", "old", "new", "demo", "sandbox", "lab", "corp",
     ]
-    
+
     if wordlist:
         with open(wordlist) as f:
             prefixes = [line.strip() for line in f if line.strip()]
-    
+
     print(f"Enumerating subdomains of {{base_domain}}...")
     found = []
-    
+
     with ThreadPoolExecutor(max_workers=50) as executor:
         futures = {
             executor.submit(check_subdomain, f"{{p}}.{{base_domain}}"): p
@@ -135,13 +134,12 @@ def main():
             if exists:
                 found.append((subdomain, ip))
                 print(f"  [+] {{subdomain}} -> {{ip}}")
-    
+
     print(f"\\nFound {{len(found)}} subdomains")
 
 if __name__ == "__main__":
     main()
 ''',
-
             "web_screenshot": '''#!/usr/bin/env python3
 """Take screenshots of web pages using requests + Pillow."""
 
@@ -171,7 +169,7 @@ def extract_title(html: str) -> str:
 
 def main():
     url = sys.argv[1] if len(sys.argv) > 1 else "https://example.com"
-    
+
     result = check_url(url)
     print(f"URL: {{result.get('url', url)}}")
     if "error" in result:
@@ -187,7 +185,6 @@ def main():
 if __name__ == "__main__":
     main()
 ''',
-
             "nmap_parser": '''#!/usr/bin/env python3
 """Parse nmap XML output into structured findings."""
 
@@ -201,23 +198,23 @@ def parse_nmap_xml(xml_file: str) -> list[dict]:
     try:
         tree = ET.parse(xml_file)
         root = tree.getroot()
-        
+
         for host in root.findall(".//host"):
             addr = host.find("address")
             ip = addr.get("addr", "unknown") if addr is not None else "unknown"
-            
+
             for port_elem in host.findall(".//port"):
                 portid = port_elem.get("portid", "")
                 protocol = port_elem.get("protocol", "")
-                
+
                 state = port_elem.find("state")
                 state_str = state.get("state", "") if state is not None else ""
-                
+
                 service = port_elem.find("service")
                 service_name = service.get("name", "") if service is not None else ""
                 service_product = service.get("product", "") if service is not None else ""
                 service_version = service.get("version", "") if service is not None else ""
-                
+
                 if state_str == "open":
                     findings.append({
                         "host": ip,
@@ -230,14 +227,14 @@ def parse_nmap_xml(xml_file: str) -> list[dict]:
                     })
     except ET.ParseError as e:
         print(f"XML parse error: {{e}}", file=sys.stderr)
-    
+
     return findings
 
 def main():
     if len(sys.argv) < 2:
         print("Usage: nmap_parser.py <nmap_xml_file>")
         sys.exit(1)
-    
+
     findings = parse_nmap_xml(sys.argv[1])
     print(json.dumps(findings, indent=2))
     print(f"\\nFound {{len(findings)}} open ports")
@@ -245,7 +242,6 @@ def main():
 if __name__ == "__main__":
     main()
 ''',
-
             "param_fuzzer": '''#!/usr/bin/env python3
 """Fuzz URL parameters for injection points."""
 
@@ -257,21 +253,21 @@ def fuzz_params(url: str, params_to_test: list[str] = None) -> list[dict]:
     """Test URL parameters for injection."""
     if params_to_test is None:
         params_to_test = ["id", "q", "search", "page", "cmd", "file", "path", "url", "redirect"]
-    
+
     results = []
-    
+
     for param in params_to_test:
         test_url = f"{{url}}?{{param}}=nova_test"
         try:
             resp = requests.get(test_url, timeout=10)
-            
+
             # Check for reflection
             reflected = "nova_test" in resp.text
-            
+
             # Check for error-based indicators
             error_indicators = ["sql", "syntax", "error", "warning", "exception", "stack trace"]
             has_errors = any(ind in resp.text.lower() for ind in error_indicators)
-            
+
             results.append({
                 "param": param,
                 "status": resp.status_code,
@@ -279,21 +275,21 @@ def fuzz_params(url: str, params_to_test: list[str] = None) -> list[dict]:
                 "errors": has_errors,
                 "length": len(resp.text),
             })
-            
+
             status = "VULNERABLE" if reflected or has_errors else "safe"
             print(f"  [{{status}}] {{param}} ({{resp.status_code}}, reflected={{reflected}})")
-            
+
         except requests.RequestException as e:
             results.append({"param": param, "error": str(e)})
             print(f"  [ERROR] {{param}}: {{e}}")
-    
+
     return results
 
 def main():
     url = sys.argv[1] if len(sys.argv) > 1 else "https://example.com"
     print(f"Fuzzing parameters at {{url}}...")
     results = fuzz_params(url)
-    
+
     vulns = [r for r in results if r.get("reflected") or r.get("errors")]
     print(f"\\nPotential vulnerabilities: {{len(vulns)}}")
 
@@ -376,13 +372,13 @@ import requests
 def main():
     """Execute: {task}"""
     target = "{target}"
-    
+
     print(f"[*] Starting: {task}")
     print(f"[*] Target: {{target}}")
-    
+
     # TODO: Implement task logic
     # This script was generated by Nova-Arsenal CodeGenerator
-    
+
     print("[*] Complete")
 
 if __name__ == "__main__":
@@ -410,5 +406,5 @@ if __name__ == "__main__":
     def list_templates(self) -> list[str]:
         return list(self._templates.keys())
 
-    def get_template(self, name: str) -> Optional[str]:
+    def get_template(self, name: str) -> str | None:
         return self._templates.get(name)

@@ -1,8 +1,10 @@
 """Tests for E2E Encryption module."""
 
-import pytest
 import json
-from nova_arsenal.crypto import KeyManager, KeySize, Cipher, SecureEnvelope, EncryptionError
+
+import pytest
+
+from nova_arsenal.crypto import Cipher, KeyManager, KeySize
 
 
 class TestKeyManager:

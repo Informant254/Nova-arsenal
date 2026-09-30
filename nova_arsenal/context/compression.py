@@ -13,7 +13,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ class DSAConfig:
     - deterministic_topk: use torch.topk for consistency
     - freeze_indexer: freeze indexer params during RL training
     """
+
     compressed_latent_dim: int = 256
     top_k: int = 2048
     num_heads: int = 8
@@ -56,16 +57,17 @@ class DSAIndexer:
     For the Nova context: adapted as a content relevance scorer
     that selects the most important segments of long security tool outputs.
     """
+
     top_k: int = 2048
     deterministic: bool = True
-    _score_cache: Dict[str, List[float]] = field(default_factory=dict)
+    _score_cache: dict[str, list[float]] = field(default_factory=dict)
 
     def score_segments(
         self,
-        query_embedding: List[float],
-        segment_embeddings: List[List[float]],
-    ) -> List[Tuple[int, float]]:
-        scores: List[Tuple[int, float]] = []
+        query_embedding: list[float],
+        segment_embeddings: list[list[float]],
+    ) -> list[tuple[int, float]]:
+        scores: list[tuple[int, float]] = []
         for idx, seg_emb in enumerate(segment_embeddings):
             score = self._cosine_similarity(query_embedding, seg_emb)
             scores.append((idx, score))
@@ -73,19 +75,17 @@ class DSAIndexer:
 
     def select_top_k(
         self,
-        scores: List[Tuple[int, float]],
-    ) -> List[int]:
+        scores: list[tuple[int, float]],
+    ) -> list[int]:
         if self.deterministic:
             top_k_scores = heapq.nlargest(self.top_k, scores, key=lambda x: x[1])
         else:
             sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
-            top_k_scores = sorted_scores[:self.top_k]
+            top_k_scores = sorted_scores[: self.top_k]
 
         return [idx for idx, _ in top_k_scores]
 
-    def _cosine_similarity(
-        self, a: List[float], b: List[float]
-    ) -> float:
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
         dot = sum(x * y for x, y in zip(a, b))
         norm_a = math.sqrt(sum(x * x for x in a))
         norm_b = math.sqrt(sum(x * x for x in b))
@@ -106,9 +106,10 @@ class CompressedLatent:
     - Use compressed latent for top-k selection instead of full KV
     - Reduces storage and compute for long-context attention
     """
-    compressed_keys: List[List[float]] = field(default_factory=list)
-    compressed_values: List[List[float]] = field(default_factory=list)
-    original_indices: List[int] = field(default_factory=list)
+
+    compressed_keys: list[list[float]] = field(default_factory=list)
+    compressed_values: list[list[float]] = field(default_factory=list)
+    original_indices: list[int] = field(default_factory=list)
     compression_ratio: float = 1.0
 
 
@@ -128,7 +129,7 @@ class ContentCompressor:
 
     def __init__(
         self,
-        config: Optional[DSAConfig] = None,
+        config: DSAConfig | None = None,
         strategy: CompressionStrategy = CompressionStrategy.DSA,
     ):
         self.config = config or DSAConfig()
@@ -144,7 +145,7 @@ class ContentCompressor:
             "segments_processed": 0,
         }
 
-    def segment_content(self, content: str, max_segment_size: int = 512) -> List[str]:
+    def segment_content(self, content: str, max_segment_size: int = 512) -> list[str]:
         """Split long content into segments for sparse attention.
 
         Uses a combination of:
@@ -153,8 +154,8 @@ class ContentCompressor:
         3. Fixed-size chunks as fallback
         """
         lines = content.split("\n")
-        segments: List[str] = []
-        current: List[str] = []
+        segments: list[str] = []
+        current: list[str] = []
 
         for line in lines:
             current.append(line)
@@ -169,9 +170,9 @@ class ContentCompressor:
 
     def score_segments_by_keywords(
         self,
-        segments: List[str],
-        keywords: List[str],
-    ) -> List[Tuple[int, float]]:
+        segments: list[str],
+        keywords: list[str],
+    ) -> list[tuple[int, float]]:
         """Score segments by keyword relevance.
 
         Security-specific scoring:
@@ -181,7 +182,7 @@ class ContentCompressor:
         - Vulnerability names
         - Target-specific terms
         """
-        scores: List[Tuple[int, float]] = []
+        scores: list[tuple[int, float]] = []
         keyword_set = set(k.lower() for k in keywords)
 
         for idx, segment in enumerate(segments):
@@ -193,9 +194,7 @@ class ContentCompressor:
                 scores.append((idx, 0.0))
                 continue
 
-            matched_keywords = sum(
-                1 for kw in keyword_set if kw in seg_lower
-            )
+            matched_keywords = sum(1 for kw in keyword_set if kw in seg_lower)
             score += matched_keywords / max(len(keyword_set), 1)
 
             cve_count = seg_lower.count("cve-")
@@ -224,8 +223,8 @@ class ContentCompressor:
     def compress(
         self,
         content: str,
-        query_keywords: Optional[List[str]] = None,
-        max_tokens: Optional[int] = None,
+        query_keywords: list[str] | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """Compress long content by selecting top-k relevant segments.
 
@@ -271,8 +270,8 @@ class ContentCompressor:
 
         self._stats["total_chars_processed"] += len(content)
         self._stats["compressed_chars"] += len(compressed)
-        self._stats["compression_ratio"] = (
-            self._stats["compressed_chars"] / max(self._stats["total_chars_processed"], 1)
+        self._stats["compression_ratio"] = self._stats["compressed_chars"] / max(
+            self._stats["total_chars_processed"], 1
         )
         self._stats["segments_processed"] += len(segments)
 
@@ -291,9 +290,9 @@ class ContentCompressor:
         """
         segments = self.segment_content(content)
 
-        compressed_keys: List[List[float]] = []
-        compressed_values: List[List[float]] = []
-        original_indices: List[int] = []
+        compressed_keys: list[list[float]] = []
+        compressed_values: list[list[float]] = []
+        original_indices: list[int] = []
 
         for idx, segment in enumerate(segments):
             latent = self._project_to_latent(segment, num_latent_dims)
@@ -308,9 +307,7 @@ class ContentCompressor:
             compression_ratio=len(compressed_keys) / max(len(segments), 1),
         )
 
-    def _project_to_latent(
-        self, text: str, dims: int
-    ) -> List[float]:
+    def _project_to_latent(self, text: str, dims: int) -> list[float]:
         """Simple frequency-based projection to latent space.
 
         In production, this would be a learned projection matrix.
@@ -326,21 +323,42 @@ class ContentCompressor:
 
         text_lower = text.lower()
         words = text_lower.split()
-        word_set = set(words)
+        _word_set = set(words)
 
         security_terms = [
-            "cve", "vulnerability", "exploit", "attack", "breach",
-            "malware", "ransomware", "phishing", "backdoor", "trojan",
-            "port", "service", "protocol", "ssl", "tls", "http",
-            "sql", "injection", "xss", "csrf", "authentication",
-            "authorization", "bypass", "escalation", "payload", "shell",
+            "cve",
+            "vulnerability",
+            "exploit",
+            "attack",
+            "breach",
+            "malware",
+            "ransomware",
+            "phishing",
+            "backdoor",
+            "trojan",
+            "port",
+            "service",
+            "protocol",
+            "ssl",
+            "tls",
+            "http",
+            "sql",
+            "injection",
+            "xss",
+            "csrf",
+            "authentication",
+            "authorization",
+            "bypass",
+            "escalation",
+            "payload",
+            "shell",
         ]
 
         for i, term in enumerate(security_terms):
             if i < dims:
                 latent[i] = text_lower.count(term) / max(len(words), 1)
 
-        char_bigrams: Dict[str, int] = {}
+        char_bigrams: dict[str, int] = {}
         for i in range(len(text_lower) - 1):
             bg = text_lower[i : i + 2]
             char_bigrams[bg] = char_bigrams.get(bg, 0) + 1
@@ -354,7 +372,7 @@ class ContentCompressor:
 
         return latent
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return dict(self._stats)
 
     def reset_stats(self) -> None:

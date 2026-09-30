@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
-from nova_arsenal.agent_runner import AgentRunner, Finding
+from nova_arsenal.agent_runner import AgentRunner
 from nova_arsenal.sandbox_executor import SandboxExecutor
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class SwarmFinding:
     confidence: float = 1.0
     votes: int = 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_role": self.agent_role.value,
             "title": self.title,
@@ -57,16 +58,16 @@ class SwarmFinding:
 @dataclass
 class SwarmResult:
     target: str
-    findings: List[SwarmFinding] = field(default_factory=list)
-    consensus_findings: List[SwarmFinding] = field(default_factory=list)
-    agent_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    findings: list[SwarmFinding] = field(default_factory=list)
+    consensus_findings: list[SwarmFinding] = field(default_factory=list)
+    agent_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
     total_steps: int = 0
     elapsed_seconds: float = 0.0
-    zeroday_hunt: Optional[Dict[str, Any]] = None
-    phases: List[str] = field(default_factory=list)
+    zeroday_hunt: dict[str, Any] | None = None
+    phases: list[str] = field(default_factory=list)
     summary: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "findings_count": len(self.findings),
@@ -87,7 +88,7 @@ class SwarmAgentConfig:
     objective: str = ""
     weight: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role.value,
             "max_steps": self.max_steps,
@@ -96,7 +97,7 @@ class SwarmAgentConfig:
         }
 
 
-AGENT_ROLE_CONFIGS: Dict[SwarmAgentRole, Dict[str, str]] = {
+AGENT_ROLE_CONFIGS: dict[SwarmAgentRole, dict[str, str]] = {
     SwarmAgentRole.RECON: {
         "objective": "Discover all open ports, services, and attack surface",
         "persona": "Reconnaissance Specialist - thorough discovery of every entry point",
@@ -138,10 +139,10 @@ class SwarmOrchestrator:
     def __init__(
         self,
         target: str = "",
-        executor: Optional[SandboxExecutor] = None,
-        llm_complete: Optional[Callable[..., Any]] = None,
-        on_event: Optional[Callable[..., Any]] = None,
-        configs: Optional[List[SwarmAgentConfig]] = None,
+        executor: SandboxExecutor | None = None,
+        llm_complete: Callable[..., Any] | None = None,
+        on_event: Callable[..., Any] | None = None,
+        configs: list[SwarmAgentConfig] | None = None,
         # Zero-day research integration
         enable_zeroday: bool = True,
         zeroday_authorized: bool = False,
@@ -178,7 +179,7 @@ class SwarmOrchestrator:
         """Phased swarm: recon → zeroday researcher → remaining agents."""
         return await self.run_swarm(self.target)
 
-    async def run_swarm(self, target: Optional[str] = None) -> SwarmResult:
+    async def run_swarm(self, target: str | None = None) -> SwarmResult:
         if target:
             self.target = target
         if not self.target:
@@ -202,16 +203,18 @@ class SwarmOrchestrator:
         ]
 
         # ── Phase 1: recon (+ osint) ──────────────────────────────────────
-        recon_findings: List[SwarmFinding] = []
+        recon_findings: list[SwarmFinding] = []
         if recon_roles:
             result.phases.append("recon")
-            await self._emit("swarm_phase", {"phase": "recon", "roles": [r.value for r in recon_roles]})
+            await self._emit(
+                "swarm_phase", {"phase": "recon", "roles": [r.value for r in recon_roles]}
+            )
             phase1 = await asyncio.gather(
                 *[self._run_agent(by_role[r]) for r in recon_roles],
                 return_exceptions=True,
             )
             for role, agent_result in zip(recon_roles, phase1):
-                if isinstance(agent_result, Exception):
+                if isinstance(agent_result, BaseException):
                     logger.error("Swarm agent %s failed: %s", role.value, agent_result)
                     result.agent_stats[role.value] = {"status": "error", "error": str(agent_result)}
                     continue
@@ -259,7 +262,7 @@ class SwarmOrchestrator:
                 return_exceptions=True,
             )
             for role, agent_result in zip(later_roles, phase3):
-                if isinstance(agent_result, Exception):
+                if isinstance(agent_result, BaseException):
                     logger.error("Swarm agent %s failed: %s", role.value, agent_result)
                     result.agent_stats[role.value] = {"status": "error", "error": str(agent_result)}
                     continue
@@ -280,7 +283,7 @@ class SwarmOrchestrator:
                 return_exceptions=True,
             )
             for config, agent_result in zip(extras, extra_results):
-                if isinstance(agent_result, Exception):
+                if isinstance(agent_result, BaseException):
                     continue
                 findings, stats = agent_result
                 result.findings.extend(findings)
@@ -306,7 +309,7 @@ class SwarmOrchestrator:
     async def _run_researcher_zeroday(
         self,
         config: SwarmAgentConfig,
-        recon_findings: List[SwarmFinding],
+        recon_findings: list[SwarmFinding],
     ) -> tuple:
         """Run ZeroDayHunter using recon output; emit SwarmFindings from candidates."""
         from nova_arsenal.zeroday import ZeroDayHuntConfig, ZeroDayHunter, findings_to_services
@@ -335,13 +338,15 @@ class SwarmOrchestrator:
             ),
         )
 
-        swarm_findings: List[SwarmFinding] = []
+        swarm_findings: list[SwarmFinding] = []
         for c in hunt.candidates:
             swarm_findings.append(
                 SwarmFinding(
                     agent_role=SwarmAgentRole.RESEARCHER,
                     title=c.title,
-                    severity=c.severity if c.severity in {"low", "medium", "high", "critical"} else "medium",
+                    severity=c.severity
+                    if c.severity in {"low", "medium", "high", "critical"}
+                    else "medium",
                     description=c.evidence or c.bug_class,
                     evidence=(
                         f"novelty={c.novelty:.2f}; stage={c.source_stage}; "
@@ -415,8 +420,8 @@ class SwarmOrchestrator:
 
         return swarm_findings, stats
 
-    def _compute_consensus(self, findings: List[SwarmFinding]) -> List[SwarmFinding]:
-        merged: Dict[str, SwarmFinding] = {}
+    def _compute_consensus(self, findings: list[SwarmFinding]) -> list[SwarmFinding]:
+        merged: dict[str, SwarmFinding] = {}
         severity_order = ["info", "low", "medium", "high", "critical"]
 
         for f in findings:
@@ -475,7 +480,7 @@ class SwarmOrchestrator:
         consensus.sort(key=sort_key, reverse=True)
         return consensus
 
-    def get_role_configs(self) -> List[Dict[str, Any]]:
+    def get_role_configs(self) -> list[dict[str, Any]]:
         return [c.to_dict() for c in self.agent_configs]
 
     async def _emit(self, event: str, data: Any) -> None:
@@ -492,17 +497,17 @@ class SwarmOrchestrator:
     def create_swarm(
         cls,
         target: str = "",
-        roles: Optional[List[str]] = None,
-        executor: Optional[SandboxExecutor] = None,
+        roles: list[str] | None = None,
+        executor: SandboxExecutor | None = None,
         **kwargs: Any,
-    ) -> "SwarmOrchestrator":
+    ) -> SwarmOrchestrator:
         return create_swarm(target=target, roles=roles, executor=executor, **kwargs)
 
 
 def create_swarm(
     target: str = "",
-    roles: Optional[List[str]] = None,
-    executor: Optional[SandboxExecutor] = None,
+    roles: list[str] | None = None,
+    executor: SandboxExecutor | None = None,
     **kwargs: Any,
 ) -> SwarmOrchestrator:
     configs = None

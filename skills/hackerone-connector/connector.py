@@ -39,8 +39,7 @@ class HackerOneConnector(PlatformConnector):
         super().__init__(credentials)
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for the HackerOne connector. "
-                "Install it with: pip install httpx"
+                "httpx is required for the HackerOne connector. Install it with: pip install httpx"
             )
         self._username = credentials.get("api_username", "")
         self._token = credentials.get("api_token", "")
@@ -88,7 +87,9 @@ class HackerOneConnector(PlatformConnector):
                     kind=PlatformKind.BUG_BOUNTY,
                     name=attrs.get("name", handle),
                     url=f"https://hackerone.com/{handle}",
-                    scope_summary=attrs.get("profile_picture", ""),  # populated fully in get_target_detail
+                    scope_summary=attrs.get(
+                        "profile_picture", ""
+                    ),  # populated fully in get_target_detail
                     tags=["bounty"] if offers_bounties else ["vdp"],
                     max_reward_usd=None,  # requires detail call — H1 doesn't expose this on list
                     raw=item,
@@ -107,16 +108,14 @@ class HackerOneConnector(PlatformConnector):
         attrs = item.get("attributes", {})
         handle = attrs.get("handle", target_id)
 
-        structured_scopes = item.get("relationships", {}).get(
-            "structured_scopes", {}
-        ).get("data", [])
-        asset_types = sorted({
-            s.get("attributes", {}).get("asset_type", "unknown")
-            for s in structured_scopes
-        })
+        structured_scopes = (
+            item.get("relationships", {}).get("structured_scopes", {}).get("data", [])
+        )
+        asset_types = sorted(
+            {s.get("attributes", {}).get("asset_type", "unknown") for s in structured_scopes}
+        )
         scope_lines = [
-            s.get("attributes", {}).get("asset_identifier", "")
-            for s in structured_scopes
+            s.get("attributes", {}).get("asset_identifier", "") for s in structured_scopes
         ]
 
         return Target(

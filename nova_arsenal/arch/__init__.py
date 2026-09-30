@@ -6,6 +6,7 @@ Ported from DeepSeek V4 Pro architectural innovations:
 - Multimodal projection for dense fusion
 - Reference transformer block builder
 """
+
 from nova_arsenal.arch.mhc import (
     AnticipatoryRouter,
     ManifoldConstrainedHyperConnection,

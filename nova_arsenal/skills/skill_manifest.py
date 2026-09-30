@@ -42,8 +42,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 SKILL_TYPES = {"platform_connector", "tool", "reporting", "analysis"}
 
@@ -67,7 +66,7 @@ class SkillManifest:
     nova_min_version: str = "0.0.0"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SkillManifest":
+    def from_dict(cls, data: dict[str, Any]) -> SkillManifest:
         required = ["name", "version", "author", "description", "type", "entry", "entry_class"]
         missing = [k for k in required if k not in data]
         if missing:
@@ -159,7 +158,7 @@ class SkillRegistry:
     def load(
         self,
         skill_name: str,
-        credentials: Optional[dict[str, str]] = None,
+        credentials: dict[str, str] | None = None,
     ) -> LoadedSkill:
         """Load a single skill by name, instantiating its entry class."""
         if skill_name not in self._manifests:
@@ -197,7 +196,9 @@ class SkillRegistry:
         self._loaded[skill_name] = loaded
         return loaded
 
-    def load_all(self, credentials: Optional[dict[str, dict[str, str]]] = None) -> dict[str, LoadedSkill]:
+    def load_all(
+        self, credentials: dict[str, dict[str, str]] | None = None
+    ) -> dict[str, LoadedSkill]:
         """Load every discovered skill. credentials is keyed by skill name."""
         credentials = credentials or {}
         for name in self._manifests:
@@ -207,7 +208,7 @@ class SkillRegistry:
                 print(f"  [!] Failed to load skill '{name}': {e}")
         return self._loaded
 
-    def get(self, skill_name: str) -> Optional[LoadedSkill]:
+    def get(self, skill_name: str) -> LoadedSkill | None:
         return self._loaded.get(skill_name)
 
     def ready_skills(self) -> list[LoadedSkill]:

@@ -39,9 +39,7 @@ async def ensure_bootstrap_admin() -> bool:
 
     factory = get_session_factory()
     async with factory() as db:
-        email_result = await db.execute(
-            select(User).where(User.email == email)
-        )
+        email_result = await db.execute(select(User).where(User.email == email))
         email_user = email_result.scalar_one_or_none()
         if email_user:
             if email_user.role != UserRole.ADMIN:
@@ -51,13 +49,9 @@ async def ensure_bootstrap_admin() -> bool:
                 )
             return False
 
-        username_result = await db.execute(
-            select(User).where(User.username == username)
-        )
+        username_result = await db.execute(select(User).where(User.username == username))
         if username_result.scalar_one_or_none():
-            raise RuntimeError(
-                "NOVA_ADMIN_USERNAME is already used by another account"
-            )
+            raise RuntimeError("NOVA_ADMIN_USERNAME is already used by another account")
 
         user = User(
             email=email,

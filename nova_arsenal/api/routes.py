@@ -24,21 +24,22 @@ from nova_arsenal.db.crud import (
     persist_findings_batch,
 )
 from nova_arsenal.db.models import Agent, AgentStatus, Finding, Scope, User
+from nova_arsenal.skills.api_routes import router as skills_router
+from nova_arsenal.skills.memory_api_routes import router as memory_router
 
 router = APIRouter(prefix="/api")
 
 # Skills marketplace — platform connectors (HackerOne, HackTheBox, ...)
 # and Nova's target-recommendation reasoning endpoint.
-from nova_arsenal.skills.api_routes import router as skills_router  # noqa: E402
 router.include_router(skills_router)
 
 # Persistent per-user memory (recap, target history, preferences) and
 # the self-authoring skill review workflow (approve/reject).
-from nova_arsenal.skills.memory_api_routes import router as memory_router  # noqa: E402
 router.include_router(memory_router)
 
 
 # ââ Request/Response Models ââââââââââââââââââââââââââââââââââââââââââââââââ
+
 
 class RunAgentRequest(BaseModel):
     target: str
@@ -60,6 +61,7 @@ _active_runners: dict = {}  # agent_id -> AgentRunner instance (lazy import)
 async def _event_bridge(agent_id: int, event_type: str, data: dict):
     """Bridge agent events to WebSocket."""
     from nova_arsenal.api.websocket.events import emit_agent_event
+
     await emit_agent_event(agent_id, event_type, data)
 
 
@@ -140,8 +142,7 @@ async def llm_reload_config(
         "primary": {
             "provider": cfg.llm.primary.provider,
             "model": cfg.llm.primary.model,
-            "has_key": bool(cfg.llm.primary.api_key)
-            or cfg.llm.primary.provider == "ollama",
+            "has_key": bool(cfg.llm.primary.api_key) or cfg.llm.primary.provider == "ollama",
         },
         "active_providers": router_inst.list_providers(),
         "env_keys_detected": router_inst.byok_status().get("env_keys_detected"),
@@ -227,8 +228,7 @@ async def llm_account_login(
         raise HTTPException(
             status_code=400,
             detail=(
-                "token required, or oauth=true for openai/gemini, "
-                "or provider=ollama for local LLM"
+                "token required, or oauth=true for openai/gemini, or provider=ollama for local LLM"
             ),
         )
     cred = store.login_with_token(
@@ -252,7 +252,11 @@ async def llm_account_import(
     store = get_account_store()
     results = store.import_from_tools()
     reset_llm_router()
-    return {"status": "ok", "results": results, "accounts": [a.to_public_dict() for a in store.list_accounts()]}
+    return {
+        "status": "ok",
+        "results": results,
+        "accounts": [a.to_public_dict() for a in store.list_accounts()],
+    }
 
 
 @router.delete("/llm/accounts/{provider}")
@@ -281,9 +285,7 @@ async def list_agents(
     if current_user.role.value == "admin":
         result = await db.execute(select(Agent))
     else:
-        result = await db.execute(
-            select(Agent).where(Agent.owner_id == current_user.id)
-        )
+        result = await db.execute(select(Agent).where(Agent.owner_id == current_user.id))
 
     agents = result.scalars().all()
     return {
@@ -307,9 +309,7 @@ async def get_agent(
     db: AsyncSession = Depends(get_db),
 ):
     """Get agent details."""
-    result = await db.execute(
-        select(Agent).where(Agent.id == agent_id)
-    )
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
 
     if not agent:
@@ -373,9 +373,7 @@ async def delete_agent(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete an agent (admin only)."""
-    result = await db.execute(
-        select(Agent).where(Agent.id == agent_id)
-    )
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
 
     if not agent:
@@ -391,8 +389,8 @@ async def delete_agent(
 # Findings routes
 @router.get("/findings")
 async def list_findings(
-    agent_id: int = None,
-    severity: str = None,
+    agent_id: int | None = None,
+    severity: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -416,7 +414,7 @@ async def list_findings(
             {
                 "id": finding.id,
                 "title": finding.title,
-                "severity": finding.severity.value,
+                "severity": finding.severity.value if finding.severity else None,
                 "endpoint": finding.endpoint,
                 "verified": finding.verified,
                 "created_at": finding.created_at.isoformat(),
@@ -450,7 +448,7 @@ async def get_finding(
     return {
         "id": finding.id,
         "title": finding.title,
-        "severity": finding.severity.value,
+        "severity": finding.severity.value if finding.severity else None,
         "description": finding.description,
         "evidence": finding.evidence,
         "endpoint": finding.endpoint,
@@ -523,7 +521,7 @@ async def list_scope(
 @router.post("/scope", status_code=status.HTTP_201_CREATED)
 async def add_scope(
     target: str,
-    description: str = None,
+    description: str | None = None,
     current_user: User = Depends(require_analyst),
     db: AsyncSession = Depends(get_db),
 ):
@@ -569,6 +567,7 @@ async def remove_scope(
 
 
 # ââ Autonomous Agent Runner Endpoints ââââââââââââââââââââââââââââââââââââââ
+
 
 @router.post("/agents/{agent_id}/run", status_code=status.HTTP_202_ACCEPTED)
 async def run_agent(
@@ -616,7 +615,9 @@ async def run_agent(
     async def _run_background():
         try:
             result = await runner.run()
-            agent.status = AgentStatus.COMPLETED if result["status"] == "completed" else AgentStatus.FAILED
+            agent.status = (
+                AgentStatus.COMPLETED if result["status"] == "completed" else AgentStatus.FAILED
+            )
             agent.completed_at = datetime.now(timezone.utc)
             agent.current_step = result.get("steps_taken", 0)
             await db.commit()
@@ -628,7 +629,8 @@ async def run_agent(
 
             # Complete the run record
             await complete_agent_run(
-                db, run_record.id,
+                db,
+                run_record.id,
                 status=result["status"],
                 steps_taken=result.get("steps_taken", 0),
                 total_findings=len(findings_data),
@@ -640,7 +642,8 @@ async def run_agent(
             agent.status = AgentStatus.FAILED
             await db.commit()
             await complete_agent_run(
-                db, run_record.id,
+                db,
+                run_record.id,
                 status="failed",
                 steps_taken=0,
                 summary=str(e),
@@ -774,7 +777,7 @@ async def agent_findings(
             {
                 "id": f.id,
                 "title": f.title,
-                "severity": f.severity.value,
+                "severity": f.severity.value if f.severity else None,
                 "description": f.description,
                 "evidence": f.evidence,
                 "endpoint": f.endpoint,
@@ -885,10 +888,12 @@ async def generate_code(
 
 # ââ MCP Server Routes ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
+
 @router.get("/mcp/tools")
 async def mcp_tools():
     """List MCP tools available from Nova."""
     from nova_arsenal.mcp import NovaMcpServer
+
     server = NovaMcpServer()
     server.register_all_tools()
     return {"tools": server.get_tool_list()}
@@ -898,6 +903,7 @@ async def mcp_tools():
 async def mcp_resources():
     """List MCP resources available from Nova."""
     from nova_arsenal.mcp import NovaMcpServer
+
     server = NovaMcpServer()
     server.register_all_resources()
     return {"resources": server.get_resource_list()}
@@ -910,6 +916,7 @@ async def mcp_call_tool(
 ):
     """Call an MCP tool."""
     from nova_arsenal.mcp import NovaMcpServer
+
     server = NovaMcpServer()
     server.register_all_tools()
     result = await server.handle_tool_call(tool_name, arguments)
@@ -918,12 +925,14 @@ async def mcp_call_tool(
 
 # ââ E2E Encryption Routes ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
+
 @router.post("/crypto/keypair")
 async def generate_keypair(
     key_size: str = "rsa_4096",
 ):
     """Generate a new RSA keypair."""
     from nova_arsenal.crypto import KeyManager, KeySize
+
     km = KeyManager()
     size = KeySize.RSA_4096 if "4096" in key_size else KeySize.RSA_2048
     kp = km.generate_rsa_keypair(key_size=size)
@@ -943,6 +952,7 @@ async def encrypt_message(
 ):
     """Encrypt a message using E2E encryption (RSA+AES-GCM)."""
     from nova_arsenal.crypto import Cipher, KeyManager
+
     km = KeyManager()
     cipher = Cipher(km)
     envelope = cipher.encrypt(plaintext, recipient_public_key, sender_id, recipient_id)
@@ -961,6 +971,7 @@ async def decrypt_message(
 ):
     """Decrypt a message using E2E encryption."""
     from nova_arsenal.crypto import Cipher, KeyManager, SecureEnvelope
+
     km = KeyManager()
     cipher = Cipher(km)
     envelope = SecureEnvelope(
@@ -977,6 +988,7 @@ async def decrypt_message(
 
 # ââ CTF Solver Routes ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
+
 @router.post("/ctf/solve")
 async def ctf_solve(
     challenge_name: str,
@@ -986,6 +998,7 @@ async def ctf_solve(
 ):
     """Solve a CTF challenge automatically."""
     from nova_arsenal.ctf_solver import ChallengeType, CtfSolver
+
     solver = CtfSolver()
     try:
         ctype = ChallengeType(challenge_type)
@@ -1012,5 +1025,6 @@ async def ctf_solve(
 async def ctf_stats():
     """Get CTF solver stats."""
     from nova_arsenal.ctf_solver import CtfSolver
+
     solver = CtfSolver()
     return solver.get_stats()

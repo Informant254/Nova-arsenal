@@ -10,10 +10,9 @@ Supports:
 import asyncio
 import logging
 import os
-import subprocess
 import tempfile
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecResult:
     """Result of a command execution."""
+
     command: str
     stdout: str
     stderr: str
@@ -42,7 +42,7 @@ class ExecResult:
             parts.append(f"[STDERR]\n{self.stderr}")
         return "\n".join(parts)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "command": self.command,
             "stdout": self.stdout,
@@ -56,7 +56,7 @@ class ExecResult:
 class SandboxExecutor:
     """
     Executes commands inside the Kali Linux sandbox.
-    
+
     Modes:
     - docker: Uses docker exec to run in nova-sandbox container
     - ssh: Uses SSH to connect to the sandbox
@@ -88,8 +88,8 @@ class SandboxExecutor:
         self,
         command: str,
         working_dir: str = "/tmp",
-        timeout: Optional[int] = None,
-        env: Optional[Dict[str, str]] = None,
+        timeout: int | None = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute a command in the sandbox."""
         timeout = timeout or self.timeout
@@ -129,9 +129,9 @@ class SandboxExecutor:
 
         # Truncate large output
         if len(result.stdout) > self.max_output:
-            result.stdout = result.stdout[:self.max_output] + "\n... [TRUNCATED]"
+            result.stdout = result.stdout[: self.max_output] + "\n... [TRUNCATED]"
         if len(result.stderr) > self.max_output:
-            result.stderr = result.stderr[:self.max_output] + "\n... [TRUNCATED]"
+            result.stderr = result.stderr[: self.max_output] + "\n... [TRUNCATED]"
 
         self._history.append(result)
         return result
@@ -141,7 +141,7 @@ class SandboxExecutor:
         script: str,
         filename: str = "script.sh",
         working_dir: str = "/tmp",
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> ExecResult:
         """Write a script to the sandbox and execute it."""
         # Write script to temp file and copy it in
@@ -151,14 +151,12 @@ class SandboxExecutor:
             cmd = f"bash -c '{escaped}'"
             return await self.execute(cmd, working_dir, timeout)
         elif self.mode == "local":
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=f"_{filename}", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=f"_{filename}", delete=False) as f:
                 f.write(script)
                 f.flush()
                 try:
-                    result = await self.execute_local(
-                        f"bash {f.name}", working_dir, timeout
+                    result = await self._execute_local(
+                        f"bash {f.name}", working_dir, timeout or self.timeout
                     )
                 finally:
                     os.unlink(f.name)
@@ -175,7 +173,9 @@ class SandboxExecutor:
         try:
             if self.mode == "docker":
                 proc = await asyncio.create_subprocess_exec(
-                    "docker", "cp", local_path,
+                    "docker",
+                    "cp",
+                    local_path,
                     f"{self.container_name}:{remote_path}",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -184,6 +184,7 @@ class SandboxExecutor:
                 return proc.returncode == 0
             elif self.mode == "local":
                 import shutil
+
                 shutil.copy2(local_path, remote_path)
                 return True
             return False
@@ -200,8 +201,10 @@ class SandboxExecutor:
         try:
             if self.mode == "docker":
                 proc = await asyncio.create_subprocess_exec(
-                    "docker", "cp",
-                    f"{self.container_name}:{remote_path}", local_path,
+                    "docker",
+                    "cp",
+                    f"{self.container_name}:{remote_path}",
+                    local_path,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -209,6 +212,7 @@ class SandboxExecutor:
                 return proc.returncode == 0
             elif self.mode == "local":
                 import shutil
+
                 shutil.copy2(remote_path, local_path)
                 return True
             return False
@@ -249,7 +253,7 @@ class SandboxExecutor:
         command: str,
         working_dir: str,
         timeout: int,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute via docker exec."""
         cmd_args = ["docker", "exec", "-w", working_dir]
@@ -266,9 +270,7 @@ class SandboxExecutor:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return ExecResult(
             command=command,
@@ -283,14 +285,17 @@ class SandboxExecutor:
         command: str,
         working_dir: str,
         timeout: int,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute via SSH."""
         ssh_args = [
             "ssh",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null",
-            "-p", str(self.ssh_port),
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-p",
+            str(self.ssh_port),
         ]
 
         if self.ssh_key:
@@ -305,9 +310,7 @@ class SandboxExecutor:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return ExecResult(
             command=command,
@@ -322,7 +325,7 @@ class SandboxExecutor:
         command: str,
         working_dir: str,
         timeout: int,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute locally via subprocess."""
         full_env = dict(os.environ)
@@ -337,9 +340,7 @@ class SandboxExecutor:
             env=full_env,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return ExecResult(
             command=command,
@@ -351,8 +352,8 @@ class SandboxExecutor:
 
 
 def create_executor(
-    mode: Optional[str] = None,
-    container_name: Optional[str] = None,
+    mode: str | None = None,
+    container_name: str | None = None,
 ) -> SandboxExecutor:
     """Factory to create a SandboxExecutor from environment."""
     mode = mode or os.getenv("NOVA_SANDBOX_MODE", "docker")

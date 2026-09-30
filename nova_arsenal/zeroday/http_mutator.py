@@ -10,11 +10,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import random
 import sys
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 
@@ -25,7 +24,7 @@ class MutationResult:
     detail: str = ""
     elapsed_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "mutation": self.mutation,
             "status": self.status,
@@ -35,8 +34,11 @@ class MutationResult:
 
 
 # Research-oriented mutation *descriptions* and request shapes (not weaponized payloads).
-_MUTATIONS: List[Dict[str, Any]] = [
-    {"name": "duplicate_content_length", "headers": {"Content-Length": "0", "Content-Length ": "5"}},
+_MUTATIONS: list[dict[str, Any]] = [
+    {
+        "name": "duplicate_content_length",
+        "headers": {"Content-Length": "0", "Content-Length ": "5"},
+    },
     {"name": "tab_in_header_name", "headers": {"X-Test\tName": "1"}},
     {"name": "obs_fold_hint", "headers": {"X-Fold": "start\r\n folded"}},
     {"name": "absolute_form_path", "path_suffix": ""},
@@ -55,7 +57,7 @@ class HttpMutator:
     def __init__(self, max_requests: int = 100) -> None:
         self.max_requests = max_requests
 
-    def plan(self, url: str) -> List[Dict[str, Any]]:
+    def plan(self, url: str) -> list[dict[str, Any]]:
         parsed = urlparse(url)
         base_path = parsed.path or "/"
         plans = []
@@ -79,7 +81,7 @@ class HttpMutator:
         url: str,
         execute: bool = False,
         timeout: float = 3.0,
-    ) -> List[MutationResult]:
+    ) -> list[MutationResult]:
         plans = self.plan(url)
         if not execute:
             return [
@@ -98,14 +100,20 @@ class HttpMutator:
                 )
             ]
 
-        results: List[MutationResult] = []
-        async with httpx.AsyncClient(timeout=timeout, verify=False, follow_redirects=False) as client:
+        results: list[MutationResult] = []
+        async with httpx.AsyncClient(
+            timeout=timeout, verify=False, follow_redirects=False
+        ) as client:
             for p in plans:
                 t0 = time.perf_counter()
                 try:
                     # Only send relatively safe GET-like probes; skip grotesque methods on execute
                     method = p["method"] if len(p["method"]) <= 16 else "GET"
-                    headers = {k: v for k, v in p.get("headers", {}).items() if "\r" not in k and "\n" not in k}
+                    headers = {
+                        k: v
+                        for k, v in p.get("headers", {}).items()
+                        if "\r" not in k and "\n" not in k
+                    }
                     r = await client.request(method, url, headers=headers)
                     results.append(
                         MutationResult(
@@ -127,7 +135,7 @@ class HttpMutator:
         return results
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Nova HTTP mutator (authorized testing only)")
     parser.add_argument("--url", required=True, help="Target URL")
     parser.add_argument("--out", default="./fuzz_out", help="Output directory (reserved)")

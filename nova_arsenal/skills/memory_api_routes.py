@@ -37,7 +37,6 @@ from nova_arsenal.db.models import User
 from .session_memory import SessionMemory
 from .skill_author import SkillAuthor, SkillAuthoringError
 
-
 router = APIRouter(tags=["memory", "skill-authoring"])
 
 _author = SkillAuthor()

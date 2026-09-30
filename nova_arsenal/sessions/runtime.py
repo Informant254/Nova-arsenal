@@ -9,8 +9,9 @@ import json
 import logging
 import os
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any
 
 from .models import (
     DEFAULT_PARALLEL_ROLES,
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 STORE_DIR = Path(os.getenv("NOVA_HOME", Path.home() / ".nova")) / "work_sessions"
 
-ROLE_OBJECTIVES: Dict[SubAgentRole, str] = {
+ROLE_OBJECTIVES: dict[SubAgentRole, str] = {
     SubAgentRole.RECON: "Map ports, services, and attack surface for the target",
     SubAgentRole.WEB: "Analyze web surface for common vulns and misconfigurations",
     SubAgentRole.EXPLOIT: "Prioritize high-impact exploitation paths from recon (authorized only)",
@@ -44,8 +45,8 @@ class SessionManager:
     def __init__(self, store_dir: Path = STORE_DIR) -> None:
         self.store_dir = store_dir
         self.store_dir.mkdir(parents=True, exist_ok=True)
-        self._sessions: Dict[str, TaskSession] = {}
-        self._tasks: Dict[str, asyncio.Task] = {}
+        self._sessions: dict[str, TaskSession] = {}
+        self._tasks: dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
         self._load_index()
 
@@ -66,8 +67,10 @@ class SessionManager:
         except OSError:
             pass
 
-    def _from_dict(self, data: Dict[str, Any]) -> TaskSession:
-        roles = [SubAgentRole(r) for r in data.get("roles") or [r.value for r in DEFAULT_PARALLEL_ROLES]]
+    def _from_dict(self, data: dict[str, Any]) -> TaskSession:
+        roles = [
+            SubAgentRole(r) for r in data.get("roles") or [r.value for r in DEFAULT_PARALLEL_ROLES]
+        ]
         sess = TaskSession(
             session_id=data.get("session_id") or _id("sess_"),
             goal=data.get("goal") or "",
@@ -105,13 +108,13 @@ class SessionManager:
         self,
         goal: str,
         target: str = "",
-        roles: Optional[Sequence[str]] = None,
+        roles: Sequence[str] | None = None,
         max_concurrent: int = 6,
         authorized: bool = False,
         authorization_ref: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> TaskSession:
-        role_list: List[SubAgentRole] = []
+        role_list: list[SubAgentRole] = []
         if roles:
             for r in roles:
                 try:
@@ -144,10 +147,10 @@ class SessionManager:
         self._persist(sess)
         return sess
 
-    def get(self, session_id: str) -> Optional[TaskSession]:
+    def get(self, session_id: str) -> TaskSession | None:
         return self._sessions.get(session_id)
 
-    def list_sessions(self) -> List[TaskSession]:
+    def list_sessions(self) -> list[TaskSession]:
         return sorted(
             self._sessions.values(),
             key=lambda s: s.created_at,
@@ -223,7 +226,7 @@ class SessionManager:
             )
             for item, outcome in zip(agent_items, outcomes):
                 aid, _ = item
-                if isinstance(outcome, Exception):
+                if isinstance(outcome, BaseException):
                     r = sess.agents[aid]
                     r.status = SubAgentStatus.FAILED
                     r.error = str(outcome)
@@ -310,8 +313,8 @@ class SessionManager:
     # ── Role implementations (fast concurrent workers) ────────────────────
 
     async def _role_recon(self, sess: TaskSession, result: SubAgentResult) -> None:
-        from nova_arsenal.zeroday.surface import AttackSurfaceMapper
         from nova_arsenal.intelligence.tool_selector import ToolSelector
+        from nova_arsenal.zeroday.surface import AttackSurfaceMapper
 
         result.reasoning.append("Mapping attack surface")
         services = sess.metadata.get("services") or {
@@ -335,7 +338,7 @@ class SessionManager:
                 }
             )
         # Normalize services → Dict[str, List[int]] for ToolSelector
-        svc_ports: Dict[str, List[int]] = {}
+        svc_ports: dict[str, list[int]] = {}
         for k, v in list(services.items())[:8]:
             if isinstance(v, list):
                 ports = [int(x) for x in v if str(x).isdigit() or isinstance(x, int)]
@@ -497,7 +500,7 @@ class SessionManager:
     async def _role_validator(self, sess: TaskSession, result: SubAgentResult) -> None:
         # Wait briefly so peer findings exist (other agents run in parallel — snapshot peers)
         await asyncio.sleep(0.05)
-        peer_findings: List[Dict[str, Any]] = []
+        peer_findings: list[dict[str, Any]] = []
         for a in sess.agents.values():
             if a.agent_id == result.agent_id:
                 continue
@@ -524,7 +527,7 @@ class SessionManager:
 
     async def _role_reporter(self, sess: TaskSession, result: SubAgentResult) -> None:
         await asyncio.sleep(0.1)  # let others progress
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         total = 0
         for a in sess.agents.values():
             if a.agent_id == result.agent_id:
@@ -551,7 +554,7 @@ class SessionManager:
         result.evidence = json.dumps(counts)
 
     def _aggregate(self, sess: TaskSession) -> None:
-        all_f: List[Dict[str, Any]] = []
+        all_f: list[dict[str, Any]] = []
         for a in sess.agents.values():
             for f in a.findings:
                 item = dict(f)
@@ -561,7 +564,7 @@ class SessionManager:
         sess.aggregated_findings = all_f
 
         # Consensus: validated or multi-role or high severity
-        by_title: Dict[str, Dict[str, Any]] = {}
+        by_title: dict[str, dict[str, Any]] = {}
         for f in all_f:
             key = (f.get("title") or f.get("type") or "finding").lower().strip()
             if key not in by_title:
@@ -605,7 +608,7 @@ class SessionManager:
         )
 
 
-_manager: Optional[SessionManager] = None
+_manager: SessionManager | None = None
 
 
 def get_session_manager() -> SessionManager:
