@@ -16,7 +16,7 @@ Sub-packages:
 - zeroday: High-speed zero-day *candidate* discovery pipeline
 """
 
-__version__ = "1.3.0"
+__version__ = "2.0.0"
 __author__ = "Informant254"
 
 from nova_arsenal.compliance import ComplianceMapper, ComplianceResult

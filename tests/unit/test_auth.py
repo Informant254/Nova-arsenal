@@ -266,7 +266,7 @@ class TestJWTRegression:
 
         from nova_arsenal.auth.routes import create_access_token
 
-        jwt_secret = "test-secret-long-enough-for-hs256-signing-key"
+        jwt_secret = "test-only-hs256-secret-" + ("x" * 64)
         with patch("nova_arsenal.auth.routes.get_config") as mock_cfg:
             mock_cfg.return_value.auth.jwt_secret = jwt_secret
             mock_cfg.return_value.auth.access_token_expire_minutes = 15
